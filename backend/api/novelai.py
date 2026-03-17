@@ -55,7 +55,10 @@ async def generate_image(
         "qualityToggle": True,
         "dynamic_thresholding": False,
         "cfg_rescale": 0,
-        "noise_schedule": "native",
+        "noise_schedule": "karras",
+        "uncond_scale": 0.0,
+        "prefer_brownian": True,
+        "uncond_per_vibe": True,
     }
 
     # V4+ models require v4_prompt and v4_negative_prompt caption structures
@@ -67,12 +70,16 @@ async def generate_image(
             },
             "use_coords": False,
             "use_order": True,
+            "legacy_uc": False,
         }
         params["v4_negative_prompt"] = {
             "caption": {
                 "base_caption": negative_prompt,
                 "char_captions": [],
             },
+            "use_coords": False,
+            "use_order": False,
+            "legacy_uc": False,
         }
         params["characterPrompts"] = []
 

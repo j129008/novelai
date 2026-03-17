@@ -94,6 +94,22 @@ body { font-family: -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-ser
 .pill-label { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 3px 10px; border-radius: 10px; border: 1px solid var(--border-muted); color: var(--text-tertiary); background: transparent; transition: all 0.15s; }
 .pill-toggle input:checked + .pill-label { background: var(--accent-dim); border-color: rgba(124,92,252,0.4); color: var(--accent-bright); }
 
+/* Tag autocomplete */
+.tag-dropdown { position: absolute; left: 0; right: 0; z-index: 50; background: var(--bg-float); border: 1px solid var(--border-muted); border-radius: 0 0 var(--radius-md) var(--radius-md); max-height: 220px; overflow-y: auto; display: none; box-shadow: 0 8px 24px rgba(0,0,0,0.4); scrollbar-width: thin; scrollbar-color: var(--border-muted) transparent; }
+.tag-dropdown.visible { display: block; }
+.tag-item { display: flex; align-items: center; gap: 8px; padding: 7px 13px; cursor: pointer; transition: background 0.1s; font-size: 0.84rem; }
+.tag-item:hover, .tag-item.selected { background: var(--bg-overlay); }
+.tag-item-name { color: var(--text-primary); flex: 1; }
+.tag-item-name mark { background: none; color: var(--accent-bright); font-weight: 600; }
+.tag-item-cat { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 1px 6px; border-radius: 3px; flex-shrink: 0; }
+.tag-item-cat[data-cat="general"] { color: #6cb6ff; background: rgba(108,182,255,0.1); }
+.tag-item-cat[data-cat="artist"] { color: #f7768e; background: rgba(247,118,142,0.1); }
+.tag-item-cat[data-cat="series"] { color: #bb9af7; background: rgba(187,154,247,0.1); }
+.tag-item-cat[data-cat="character"] { color: #73daca; background: rgba(115,218,202,0.1); }
+.tag-item-cat[data-cat="meta"] { color: #a9b1d6; background: rgba(169,177,214,0.1); }
+.tag-item-count { font-size: 0.7rem; color: var(--text-tertiary); font-variant-numeric: tabular-nums; flex-shrink: 0; min-width: 32px; text-align: right; }
+.prompt-box { position: relative; }
+
 /* Textarea */
 .field-textarea { background: transparent; border: none; border-radius: 0; padding: 11px 13px; color: var(--text-primary); font-size: 0.88rem; font-family: inherit; line-height: 1.6; resize: vertical; width: 100%; }
 .field-textarea--prompt { min-height: 120px; }

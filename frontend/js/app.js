@@ -55,6 +55,7 @@ async function init() {
 
   setupPromptTabs();
   setupHdEnhancement();
+  setupTagAutocomplete();
 
   $("#generate-btn").addEventListener("click", generate);
   $("#btn-reuse-seed").addEventListener("click", reuseSeed);
@@ -130,6 +131,161 @@ function setupHdEnhancement() {
     smea.checked = toggle.checked;
     smeaDyn.checked = toggle.checked;
   });
+}
+
+/* ── TAG AUTOCOMPLETE ────────────────────────────────────── */
+
+function setupTagAutocomplete() {
+  const prompt = $("#prompt");
+  const negative = $("#negative-prompt");
+  const dropdown = $("#tag-dropdown");
+  if (!prompt || !dropdown) return;
+
+  let selectedIdx = -1;
+  let debounceTimer = null;
+  let activeTextarea = prompt;
+
+  // Track which textarea is active
+  prompt.addEventListener("focus", () => { activeTextarea = prompt; });
+  negative.addEventListener("focus", () => { activeTextarea = negative; });
+
+  function getWordAtCursor(textarea) {
+    const val = textarea.value;
+    const cursor = textarea.selectionStart;
+    // Find start of current tag (after last comma or start)
+    let start = val.lastIndexOf(",", cursor - 1) + 1;
+    while (start < cursor && val[start] === " ") start++;
+    const word = val.slice(start, cursor).trim();
+    return { word, start, end: cursor };
+  }
+
+  async function fetchTags(query) {
+    if (query.length < 2) { hideDropdown(); return; }
+    try {
+      const resp = await fetch(`/api/tags?q=${encodeURIComponent(query)}`);
+      if (!resp.ok) return;
+      const tags = await resp.json();
+      showDropdown(tags, query);
+    } catch { /* ignore */ }
+  }
+
+  function showDropdown(tags, query) {
+    if (!tags.length) { hideDropdown(); return; }
+    selectedIdx = -1;
+    const q = query.toLowerCase();
+    dropdown.innerHTML = "";
+    tags.forEach((tag, i) => {
+      const item = document.createElement("div");
+      item.className = "tag-item";
+      item.dataset.index = i;
+
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "tag-item-name";
+      const name = tag.name.replace(/_/g, " ");
+      const idx = name.toLowerCase().indexOf(q.replace(/_/g, " "));
+      if (idx >= 0) {
+        nameSpan.innerHTML = escapeHtml(name.slice(0, idx))
+          + "<mark>" + escapeHtml(name.slice(idx, idx + q.length)) + "</mark>"
+          + escapeHtml(name.slice(idx + q.length));
+      } else {
+        nameSpan.textContent = name;
+      }
+
+      const catSpan = document.createElement("span");
+      catSpan.className = "tag-item-cat";
+      catSpan.dataset.cat = tag.category;
+      catSpan.textContent = tag.category;
+
+      const countSpan = document.createElement("span");
+      countSpan.className = "tag-item-count";
+      countSpan.textContent = formatCount(tag.count);
+
+      item.appendChild(nameSpan);
+      item.appendChild(catSpan);
+      item.appendChild(countSpan);
+
+      item.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        insertTag(tag.name);
+      });
+
+      dropdown.appendChild(item);
+    });
+    dropdown.classList.add("visible");
+  }
+
+  function hideDropdown() {
+    dropdown.classList.remove("visible");
+    selectedIdx = -1;
+  }
+
+  function insertTag(tagName) {
+    const textarea = activeTextarea;
+    const { start, end } = getWordAtCursor(textarea);
+    const val = textarea.value;
+    const before = val.slice(0, start);
+    const after = val.slice(end);
+    const tag = tagName.replace(/_/g, " ");
+    const needsComma = before.length > 0 && !before.trimEnd().endsWith(",");
+    const insert = (needsComma ? ", " : "") + tag + ", ";
+    textarea.value = before + insert + after;
+    const newPos = before.length + insert.length;
+    textarea.selectionStart = textarea.selectionEnd = newPos;
+    textarea.focus();
+    hideDropdown();
+  }
+
+  function formatCount(n) {
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
+    if (n >= 1000) return (n / 1000).toFixed(0) + "k";
+    return String(n);
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function handleInput(e) {
+    clearTimeout(debounceTimer);
+    const { word } = getWordAtCursor(e.target);
+    debounceTimer = setTimeout(() => fetchTags(word), 150);
+  }
+
+  function handleKeydown(e) {
+    if (!dropdown.classList.contains("visible")) return;
+    const items = dropdown.querySelectorAll(".tag-item");
+    if (!items.length) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      selectedIdx = Math.min(selectedIdx + 1, items.length - 1);
+      updateSelection(items);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      selectedIdx = Math.max(selectedIdx - 1, 0);
+      updateSelection(items);
+    } else if (e.key === "Tab" || e.key === "Enter") {
+      if (selectedIdx >= 0) {
+        e.preventDefault();
+        const name = items[selectedIdx].querySelector(".tag-item-name").textContent;
+        insertTag(name.replace(/ /g, "_"));
+      }
+    } else if (e.key === "Escape") {
+      hideDropdown();
+    }
+  }
+
+  function updateSelection(items) {
+    items.forEach((el, i) => el.classList.toggle("selected", i === selectedIdx));
+    if (selectedIdx >= 0) items[selectedIdx].scrollIntoView({ block: "nearest" });
+  }
+
+  prompt.addEventListener("input", handleInput);
+  negative.addEventListener("input", handleInput);
+  prompt.addEventListener("keydown", handleKeydown);
+  negative.addEventListener("keydown", handleKeydown);
+  prompt.addEventListener("blur", () => setTimeout(hideDropdown, 150));
+  negative.addEventListener("blur", () => setTimeout(hideDropdown, 150));
 }
 
 function populateSelect(selector, options) {
