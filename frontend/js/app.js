@@ -20,10 +20,33 @@ const UC_PRESETS = {
 };
 
 const state = {
-  img2img: null,
+  img2img: null,          // base64 PNG at exact output resolution, set after crop confirmed
+  img2imgThumbDataUrl: null, // small data URL just for the thumbnail preview
   vibe: null,
   lastSeed: null,
   lastImageBase64: null,
+};
+
+// ── CROP STATE ──────────────────────────────────────────────
+// Lives here so openCropOverlay and the interaction handlers share it cleanly.
+const crop = {
+  img: null,          // the source HTMLImageElement
+  targetW: 832,       // output resolution width
+  targetH: 1216,      // output resolution height
+  // Pan / zoom state in "image-space" coordinates.
+  // We track the offset of the image's top-left corner
+  // relative to the crop frame's top-left corner, in image pixels.
+  offsetX: 0,
+  offsetY: 0,
+  scale: 1,           // image pixels per crop-frame pixel (zoom)
+  // Canvas & frame geometry (screen pixels), set on each render
+  frameX: 0,
+  frameY: 0,
+  frameW: 0,
+  frameH: 0,
+  dragging: false,
+  lastPointerX: 0,
+  lastPointerY: 0,
 };
 
 async function init() {
@@ -50,8 +73,11 @@ async function init() {
   bindSlider("ref-strength", "ref-strength-val", 2);
   bindSlider("ref-info", "ref-info-val", 2);
 
-  setupFileUpload("img2img-upload", "img2img-preview", "img2img-placeholder", "img2img-clear", "img2img");
+  // Vibe/style-reference upload (sidebar, unchanged)
   setupFileUpload("vibe-upload", "vibe-preview", "vibe-placeholder", "vibe-clear", "vibe");
+
+  // NEW: img2img via canvas drop zone
+  setupImg2ImgDrop();
 
   setupPromptTabs();
   setupHdEnhancement();
@@ -72,8 +98,439 @@ async function init() {
       e.preventDefault();
       generate();
     }
+    // Escape closes the crop overlay
+    if (e.key === "Escape") {
+      const co = $("#crop-overlay");
+      if (co && co.style.display !== "none") closeCropOverlay();
+    }
   });
 }
+
+/* ═══════════════════════════════════════════════════════════
+   IMG2IMG — DROP ZONE SETUP
+   ═══════════════════════════════════════════════════════════ */
+
+function setupImg2ImgDrop() {
+  const dropTarget = $("#canvas-drop-target");
+  const fileInput  = $("#img2img-file-input");
+  const clearBadge = $("#img2img-badge-clear");
+  const changeBtn  = $("#img2img-change");
+
+  if (!dropTarget) return;
+
+  // ── Drag events on the canvas drop target ──────────────
+  let dragCounter = 0; // track nested enter/leave
+
+  dropTarget.addEventListener("dragenter", (e) => {
+    e.preventDefault();
+    dragCounter++;
+    if (dragCounter === 1) dropTarget.classList.add("drag-over");
+  });
+
+  dropTarget.addEventListener("dragleave", () => {
+    dragCounter--;
+    if (dragCounter <= 0) {
+      dragCounter = 0;
+      dropTarget.classList.remove("drag-over");
+    }
+  });
+
+  dropTarget.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  });
+
+  dropTarget.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dragCounter = 0;
+    dropTarget.classList.remove("drag-over");
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith("image/")) {
+      loadImageFile(file);
+    }
+  });
+
+  // ── Hidden file input (triggered by change button) ────
+  if (fileInput) {
+    fileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) loadImageFile(file);
+      fileInput.value = ""; // reset so same file can be picked again
+    });
+  }
+
+  // ── Badge clear (exit img2img mode) ───────────────────
+  if (clearBadge) {
+    clearBadge.addEventListener("click", clearImg2Img);
+  }
+
+  // ── Thumbnail "change" button ──────────────────────────
+  if (changeBtn) {
+    changeBtn.addEventListener("click", () => {
+      if (fileInput) fileInput.click();
+    });
+  }
+}
+
+function loadImageFile(file) {
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = () => {
+      openCropOverlay(img);
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearImg2Img() {
+  state.img2img = null;
+  state.img2imgThumbDataUrl = null;
+
+  const badge    = $("#img2img-badge");
+  const controls = $("#img2img-controls");
+  const thumb    = $("#img2img-source-thumb");
+
+  if (badge)    badge.style.display = "none";
+  if (controls) controls.style.display = "none";
+  if (thumb)    thumb.src = "";
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CROP OVERLAY
+   ═══════════════════════════════════════════════════════════ */
+
+function openCropOverlay(imgEl) {
+  const overlay = $("#crop-overlay");
+  if (!overlay) return;
+
+  // Read target resolution from the resolution select
+  const resVal = $("#resolution").value || "832x1216";
+  const [tw, th] = resVal.split("x").map(Number);
+  crop.targetW = tw || 832;
+  crop.targetH = th || 1216;
+
+  crop.img = imgEl;
+
+  // Update resolution label in footer
+  const resLabel = $("#crop-resolution-label");
+  if (resLabel) resLabel.textContent = `${crop.targetW} \u00d7 ${crop.targetH}`;
+
+  overlay.style.display = "flex";
+
+  // Wait one frame for the overlay to be visible and sized, then init canvas
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      initCropCanvas();
+      setupCropInteraction();
+    });
+  });
+}
+
+function closeCropOverlay() {
+  const overlay = $("#crop-overlay");
+  if (overlay) overlay.style.display = "none";
+  // Tear down interaction listeners (they are re-added on next open)
+  teardownCropInteraction();
+}
+
+// ── Canvas render ──────────────────────────────────────────
+
+function initCropCanvas() {
+  const canvasEl = $("#crop-canvas");
+  const frameEl  = $("#crop-frame-overlay");
+  if (!canvasEl || !frameEl || !crop.img) return;
+
+  const stageWrap = canvasEl.parentElement;
+  const stageRect = stageWrap.getBoundingClientRect();
+
+  // Set canvas to physical pixel size of the stage
+  const dpr = window.devicePixelRatio || 1;
+  canvasEl.width  = stageRect.width  * dpr;
+  canvasEl.height = stageRect.height * dpr;
+  canvasEl.style.width  = stageRect.width  + "px";
+  canvasEl.style.height = stageRect.height + "px";
+
+  // Compute the crop frame dimensions, centered in stage,
+  // preserving the target aspect ratio, with some padding.
+  const padding  = 48; // px each side
+  const stageW   = stageRect.width;
+  const stageH   = stageRect.height;
+  const targetAR = crop.targetW / crop.targetH;
+  const stageAR  = (stageW - padding * 2) / (stageH - padding * 2);
+
+  let frameW, frameH;
+  if (targetAR > stageAR) {
+    frameW = stageW - padding * 2;
+    frameH = frameW / targetAR;
+  } else {
+    frameH = stageH - padding * 2;
+    frameW = frameH * targetAR;
+  }
+
+  crop.frameW = frameW;
+  crop.frameH = frameH;
+  crop.frameX = (stageW - frameW) / 2;
+  crop.frameY = (stageH - frameH) / 2;
+
+  // Position the CSS frame overlay element
+  frameEl.style.left   = crop.frameX + "px";
+  frameEl.style.top    = crop.frameY + "px";
+  frameEl.style.width  = frameW + "px";
+  frameEl.style.height = frameH + "px";
+
+  // Default view: "fill" — scale image so it fully covers the crop frame
+  applyCropFill();
+}
+
+function applyCropFit() {
+  // Scale image so it fits entirely within the crop frame
+  const scaleX = crop.frameW / crop.img.naturalWidth;
+  const scaleY = crop.frameH / crop.img.naturalHeight;
+  crop.scale = Math.min(scaleX, scaleY);
+  // Center
+  crop.offsetX = (crop.img.naturalWidth  * crop.scale - crop.frameW) / 2;
+  crop.offsetY = (crop.img.naturalHeight * crop.scale - crop.frameH) / 2;
+  renderCropCanvas();
+}
+
+function applyCropFill() {
+  // Scale image so it fully covers the crop frame (default)
+  const scaleX = crop.frameW / crop.img.naturalWidth;
+  const scaleY = crop.frameH / crop.img.naturalHeight;
+  crop.scale = Math.max(scaleX, scaleY);
+  // Center
+  crop.offsetX = (crop.img.naturalWidth  * crop.scale - crop.frameW) / 2;
+  crop.offsetY = (crop.img.naturalHeight * crop.scale - crop.frameH) / 2;
+  renderCropCanvas();
+}
+
+function renderCropCanvas() {
+  const canvasEl = $("#crop-canvas");
+  if (!canvasEl || !crop.img) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const ctx  = canvasEl.getContext("2d");
+  const W    = canvasEl.width;
+  const H    = canvasEl.height;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.save();
+  ctx.scale(dpr, dpr);
+
+  // Draw the image.
+  // The image's top-left corner in screen coords:
+  //   imageX = frameX - offsetX
+  //   imageY = frameY - offsetY
+  // The image's screen dimensions:
+  //   imgScreenW = naturalWidth  * scale
+  //   imgScreenH = naturalHeight * scale
+  const imgScreenW = crop.img.naturalWidth  * crop.scale;
+  const imgScreenH = crop.img.naturalHeight * crop.scale;
+  const imgX = crop.frameX - crop.offsetX;
+  const imgY = crop.frameY - crop.offsetY;
+
+  ctx.drawImage(crop.img, imgX, imgY, imgScreenW, imgScreenH);
+
+  ctx.restore();
+}
+
+// ── Interaction ────────────────────────────────────────────
+
+let _cropWheelHandler    = null;
+let _cropPointerDownHandler = null;
+let _cropPointerMoveHandler = null;
+let _cropPointerUpHandler   = null;
+
+function setupCropInteraction() {
+  teardownCropInteraction(); // always clean before re-adding
+
+  const canvasEl = $("#crop-canvas");
+  const fitBtn   = $("#crop-fit");
+  const fillBtn  = $("#crop-fill");
+  const confirmBtn = $("#crop-confirm");
+  const cancelBtn  = $("#crop-cancel");
+  if (!canvasEl) return;
+
+  // Scroll / pinch to zoom
+  _cropWheelHandler = (e) => {
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 1.08 : 0.925;
+    zoomCropAtPoint(delta, e.clientX, e.clientY);
+  };
+  canvasEl.addEventListener("wheel", _cropWheelHandler, { passive: false });
+
+  // Pointer drag to pan
+  _cropPointerDownHandler = (e) => {
+    e.preventDefault();
+    crop.dragging = true;
+    crop.lastPointerX = e.clientX;
+    crop.lastPointerY = e.clientY;
+    canvasEl.setPointerCapture(e.pointerId);
+  };
+
+  _cropPointerMoveHandler = (e) => {
+    if (!crop.dragging) return;
+    const dx = e.clientX - crop.lastPointerX;
+    const dy = e.clientY - crop.lastPointerY;
+    crop.lastPointerX = e.clientX;
+    crop.lastPointerY = e.clientY;
+    // Moving the pointer right means we want to reveal more of the left side
+    // of the image — i.e. decrease offsetX.
+    crop.offsetX -= dx;
+    crop.offsetY -= dy;
+    clampCropOffset();
+    renderCropCanvas();
+  };
+
+  _cropPointerUpHandler = () => {
+    crop.dragging = false;
+  };
+
+  canvasEl.addEventListener("pointerdown",  _cropPointerDownHandler);
+  canvasEl.addEventListener("pointermove",  _cropPointerMoveHandler);
+  canvasEl.addEventListener("pointerup",    _cropPointerUpHandler);
+  canvasEl.addEventListener("pointercancel", _cropPointerUpHandler);
+
+  // Fit / Fill buttons
+  if (fitBtn)  fitBtn.addEventListener("click",  applyCropFit);
+  if (fillBtn) fillBtn.addEventListener("click", applyCropFill);
+
+  // Confirm
+  if (confirmBtn) confirmBtn.addEventListener("click", confirmCrop);
+
+  // Cancel
+  if (cancelBtn)  cancelBtn.addEventListener("click", closeCropOverlay);
+}
+
+function teardownCropInteraction() {
+  const canvasEl = $("#crop-canvas");
+  if (!canvasEl) return;
+  if (_cropWheelHandler)       canvasEl.removeEventListener("wheel",        _cropWheelHandler);
+  if (_cropPointerDownHandler) canvasEl.removeEventListener("pointerdown",  _cropPointerDownHandler);
+  if (_cropPointerMoveHandler) canvasEl.removeEventListener("pointermove",  _cropPointerMoveHandler);
+  if (_cropPointerUpHandler) {
+    canvasEl.removeEventListener("pointerup",    _cropPointerUpHandler);
+    canvasEl.removeEventListener("pointercancel", _cropPointerUpHandler);
+  }
+}
+
+function zoomCropAtPoint(factor, clientX, clientY) {
+  // Get the canvas position in screen coords
+  const canvasEl  = $("#crop-canvas");
+  const rect      = canvasEl.getBoundingClientRect();
+  // Point in stage coords
+  const stageX    = clientX - rect.left;
+  const stageY    = clientY - rect.top;
+  // Point in image coords (before zoom)
+  const imageX    = (stageX - crop.frameX + crop.offsetX) / crop.scale;
+  const imageY    = (stageY - crop.frameY + crop.offsetY) / crop.scale;
+
+  const newScale  = Math.max(
+    Math.max(crop.frameW / crop.img.naturalWidth, crop.frameH / crop.img.naturalHeight) * 0.5,
+    Math.min(crop.scale * factor, 20)
+  );
+
+  // Adjust offset so the point under the pointer stays fixed
+  crop.offsetX = imageX * newScale - (stageX - crop.frameX);
+  crop.offsetY = imageY * newScale - (stageY - crop.frameY);
+  crop.scale   = newScale;
+
+  clampCropOffset();
+  renderCropCanvas();
+}
+
+function clampCropOffset() {
+  // Prevent the image from leaving the crop frame with empty space.
+  // offsetX/Y represent how many image-screen-pixels are hidden on the left/top.
+  const imgScreenW = crop.img.naturalWidth  * crop.scale;
+  const imgScreenH = crop.img.naturalHeight * crop.scale;
+
+  // If the image is smaller than the frame in a dimension, center it — allow
+  // it to float (no clamping). If it's larger, clamp so no gap appears.
+  if (imgScreenW >= crop.frameW) {
+    crop.offsetX = Math.max(0, Math.min(crop.offsetX, imgScreenW - crop.frameW));
+  } else {
+    crop.offsetX = (imgScreenW - crop.frameW) / 2; // center (negative offset)
+  }
+
+  if (imgScreenH >= crop.frameH) {
+    crop.offsetY = Math.max(0, Math.min(crop.offsetY, imgScreenH - crop.frameH));
+  } else {
+    crop.offsetY = (imgScreenH - crop.frameH) / 2;
+  }
+}
+
+// ── Confirm: export at exact target resolution ────────────
+
+function confirmCrop() {
+  if (!crop.img) return;
+
+  // Create an offscreen canvas at exact output resolution
+  const exportCanvas = document.createElement("canvas");
+  exportCanvas.width  = crop.targetW;
+  exportCanvas.height = crop.targetH;
+  const ctx = exportCanvas.getContext("2d");
+
+  // The crop region in image-native pixels:
+  //   srcX = offsetX / scale
+  //   srcY = offsetY / scale
+  //   srcW = frameW  / scale
+  //   srcH = frameH  / scale
+  const srcX = crop.offsetX / crop.scale;
+  const srcY = crop.offsetY / crop.scale;
+  const srcW = crop.frameW  / crop.scale;
+  const srcH = crop.frameH  / crop.scale;
+
+  ctx.drawImage(
+    crop.img,
+    srcX, srcY, srcW, srcH,
+    0, 0, crop.targetW, crop.targetH
+  );
+
+  // Export as PNG base64
+  const dataUrl = exportCanvas.toDataURL("image/png");
+  state.img2img = dataUrl.split(",")[1]; // strip "data:image/png;base64,"
+
+  // Generate a small thumbnail for the controls bar
+  const thumbCanvas = document.createElement("canvas");
+  const thumbSize = 128;
+  thumbCanvas.width  = thumbSize;
+  thumbCanvas.height = thumbSize;
+  const thumbCtx = thumbCanvas.getContext("2d");
+  thumbCtx.drawImage(exportCanvas, 0, 0, crop.targetW, crop.targetH, 0, 0, thumbSize, thumbSize);
+  state.img2imgThumbDataUrl = thumbCanvas.toDataURL("image/jpeg", 0.8);
+
+  closeCropOverlay();
+  activateImg2ImgMode();
+}
+
+function activateImg2ImgMode() {
+  const badge    = $("#img2img-badge");
+  const controls = $("#img2img-controls");
+  const thumb    = $("#img2img-source-thumb");
+
+  if (badge) {
+    badge.style.display = "inline-flex";
+    // Re-trigger animation by removing and re-adding it
+    badge.style.animation = "none";
+    badge.offsetHeight; // force reflow
+    badge.style.animation = "";
+  }
+
+  if (controls) {
+    controls.style.display = "block";
+  }
+
+  if (thumb && state.img2imgThumbDataUrl) {
+    thumb.src = state.img2imgThumbDataUrl;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SETTINGS
+   ═══════════════════════════════════════════════════════════ */
 
 function setupSettings() {
   const overlay = $("#settings-overlay");
@@ -129,6 +586,10 @@ function setupSettings() {
   });
 }
 
+/* ═══════════════════════════════════════════════════════════
+   GUIDE
+   ═══════════════════════════════════════════════════════════ */
+
 function setupGuide() {
   const overlay = $("#guide-overlay");
   const openBtn = $("#guide-btn");
@@ -145,9 +606,14 @@ function setupGuide() {
       if (overlay.style.display !== "none") overlay.style.display = "none";
       const settingsOverlay = $("#settings-overlay");
       if (settingsOverlay && settingsOverlay.style.display !== "none") settingsOverlay.style.display = "none";
+      // crop-overlay Escape is handled in init() to avoid double-handling
     }
   });
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PROMPT TABS
+   ═══════════════════════════════════════════════════════════ */
 
 function setupPromptTabs() {
   const tabs = document.querySelectorAll(".prompt-tab");
@@ -181,6 +647,10 @@ function setupPromptTabs() {
   }
 }
 
+/* ═══════════════════════════════════════════════════════════
+   HD ENHANCEMENT
+   ═══════════════════════════════════════════════════════════ */
+
 function setupHdEnhancement() {
   const toggle = $("#hd-enhancement");
   const smea = $("#smea");
@@ -193,19 +663,19 @@ function setupHdEnhancement() {
   });
 }
 
-/* ── AUTO-SAVE PROMPT ─────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   AUTO-SAVE PROMPT
+   ═══════════════════════════════════════════════════════════ */
 
 function setupAutoSavePrompt() {
   const prompt = $("#prompt");
   const negative = $("#negative-prompt");
 
-  // Restore saved values
   const savedPrompt = localStorage.getItem("nai-prompt");
   const savedNegative = localStorage.getItem("nai-negative");
   if (savedPrompt !== null) prompt.value = savedPrompt;
   if (savedNegative !== null) negative.value = savedNegative;
 
-  // Save on input
   prompt.addEventListener("input", () => {
     localStorage.setItem("nai-prompt", prompt.value);
   });
@@ -214,7 +684,9 @@ function setupAutoSavePrompt() {
   });
 }
 
-/* ── TAG AUTOCOMPLETE ────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   TAG AUTOCOMPLETE
+   ═══════════════════════════════════════════════════════════ */
 
 function setupTagAutocomplete() {
   const prompt = $("#prompt");
@@ -226,14 +698,12 @@ function setupTagAutocomplete() {
   let debounceTimer = null;
   let activeTextarea = prompt;
 
-  // Track which textarea is active
   prompt.addEventListener("focus", () => { activeTextarea = prompt; });
   negative.addEventListener("focus", () => { activeTextarea = negative; });
 
   function getWordAtCursor(textarea) {
     const val = textarea.value;
     const cursor = textarea.selectionStart;
-    // Find start of current tag (after last comma or start)
     let start = val.lastIndexOf(",", cursor - 1) + 1;
     while (start < cursor && val[start] === " ") start++;
     const word = val.slice(start, cursor).trim();
@@ -369,6 +839,10 @@ function setupTagAutocomplete() {
   negative.addEventListener("blur", () => setTimeout(hideDropdown, 150));
 }
 
+/* ═══════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════ */
+
 function populateSelect(selector, options) {
   const el = $(selector);
   if (!el) return;
@@ -424,6 +898,10 @@ function setupFileUpload(inputId, previewId, placeholderId, clearId, stateKey) {
     if (placeholder) placeholder.style.display = "flex";
   });
 }
+
+/* ═══════════════════════════════════════════════════════════
+   GENERATE
+   ═══════════════════════════════════════════════════════════ */
 
 async function generate() {
   const btn = $("#generate-btn");
@@ -523,7 +1001,9 @@ function downloadImage() {
   document.body.removeChild(a);
 }
 
-/* ── GALLERY ──────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   GALLERY
+   ═══════════════════════════════════════════════════════════ */
 
 let _galleryData = [];
 let _settingsLoadedToast = null;
@@ -701,7 +1181,6 @@ function renderGallery(files, filter) {
 function loadSettingsFromMeta(meta) {
   if (!meta || !meta.prompt) return;
 
-  // Remove quality tags (prepended or appended) if present
   const qualitySuffix = ", location, very aesthetic, masterpiece, no text";
   const qualityPrefix = "location, very aesthetic, masterpiece, no text, ";
   let prompt = meta.prompt;
@@ -750,6 +1229,10 @@ function loadSettingsFromMeta(meta) {
     smeaDyn.checked = !!meta.sm_dyn;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   ERROR
+   ═══════════════════════════════════════════════════════════ */
 
 function showError(msg) {
   clearError();

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=17">
+  <link rel="stylesheet" href="css/style.css?v=18">
 </head>
 <body>
   <div class="app">
@@ -34,7 +34,6 @@
           <button id="settings-close" class="guide-close" type="button">&times;</button>
         </div>
         <div class="guide-body">
-
           <section class="guide-section">
             <h3>Output Folder</h3>
             <p class="guide-note">Generated images are automatically saved here.</p>
@@ -43,14 +42,12 @@
               <button id="settings-browse" class="btn-action" type="button">Browse</button>
             </div>
           </section>
-
           <section class="guide-section">
             <button id="settings-open-folder" class="btn-action btn-action--primary" type="button">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
               Open in Finder
             </button>
           </section>
-
         </div>
       </div>
     </div>
@@ -85,7 +82,6 @@
             <h3>多角色</h3>
             <p>用 <code>|</code> 分隔 base prompt 和各角色：</p>
             <code class="guide-example">base prompt | 角色1描述 | 角色2描述</code>
-
             <p style="margin-top:8px"><strong>Base prompt 放什麼：</strong></p>
             <ul class="guide-tips">
               <li>人數：<code>2girls</code>、<code>1boy, 1girl</code></li>
@@ -93,7 +89,6 @@
               <li>風格/氛圍：<code>watercolor</code>、<code>dramatic lighting</code>、<code>year 2024</code></li>
               <li>構圖：<code>from above</code>、<code>wide shot</code>、<code>close-up</code></li>
             </ul>
-
             <p style="margin-top:8px"><strong>角色 prompt 放什麼：</strong></p>
             <ul class="guide-tips">
               <li>只寫 <code>girl</code>/<code>boy</code>（不加數字）</li>
@@ -101,10 +96,8 @@
               <li>表情/動作：<code>smile, waving</code></li>
               <li>角色名：<code>methode (sousou no frieren)</code></li>
             </ul>
-
             <p style="margin-top:8px"><strong>完整範例：</strong></p>
             <code class="guide-example">2girls, cherry blossoms, spring, sunny, watercolor | girl, blonde hair, white dress, smile, waving | girl, black hair, blue uniform, holding book, calm</code>
-
             <p class="guide-note" style="margin-top:8px">互動標籤：<code>source#hug</code>（發起）、<code>target#hug</code>（接受）、<code>mutual#holding hands</code>（雙向）</p>
             <p class="guide-note">排列順序 = 畫面位置：第一個角色在左，第二個在右，依此類推</p>
           </section>
@@ -164,6 +157,54 @@
         </div>
       </div>
     </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         CROP OVERLAY — full-screen modal for image cropping
+         ═══════════════════════════════════════════════════════ -->
+    <div id="crop-overlay" class="crop-overlay" style="display:none" aria-modal="true" role="dialog" aria-label="Crop image">
+      <div class="crop-shell">
+
+        <div class="crop-header">
+          <div class="crop-header-left">
+            <div class="crop-mode-badge">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+              Image to Image
+            </div>
+            <span class="crop-hint">Drag to pan &nbsp;·&nbsp; Scroll to zoom</span>
+          </div>
+          <button id="crop-cancel" class="crop-cancel-btn" type="button">Cancel</button>
+        </div>
+
+        <div class="crop-stage-wrap">
+          <!-- The canvas element is the actual crop viewport -->
+          <canvas id="crop-canvas" class="crop-canvas"></canvas>
+          <!-- Frame overlay — the visible crop border drawn on top -->
+          <div class="crop-frame-overlay" id="crop-frame-overlay" aria-hidden="true"></div>
+        </div>
+
+        <div class="crop-footer">
+          <div class="crop-resolution-label" id="crop-resolution-label">832 × 1216</div>
+          <div class="crop-footer-actions">
+            <button id="crop-fit" class="btn-action" type="button">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+              Fit
+            </button>
+            <button id="crop-fill" class="btn-action" type="button">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 3 3 3 3 9"/><polyline points="15 21 21 21 21 15"/><line x1="3" y1="3" x2="10" y2="10"/><line x1="21" y1="21" x2="14" y2="14"/></svg>
+              Fill
+            </button>
+            <button id="crop-confirm" class="btn-action btn-action--confirm" type="button">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Confirm Crop
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Hidden file input for img2img — triggered programmatically -->
+    <input type="file" id="img2img-file-input" accept="image/*" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" aria-hidden="true" tabindex="-1">
 
     <main class="workspace">
 
@@ -246,34 +287,7 @@
           </div>
         </details>
 
-        <details class="accordion">
-          <summary class="accordion-header">
-            <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
-            Start from an Image
-          </summary>
-          <div class="accordion-body">
-            <div class="upload-zone" id="img2img-zone">
-              <input type="file" id="img2img-upload" accept="image/*" class="upload-input" aria-label="Upload reference image">
-              <div id="img2img-preview" class="upload-preview"></div>
-              <div class="upload-placeholder" id="img2img-placeholder">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                <span>Drop image or click to upload</span>
-              </div>
-            </div>
-            <button id="img2img-clear" class="btn-clear" style="display:none">Remove image</button>
-            <div class="control-group control-group--tight">
-              <div class="slider-header"><label class="field-label" for="strength">Transformation Amount</label><span class="slider-value" id="strength-val">0.70</span></div>
-              <input type="range" id="strength" class="field-range" min="0" max="1" step="0.05" value="0.7">
-              <div class="slider-endpoints"><span>Subtle</span><span>Dramatic</span></div>
-            </div>
-            <div class="control-group control-group--tight">
-              <div class="slider-header"><label class="field-label" for="noise">Added Variation</label><span class="slider-value" id="noise-val">0.00</span></div>
-              <input type="range" id="noise" class="field-range" min="0" max="1" step="0.05" value="0.0">
-              <div class="slider-endpoints"><span>None</span><span>Maximum</span></div>
-            </div>
-          </div>
-        </details>
-
+        <!-- Style Reference accordion stays in sidebar -->
         <details class="accordion">
           <summary class="accordion-header">
             <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
@@ -309,28 +323,87 @@
 
       </aside>
 
+      <!-- ═══════════════════════════════════════════
+           CANVAS — right panel, the creative space
+           ═══════════════════════════════════════════ -->
       <section class="canvas" aria-label="Image output">
+
         <div class="canvas-tabbar">
           <div class="canvas-tabs">
             <button class="canvas-tab canvas-tab--active" id="tab-canvas" type="button">Canvas</button>
             <button class="canvas-tab" id="tab-history" type="button">History <span id="gallery-count" class="gallery-count-badge"></span></button>
+          </div>
+          <!-- img2img active indicator — shown only when img2img is armed -->
+          <div id="img2img-badge" class="img2img-badge" style="display:none" aria-live="polite">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            img2img active
+            <button id="img2img-badge-clear" class="img2img-badge-clear" type="button" title="Remove source image" aria-label="Exit img2img mode">&times;</button>
           </div>
           <div id="history-search-wrap" class="history-search-wrap" style="display:none">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" id="gallery-search" class="history-search" placeholder="Search prompts, seeds…" spellcheck="false">
           </div>
         </div>
+
         <div id="panel-canvas" class="canvas-panel">
-          <div id="output" class="output-area">
-            <div class="placeholder">
-              <div class="placeholder-icon">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+
+          <!-- Drop target wraps the output area — drag anything here to start img2img -->
+          <div id="canvas-drop-target" class="canvas-drop-target">
+            <div id="output" class="output-area">
+              <div class="placeholder">
+                <div class="placeholder-icon">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                </div>
+                <p class="placeholder-title">Your creation awaits</p>
+                <p class="placeholder-sub">Press Generate or Cmd / Ctrl + Enter</p>
+                <div class="placeholder-drop-hint" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  or drop an image here to start from it
+                </div>
               </div>
-              <p class="placeholder-title">Your creation awaits</p>
-              <p class="placeholder-sub">Press Generate or Cmd / Ctrl + Enter</p>
+            </div>
+
+            <!-- Drag-over overlay — appears on dragenter -->
+            <div id="drop-hover-overlay" class="drop-hover-overlay" aria-hidden="true">
+              <div class="drop-hover-inner">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                <p>Drop to start from this image</p>
+              </div>
             </div>
           </div>
+
           <div id="error-slot" class="error-slot"></div>
+
+          <!-- img2img source preview + sliders — visible only when img2img is armed -->
+          <div id="img2img-controls" class="img2img-controls" style="display:none">
+            <div class="img2img-controls-inner">
+              <div class="img2img-source-preview">
+                <img id="img2img-source-thumb" src="" alt="Source image" class="img2img-thumb">
+                <button id="img2img-change" class="img2img-change-btn" type="button" title="Change source image">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+              </div>
+              <div class="img2img-sliders">
+                <div class="control-group control-group--tight">
+                  <div class="slider-header">
+                    <label class="field-label" for="strength">Transformation</label>
+                    <span class="slider-value" id="strength-val">0.70</span>
+                  </div>
+                  <input type="range" id="strength" class="field-range" min="0" max="1" step="0.05" value="0.7">
+                  <div class="slider-endpoints"><span>Subtle</span><span>Dramatic</span></div>
+                </div>
+                <div class="control-group control-group--tight">
+                  <div class="slider-header">
+                    <label class="field-label" for="noise">Variation</label>
+                    <span class="slider-value" id="noise-val">0.00</span>
+                  </div>
+                  <input type="range" id="noise" class="field-range" min="0" max="1" step="0.05" value="0.0">
+                  <div class="slider-endpoints"><span>None</span><span>Maximum</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div id="image-actions" class="image-actions" style="display:none">
             <span id="info-seed" class="seed-badge"></span>
             <div class="action-group">
@@ -344,15 +417,18 @@
               </button>
             </div>
           </div>
+
         </div>
+
         <div id="panel-history" class="canvas-panel" style="display:none">
           <div id="gallery-list" class="history-grid"></div>
           <p id="gallery-empty" class="gallery-empty" style="display:none">No saved images yet</p>
         </div>
+
       </section>
 
     </main>
   </div>
-  <script src="js/app.js?v=17"></script>
+  <script src="js/app.js?v=18"></script>
 </body>
 </html>
