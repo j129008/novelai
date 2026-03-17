@@ -93,7 +93,7 @@ async def generate_image(
         params["image"] = image
         params["mask"] = mask
         params["strength"] = strength
-        params["add_original_image"] = False
+        params["add_original_image"] = True
     elif action == "img2img" and image:
         params["image"] = image
         params["strength"] = strength

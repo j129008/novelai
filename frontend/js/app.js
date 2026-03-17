@@ -1416,7 +1416,7 @@ async function confirmInpaint() {
   blurredMaskCanvas.width = mw;
   blurredMaskCanvas.height = mh;
   const blurCtx = blurredMaskCanvas.getContext("2d");
-  blurCtx.filter = "blur(20px)";
+  blurCtx.filter = "blur(24px)";
   blurCtx.drawImage(inpaint.maskCanvas, 0, 0);
   blurCtx.filter = "none";
 
@@ -1482,15 +1482,11 @@ async function confirmInpaint() {
 
     const data = await resp.json();
     state.lastSeed = data.seed;
-
-    // Composite: blend API result with original using feathered mask
-    // This eliminates any edge artifacts from the API
-    const composited = await compositeInpaint(inpaint.sourceBase64, data.image, blurredMaskCanvas);
-    state.lastImageBase64 = composited;
+    state.lastImageBase64 = data.image;
 
     const output = $("#output");
     const img = document.createElement("img");
-    img.src = `data:image/png;base64,${composited}`;
+    img.src = `data:image/png;base64,${data.image}`;
     img.alt = "Inpainted image";
     output.innerHTML = "";
     output.appendChild(img);
