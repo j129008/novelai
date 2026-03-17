@@ -1304,7 +1304,17 @@ function setupInpaintInteraction() {
     if (!inpaint.maskCanvas) return;
     const ctx = inpaint.maskCanvas.getContext("2d");
     ctx.fillStyle = "white";
-    ctx.fillRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
+    const x = Math.min(x1, x2), y = Math.min(y1, y2);
+    const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+    const r = Math.min(12, w / 4, h / 4); // rounded corners
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+    ctx.fill();
   }
 
   // Pointer events
@@ -1411,14 +1421,25 @@ async function confirmInpaint() {
   const mw = inpaint.maskCanvas.width;
   const mh = inpaint.maskCanvas.height;
 
-  // Send clean black+white mask — let NovelAI's inpainting model handle edge blending
+  // Light feather (8px) to soften hard edges from rectangle/lasso tools
+  // This mimics how NovelAI's own soft brush naturally feathers
+  const feathered = document.createElement("canvas");
+  feathered.width = mw;
+  feathered.height = mh;
+  const fCtx = feathered.getContext("2d");
+  fCtx.filter = "blur(8px)";
+  fCtx.drawImage(inpaint.maskCanvas, 0, 0);
+  fCtx.filter = "none";
+  // Overdraw sharp center so only edges are softened
+  fCtx.drawImage(inpaint.maskCanvas, 0, 0);
+
   const exportMask = document.createElement("canvas");
   exportMask.width = mw;
   exportMask.height = mh;
   const emCtx = exportMask.getContext("2d");
   emCtx.fillStyle = "black";
   emCtx.fillRect(0, 0, mw, mh);
-  emCtx.drawImage(inpaint.maskCanvas, 0, 0);
+  emCtx.drawImage(feathered, 0, 0);
 
   const maskBase64 = exportMask.toDataURL("image/png").split(",")[1];
 
