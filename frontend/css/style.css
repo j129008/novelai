@@ -515,6 +515,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   gap: 0;
   width: 100%;
   max-width: 860px;
+  height: calc(100vh - 48px);
   max-height: calc(100vh - 48px);
   background: var(--bg-raised);
   border: 1px solid var(--border-muted);
@@ -593,8 +594,8 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 /* Crop stage — the interactive viewport */
 .crop-stage-wrap {
   position: relative;
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 0%;
+  min-height: 200px;
   overflow: hidden;
   background: var(--bg-deep);
   /* Checkerboard pattern to show transparency */
