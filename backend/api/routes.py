@@ -195,8 +195,8 @@ async def list_gallery():
 @router.get("/gallery/{filename}")
 async def get_gallery_image(filename: str):
     out = _get_output_dir()
-    filepath = out / filename
-    if not filepath.exists() or not filepath.is_relative_to(out):
+    filepath = (out / filename).resolve()
+    if not filepath.exists() or not filepath.is_relative_to(out.resolve()):
         raise HTTPException(status_code=404, detail="Image not found")
     return FileResponse(filepath, media_type="image/png")
 
@@ -204,8 +204,8 @@ async def get_gallery_image(filename: str):
 @router.delete("/gallery/{filename}")
 async def delete_gallery_image(filename: str):
     out = _get_output_dir()
-    filepath = out / filename
-    if not filepath.exists() or not filepath.is_relative_to(out):
+    filepath = (out / filename).resolve()
+    if not filepath.exists() or not filepath.is_relative_to(out.resolve()):
         raise HTTPException(status_code=404, detail="Image not found")
     filepath.unlink()
     return {"deleted": filename}

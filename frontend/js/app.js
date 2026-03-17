@@ -1411,16 +1411,35 @@ async function confirmInpaint() {
   const mw = inpaint.maskCanvas.width;
   const mh = inpaint.maskCanvas.height;
 
-  // Step 1: blur the mask to feather edges
+  // Step 1: blur the mask to feather edges (multi-pass box blur, works on all browsers)
   const blurredMaskCanvas = document.createElement("canvas");
   blurredMaskCanvas.width = mw;
   blurredMaskCanvas.height = mh;
   const blurCtx = blurredMaskCanvas.getContext("2d");
-  blurCtx.filter = "blur(24px)";
-  blurCtx.drawImage(inpaint.maskCanvas, 0, 0);
-  blurCtx.filter = "none";
 
-  // Step 2: composite sharp mask on top of blurred (ensures center is fully white)
+  // Try native filter first, fall back to manual blur
+  const supportsFilter = typeof blurCtx.filter !== "undefined" && blurCtx.filter !== undefined;
+  if (supportsFilter) {
+    blurCtx.filter = "blur(24px)";
+    blurCtx.drawImage(inpaint.maskCanvas, 0, 0);
+    blurCtx.filter = "none";
+  } else {
+    // Manual multi-pass blur: draw at offsets with low opacity (3 passes)
+    blurCtx.globalAlpha = 0.1;
+    const r = 24;
+    for (let pass = 0; pass < 3; pass++) {
+      for (let ox = -r; ox <= r; ox += 4) {
+        for (let oy = -r; oy <= r; oy += 4) {
+          if (ox * ox + oy * oy <= r * r) {
+            blurCtx.drawImage(inpaint.maskCanvas, ox, oy);
+          }
+        }
+      }
+    }
+    blurCtx.globalAlpha = 1;
+  }
+
+  // Step 2: composite sharp mask on top (ensures painted center is fully white)
   blurCtx.drawImage(inpaint.maskCanvas, 0, 0);
 
   // Step 3: render onto black background for API
