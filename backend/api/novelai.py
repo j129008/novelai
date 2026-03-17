@@ -48,19 +48,15 @@ def _restore_outside_mask(orig_b64: str, result_bytes: bytes, mask_b64: str) -> 
     # Hard composite: outside=original, inside=API result
     hard = np.where(mask_arr[:, :, np.newaxis] > 128, result_arr, orig_arr)
 
-    # Tiny feather at boundary only: 3px Gaussian blend at the mask edge
-    # to smooth the content transition. Does NOT change interior or exterior.
-    mask_float = mask_arr.astype(np.float32) / 255.0
+    # Blend outside mask edge only — inside = 100% API result
     blurred_mask = np.array(
         Image.fromarray(mask_arr).filter(ImageFilter.GaussianBlur(15))
     ).astype(np.float32) / 255.0
-    # Only blend where blurred differs from hard mask (the boundary band)
-    blend = orig_arr.astype(np.float32) * (1 - blurred_mask[:, :, np.newaxis]) + \
-            result_arr.astype(np.float32) * blurred_mask[:, :, np.newaxis]
-    # Use hard composite everywhere EXCEPT the thin boundary band
-    is_boundary = (blurred_mask > 0.01) & (blurred_mask < 0.99)
-    final = hard.copy()
-    final[is_boundary] = np.clip(blend[is_boundary], 0, 255).astype(np.uint8)
+    sharp_bool = mask_arr > 128
+    blend_mask = np.where(sharp_bool, 1.0, blurred_mask)
+    final = (orig_arr.astype(np.float32) * (1 - blend_mask[:, :, np.newaxis]) +
+             result_arr.astype(np.float32) * blend_mask[:, :, np.newaxis])
+    final = np.clip(final, 0, 255).astype(np.uint8)
 
     out = Image.fromarray(final.astype(np.uint8), mode="RGB")
     buf = io.BytesIO()
@@ -154,10 +150,8 @@ async def generate_image(
     _inpaint_orig_b64 = None
     _inpaint_mask_b64 = None
     if action == "infill" and image and mask:
-        # Send blurred mask to API so it generates edge-aware content
-        api_mask = _feather_mask(mask, blur_radius=15)
         params["image"] = image
-        params["mask"] = api_mask
+        params["mask"] = mask  # send exact user mask, no modification
         params["strength"] = strength
         params["add_original_image"] = True
         params["inpaintImg2ImgStrength"] = 1
