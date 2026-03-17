@@ -1032,10 +1032,14 @@ function downloadImage() {
 
 const inpaint = {
   sourceImg: null,
+  sourceBase64: null,
   maskCanvas: null,
   painting: false,
   lastX: 0,
   lastY: 0,
+  tool: "brush",  // brush, lasso, rect, eraser
+  lassoPoints: [],
+  rectStart: null,
 };
 
 function openInpaintMode(sourceBase64) {
@@ -1137,12 +1141,44 @@ function renderInpaintCanvas() {
     ctx.globalAlpha = 1;
   }
 
-  // 3. Draw brush cursor
-  if (inpaint.cursorX !== undefined && inpaint.cursorY !== undefined) {
+  // 3. Draw lasso preview while dragging
+  if (inpaint.tool === "lasso" && inpaint.lassoPoints.length > 1 && inpaint.painting) {
+    const { scale, drawX, drawY } = getInpaintLayout();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(inpaint.lassoPoints[0].x * scale + drawX, inpaint.lassoPoints[0].y * scale + drawY);
+    for (let i = 1; i < inpaint.lassoPoints.length; i++) {
+      ctx.lineTo(inpaint.lassoPoints[i].x * scale + drawX, inpaint.lassoPoints[i].y * scale + drawY);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // 4. Draw rect preview while dragging
+  if (inpaint.tool === "rect" && inpaint.rectStart && inpaint.rectEnd && inpaint.painting) {
+    const { scale, drawX, drawY } = getInpaintLayout();
+    const rx = Math.min(inpaint.rectStart.x, inpaint.rectEnd.x) * scale + drawX;
+    const ry = Math.min(inpaint.rectStart.y, inpaint.rectEnd.y) * scale + drawY;
+    const rw = Math.abs(inpaint.rectEnd.x - inpaint.rectStart.x) * scale;
+    const rh = Math.abs(inpaint.rectEnd.y - inpaint.rectStart.y) * scale;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(rx, ry, rw, rh);
+    ctx.fillStyle = "rgba(255, 60, 60, 0.2)";
+    ctx.fillRect(rx, ry, rw, rh);
+    ctx.setLineDash([]);
+  }
+
+  // 5. Draw brush/eraser cursor
+  if (inpaint.cursorX !== undefined && inpaint.cursorY !== undefined
+      && (inpaint.tool === "brush" || inpaint.tool === "eraser")) {
     const brushR = parseInt($("#inpaint-brush").value) / 2;
     const { scale } = getInpaintLayout();
     const screenR = brushR * scale;
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.strokeStyle = inpaint.tool === "eraser" ? "rgba(100, 200, 255, 0.8)" : "rgba(255, 255, 255, 0.8)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(inpaint.cursorX, inpaint.cursorY, screenR, 0, Math.PI * 2);
@@ -1159,12 +1195,45 @@ function setupInpaintInteraction() {
   const clearBtn = $("#inpaint-clear-mask");
   const confirmBtn = $("#inpaint-confirm");
   const cancelBtn = $("#inpaint-cancel");
+  const brushSizeCtrl = $("#brush-size-control");
+
+  // Tool selection
+  const toolBtns = {
+    brush: $("#tool-brush"),
+    lasso: $("#tool-lasso"),
+    rect: $("#tool-rect"),
+    eraser: $("#tool-eraser"),
+  };
+
+  function setTool(name) {
+    inpaint.tool = name;
+    Object.values(toolBtns).forEach((b) => b && b.classList.remove("active"));
+    if (toolBtns[name]) toolBtns[name].classList.add("active");
+    // Show brush size only for brush/eraser
+    if (brushSizeCtrl) brushSizeCtrl.style.display = (name === "brush" || name === "eraser") ? "flex" : "none";
+    // Cursor style
+    canvasEl.style.cursor = (name === "lasso" || name === "rect") ? "crosshair" : "none";
+    // Reset lasso/rect state
+    inpaint.lassoPoints = [];
+    inpaint.rectStart = null;
+  }
+
+  Object.entries(toolBtns).forEach(([name, btn]) => {
+    if (btn) btn.addEventListener("click", () => setTool(name));
+  });
+
+  // Keyboard shortcuts
+  canvasEl.addEventListener("keydown", (e) => {
+    if (e.key === "b") setTool("brush");
+    if (e.key === "l") setTool("lasso");
+    if (e.key === "r") setTool("rect");
+    if (e.key === "e") setTool("eraser");
+  });
+  canvasEl.setAttribute("tabindex", "0");
 
   if (brushSlider && brushVal) {
     brushVal.textContent = brushSlider.value;
-    brushSlider.addEventListener("input", () => {
-      brushVal.textContent = brushSlider.value;
-    });
+    brushSlider.addEventListener("input", () => { brushVal.textContent = brushSlider.value; });
   }
 
   function getImageCoords(e) {
@@ -1172,28 +1241,41 @@ function setupInpaintInteraction() {
     const { scale, drawX, drawY } = getInpaintLayout();
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
-    // Update cursor position for visual feedback
     inpaint.cursorX = sx;
     inpaint.cursorY = sy;
     return {
       x: (sx - drawX) / scale,
       y: (sy - drawY) / scale,
+      screenX: sx,
+      screenY: sy,
       brushR: parseInt(brushSlider.value) / 2,
     };
   }
 
-  function paintMask(x, y, brushR) {
+  function paintCircle(x, y, brushR, color) {
     if (!inpaint.maskCanvas) return;
     const ctx = inpaint.maskCanvas.getContext("2d");
-    ctx.fillStyle = "white";
+    if (color === "erase") {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.fillStyle = "white";
+    } else {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "white";
+    }
     ctx.beginPath();
     ctx.arc(x, y, brushR, 0, Math.PI * 2);
     ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
   }
 
-  function paintLine(x1, y1, x2, y2, brushR) {
+  function paintLine(x1, y1, x2, y2, brushR, color) {
     if (!inpaint.maskCanvas) return;
     const ctx = inpaint.maskCanvas.getContext("2d");
+    if (color === "erase") {
+      ctx.globalCompositeOperation = "destination-out";
+    } else {
+      ctx.globalCompositeOperation = "source-over";
+    }
     ctx.strokeStyle = "white";
     ctx.lineWidth = brushR * 2;
     ctx.lineCap = "round";
@@ -1202,63 +1284,110 @@ function setupInpaintInteraction() {
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.stroke();
+    ctx.globalCompositeOperation = "source-over";
   }
 
+  function fillLasso(points) {
+    if (!inpaint.maskCanvas || points.length < 3) return;
+    const ctx = inpaint.maskCanvas.getContext("2d");
+    ctx.fillStyle = "white";
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function fillRect(x1, y1, x2, y2) {
+    if (!inpaint.maskCanvas) return;
+    const ctx = inpaint.maskCanvas.getContext("2d");
+    ctx.fillStyle = "white";
+    ctx.fillRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
+  }
+
+  // Pointer events
   canvasEl.addEventListener("pointerdown", (e) => {
     e.preventDefault();
-    inpaint.painting = true;
-    const { x, y, brushR } = getImageCoords(e);
-    inpaint.lastX = x;
-    inpaint.lastY = y;
-    paintMask(x, y, brushR);
-    renderInpaintCanvas();
     canvasEl.setPointerCapture(e.pointerId);
+    const coords = getImageCoords(e);
+
+    if (inpaint.tool === "brush" || inpaint.tool === "eraser") {
+      inpaint.painting = true;
+      inpaint.lastX = coords.x;
+      inpaint.lastY = coords.y;
+      paintCircle(coords.x, coords.y, coords.brushR, inpaint.tool === "eraser" ? "erase" : "paint");
+      renderInpaintCanvas();
+    } else if (inpaint.tool === "lasso") {
+      inpaint.lassoPoints = [{ x: coords.x, y: coords.y }];
+      inpaint.painting = true;
+    } else if (inpaint.tool === "rect") {
+      inpaint.rectStart = { x: coords.x, y: coords.y };
+      inpaint.painting = true;
+    }
   });
 
   canvasEl.addEventListener("pointermove", (e) => {
-    if (!inpaint.painting) return;
-    const { x, y, brushR } = getImageCoords(e);
-    paintLine(inpaint.lastX, inpaint.lastY, x, y, brushR);
-    inpaint.lastX = x;
-    inpaint.lastY = y;
-    renderInpaintCanvas();
+    const coords = getImageCoords(e);
+
+    if (!inpaint.painting) {
+      renderInpaintCanvas();
+      return;
+    }
+
+    if (inpaint.tool === "brush" || inpaint.tool === "eraser") {
+      paintLine(inpaint.lastX, inpaint.lastY, coords.x, coords.y, coords.brushR, inpaint.tool === "eraser" ? "erase" : "paint");
+      inpaint.lastX = coords.x;
+      inpaint.lastY = coords.y;
+      renderInpaintCanvas();
+    } else if (inpaint.tool === "lasso") {
+      inpaint.lassoPoints.push({ x: coords.x, y: coords.y });
+      renderInpaintCanvas();
+    } else if (inpaint.tool === "rect") {
+      inpaint.rectEnd = { x: coords.x, y: coords.y };
+      renderInpaintCanvas();
+    }
   });
 
-  canvasEl.addEventListener("pointerup", () => { inpaint.painting = false; });
-  canvasEl.addEventListener("pointercancel", () => { inpaint.painting = false; });
-
-  // Show brush cursor on hover
-  canvasEl.addEventListener("pointermove", (e) => {
-    if (inpaint.painting) return; // already handled above
-    const rect = canvasEl.getBoundingClientRect();
-    inpaint.cursorX = e.clientX - rect.left;
-    inpaint.cursorY = e.clientY - rect.top;
-    renderInpaintCanvas();
+  canvasEl.addEventListener("pointerup", () => {
+    if (inpaint.tool === "lasso" && inpaint.lassoPoints.length >= 3) {
+      fillLasso(inpaint.lassoPoints);
+      inpaint.lassoPoints = [];
+      renderInpaintCanvas();
+    } else if (inpaint.tool === "rect" && inpaint.rectStart && inpaint.rectEnd) {
+      fillRect(inpaint.rectStart.x, inpaint.rectStart.y, inpaint.rectEnd.x, inpaint.rectEnd.y);
+      inpaint.rectStart = null;
+      inpaint.rectEnd = null;
+      renderInpaintCanvas();
+    }
+    inpaint.painting = false;
   });
+
+  canvasEl.addEventListener("pointercancel", () => {
+    inpaint.painting = false;
+    inpaint.lassoPoints = [];
+    inpaint.rectStart = null;
+  });
+
   canvasEl.addEventListener("pointerleave", () => {
     inpaint.cursorX = undefined;
     inpaint.cursorY = undefined;
-    renderInpaintCanvas();
+    if (!inpaint.painting) renderInpaintCanvas();
   });
 
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
       if (!inpaint.maskCanvas) return;
-      const ctx = inpaint.maskCanvas.getContext("2d");
-      ctx.clearRect(0, 0, inpaint.maskCanvas.width, inpaint.maskCanvas.height);
+      inpaint.maskCanvas.getContext("2d").clearRect(0, 0, inpaint.maskCanvas.width, inpaint.maskCanvas.height);
       renderInpaintCanvas();
     });
   }
 
-  if (cancelBtn) {
-    cancelBtn.addEventListener("click", () => {
-      $("#inpaint-overlay").style.display = "none";
-    });
-  }
+  if (cancelBtn) cancelBtn.addEventListener("click", () => { $("#inpaint-overlay").style.display = "none"; });
+  if (confirmBtn) confirmBtn.addEventListener("click", confirmInpaint);
 
-  if (confirmBtn) {
-    confirmBtn.addEventListener("click", confirmInpaint);
-  }
+  setTool("brush");
 }
 
 async function confirmInpaint() {

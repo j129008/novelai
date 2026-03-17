@@ -692,6 +692,10 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 
 /* Inpaint tools */
 .inpaint-tools { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.inpaint-tool-group { display: flex; background: var(--bg-deep); border: 1px solid var(--border-muted); border-radius: var(--radius-sm); padding: 2px; gap: 1px; }
+.inpaint-tool-btn { width: 32px; height: 28px; border: none; background: none; color: var(--text-tertiary); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.12s; }
+.inpaint-tool-btn:hover { color: var(--text-secondary); background: var(--bg-overlay); }
+.inpaint-tool-btn.active { color: var(--accent-bright); background: var(--accent-dim); }
 .inpaint-brush-size { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-secondary); }
 
 .btn-action--confirm {
