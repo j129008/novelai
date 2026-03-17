@@ -40,18 +40,16 @@ def _feather_mask(mask_b64: str, blur_radius: int = 20) -> tuple[str, np.ndarray
     dilated.save(buf, "PNG")
     api_mask_b64 = _b64.b64encode(buf.getvalue()).decode()
 
-    # Compositing mask using signed distance + sigmoid for perfectly smooth transition
+    # Compositing mask based on the DILATED mask (same as what API receives)
+    # This way our blend zone aligns with the API's seam location
     from scipy.ndimage import distance_transform_edt
-    sharp_bool = sharp > 128
-    # Signed distance: negative inside, positive outside
-    dist_outside = distance_transform_edt(~sharp_bool)
-    dist_inside = distance_transform_edt(sharp_bool)
-    signed_dist = dist_outside - dist_inside  # negative=inside, positive=outside
-    # Shift sigmoid outward so mask interior stays ~1.0
-    # Transition happens OUTSIDE the mask boundary
-    shift = blur_radius * 1.2  # shift center far outside mask edge
-    steepness = 4.0 / blur_radius
-    composite_mask = 1.0 / (1.0 + np.exp((signed_dist - shift) * steepness))
+    dilated_arr = np.array(dilated)
+    dilated_bool = dilated_arr > 128
+    dist_outside = distance_transform_edt(~dilated_bool)
+    dist_inside = distance_transform_edt(dilated_bool)
+    signed_dist = dist_outside - dist_inside
+    steepness = 6.0 / blur_radius
+    composite_mask = 1.0 / (1.0 + np.exp(signed_dist * steepness))
     composite_mask = composite_mask.astype(np.float32)
 
     return api_mask_b64, composite_mask
