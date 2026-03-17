@@ -1393,6 +1393,17 @@ function setupInpaintInteraction() {
 async function confirmInpaint() {
   if (!inpaint.sourceImg || !inpaint.maskCanvas) return;
 
+  // Check if mask has any painted pixels
+  const maskData = inpaint.maskCanvas.getContext("2d").getImageData(0, 0, inpaint.maskCanvas.width, inpaint.maskCanvas.height).data;
+  let hasPaint = false;
+  for (let i = 3; i < maskData.length; i += 4) {
+    if (maskData[i] > 0) { hasPaint = true; break; }
+  }
+  if (!hasPaint) {
+    showError("Please paint the areas you want to regenerate.");
+    return;
+  }
+
   const overlay = $("#inpaint-overlay");
   const confirmBtn = $("#inpaint-confirm");
 

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Literal, Optional
 
 VALID_MODELS = Literal[
@@ -36,6 +36,12 @@ class GenerateRequest(BaseModel):
     reference_image: Optional[str] = None  # base64
     reference_information_extracted: float = Field(default=1.0, ge=0, le=1)
     reference_strength: float = Field(default=0.6, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def mask_requires_image(self):
+        if self.mask and not self.image:
+            raise ValueError("mask requires image to be set")
+        return self
 
 
 class GenerateResponse(BaseModel):
