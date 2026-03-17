@@ -9,13 +9,18 @@ from typing import Optional
 API_URL = "https://image.novelai.net/ai/generate-image"
 
 
-def _feather_mask(mask_b64: str, blur_radius: int = 10) -> str:
-    """Lightly feather mask edges with Gaussian blur. Returns base64 PNG."""
+def _feather_mask(mask_b64: str, blur_radius: int = 12) -> str:
+    """Feather mask edges only — center stays pure white. Returns base64 PNG."""
+    import numpy as np
     mask_bytes = _b64.b64decode(mask_b64)
     mask_img = Image.open(io.BytesIO(mask_bytes)).convert("L")
-    blurred = mask_img.filter(ImageFilter.GaussianBlur(blur_radius))
+    sharp = np.array(mask_img)
+    blurred = np.array(mask_img.filter(ImageFilter.GaussianBlur(blur_radius)))
+    # max(sharp, blurred): center stays 255, edges get soft gradient
+    result = np.maximum(sharp, blurred).astype(np.uint8)
+    result_img = Image.fromarray(result, mode="L")
     buf = io.BytesIO()
-    blurred.save(buf, "PNG")
+    result_img.save(buf, "PNG")
     return _b64.b64encode(buf.getvalue()).decode()
 
 
