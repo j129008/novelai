@@ -1049,7 +1049,7 @@ function setupTagBrowser() {
 
   let activeCategory = "all";
 
-  function isOpen() { return drawer.style.display !== "none"; }
+  function isOpen() { return drawer.style.display !== "none" && !drawer.classList.contains("tag-browser--closing"); }
 
   function open() {
     drawer.classList.remove("tag-browser--closing");
@@ -1117,8 +1117,10 @@ function setupTagBrowser() {
   }
 
   let _searchDebounce = null;
+  let _renderGen = 0;
 
   function renderGrid() {
+    ++_renderGen;
     const filter = searchInput.value.trim().toLowerCase().replace(/ /g, "_");
     grid.innerHTML = "";
 
@@ -1156,7 +1158,8 @@ function setupTagBrowser() {
     // When filtering, also search the full 140K tag database
     if (filter && filter.length >= 2) {
       clearTimeout(_searchDebounce);
-      _searchDebounce = setTimeout(() => fetchFullSearch(filter, anyTags), 200);
+      const gen = _renderGen;
+      _searchDebounce = setTimeout(() => fetchFullSearch(filter, anyTags, gen), 200);
     } else if (!anyTags) {
       const empty = document.createElement("p");
       empty.className = "tag-browser-empty";
@@ -1165,10 +1168,10 @@ function setupTagBrowser() {
     }
   }
 
-  async function fetchFullSearch(query, hadCuratedResults) {
+  async function fetchFullSearch(query, hadCuratedResults, gen) {
     try {
       const resp = await fetch(`/api/tags?q=${encodeURIComponent(query)}&limit=30`);
-      if (!resp.ok) return;
+      if (!resp.ok || gen !== _renderGen) return;
       const results = await resp.json();
 
       // Dedupe against curated tags already shown
