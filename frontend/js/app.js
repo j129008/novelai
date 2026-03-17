@@ -1116,6 +1116,8 @@ function setupTagBrowser() {
     renderGrid();
   }
 
+  let _searchDebounce = null;
+
   function renderGrid() {
     const filter = searchInput.value.trim().toLowerCase().replace(/ /g, "_");
     grid.innerHTML = "";
@@ -1151,12 +1153,50 @@ function setupTagBrowser() {
       grid.appendChild(wrap);
     }
 
-    if (!anyTags) {
+    // When filtering, also search the full 140K tag database
+    if (filter && filter.length >= 2) {
+      clearTimeout(_searchDebounce);
+      _searchDebounce = setTimeout(() => fetchFullSearch(filter, anyTags), 200);
+    } else if (!anyTags) {
       const empty = document.createElement("p");
       empty.className = "tag-browser-empty";
       empty.textContent = "No tags found";
       grid.appendChild(empty);
     }
+  }
+
+  async function fetchFullSearch(query, hadCuratedResults) {
+    try {
+      const resp = await fetch(`/api/tags?q=${encodeURIComponent(query)}&limit=30`);
+      if (!resp.ok) return;
+      const results = await resp.json();
+
+      // Dedupe against curated tags already shown
+      const curatedSet = new Set();
+      for (const cat of _tagCategories) for (const t of cat.tags) curatedSet.add(t);
+      const extra = results.filter((r) => !curatedSet.has(r.name));
+      if (!extra.length && !hadCuratedResults) {
+        grid.innerHTML = `<p class="tag-browser-empty">No tags found</p>`;
+        return;
+      }
+      if (!extra.length) return;
+
+      const label = document.createElement("div");
+      label.className = "tag-browser-section-label";
+      label.textContent = "More Results";
+      grid.appendChild(label);
+
+      const wrap = document.createElement("div");
+      wrap.className = "tag-browser-chips";
+      for (const r of extra) {
+        const chip = document.createElement("button");
+        chip.className = "tag-chip";
+        chip.textContent = r.name.replace(/_/g, " ");
+        chip.addEventListener("click", () => insertBrowserTag(r.name, chip));
+        wrap.appendChild(chip);
+      }
+      grid.appendChild(wrap);
+    } catch { /* silent */ }
   }
 
   // Save cursor position on blur so we can restore it when chips steal focus
