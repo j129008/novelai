@@ -84,8 +84,29 @@
           <section class="guide-section">
             <h3>多角色</h3>
             <p>用 <code>|</code> 分隔 base prompt 和各角色：</p>
-            <code class="guide-example">2girls, park | girl, blonde hair, red dress | girl, black hair, blue dress</code>
-            <p class="guide-note">互動標籤：<code>source#hug</code>（發起）、<code>target#hug</code>（接受）、<code>mutual#holding hands</code>（雙向）</p>
+            <code class="guide-example">base prompt | 角色1描述 | 角色2描述</code>
+
+            <p style="margin-top:8px"><strong>Base prompt 放什麼：</strong></p>
+            <ul class="guide-tips">
+              <li>人數：<code>2girls</code>、<code>1boy, 1girl</code></li>
+              <li>場景/背景：<code>park</code>、<code>classroom</code>、<code>sunset</code></li>
+              <li>風格/氛圍：<code>watercolor</code>、<code>dramatic lighting</code>、<code>year 2024</code></li>
+              <li>構圖：<code>from above</code>、<code>wide shot</code>、<code>close-up</code></li>
+            </ul>
+
+            <p style="margin-top:8px"><strong>角色 prompt 放什麼：</strong></p>
+            <ul class="guide-tips">
+              <li>只寫 <code>girl</code>/<code>boy</code>（不加數字）</li>
+              <li>外觀：<code>blonde hair, blue eyes, school uniform</code></li>
+              <li>表情/動作：<code>smile, waving</code></li>
+              <li>角色名：<code>methode (sousou no frieren)</code></li>
+            </ul>
+
+            <p style="margin-top:8px"><strong>完整範例：</strong></p>
+            <code class="guide-example">2girls, cherry blossoms, spring, sunny, watercolor | girl, blonde hair, white dress, smile, waving | girl, black hair, blue uniform, holding book, calm</code>
+
+            <p class="guide-note" style="margin-top:8px">互動標籤：<code>source#hug</code>（發起）、<code>target#hug</code>（接受）、<code>mutual#holding hands</code>（雙向）</p>
+            <p class="guide-note">排列順序 = 畫面位置：第一個角色在左，第二個在右，依此類推</p>
           </section>
 
           <section class="guide-section">
@@ -120,7 +141,11 @@
               </div>
               <div>
                 <span class="guide-tag">多角色</span>
-                <code>2girls, cafe | girl, short pink hair, cheerful, waving | girl, glasses, reading book, calm</code>
+                <code>2girls, cafe, warm lighting, cozy | girl, short pink hair, cheerful, waving | girl, glasses, reading book, calm</code>
+              </div>
+              <div>
+                <span class="guide-tag">多角色互動</span>
+                <code>1boy, 1girl, sunset, rooftop, dramatic | boy, black hair, source#hug | girl, red scarf, target#hug, blush</code>
               </div>
             </div>
           </section>
