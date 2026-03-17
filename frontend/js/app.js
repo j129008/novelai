@@ -1268,12 +1268,25 @@ async function confirmInpaint() {
   const confirmBtn = $("#inpaint-confirm");
 
   // Export mask as black (keep) + white (repaint) PNG for API
+  // Apply gaussian-like blur to feather mask edges and avoid seams
   const exportMask = document.createElement("canvas");
   exportMask.width = inpaint.maskCanvas.width;
   exportMask.height = inpaint.maskCanvas.height;
   const emCtx = exportMask.getContext("2d");
   emCtx.fillStyle = "black";
   emCtx.fillRect(0, 0, exportMask.width, exportMask.height);
+  // Feather: draw the mask multiple times at slight offsets with low opacity
+  emCtx.globalAlpha = 0.2;
+  const featherRadius = 12;
+  for (let ox = -featherRadius; ox <= featherRadius; ox += 4) {
+    for (let oy = -featherRadius; oy <= featherRadius; oy += 4) {
+      if (ox * ox + oy * oy <= featherRadius * featherRadius) {
+        emCtx.drawImage(inpaint.maskCanvas, ox, oy);
+      }
+    }
+  }
+  // Draw the sharp mask on top at full opacity
+  emCtx.globalAlpha = 1;
   emCtx.drawImage(inpaint.maskCanvas, 0, 0);
   const maskBase64 = exportMask.toDataURL("image/png").split(",")[1];
 
