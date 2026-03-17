@@ -25,7 +25,7 @@ async def generate_image(
     height: int = 1216,
     steps: int = 28,
     scale: float = 5.0,
-    sampler: str = "k_euler",
+    sampler: str = "k_euler_ancestral",
     seed: int = 0,
     sm: bool = False,
     sm_dyn: bool = False,

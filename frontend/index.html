@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=4">
+  <link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
   <div class="app">
@@ -23,47 +23,31 @@
 
       <aside class="controls" role="form" aria-label="Generation controls">
 
-        <div class="control-group">
-          <label class="field-label" for="prompt">Prompt</label>
-          <textarea id="prompt" class="field-textarea field-textarea--prompt" rows="5" placeholder="Describe your vision…" spellcheck="false">aesthetic, masterpiece, </textarea>
+        <div class="prompt-box">
+          <div class="prompt-tabs">
+            <button class="prompt-tab active" data-target="prompt" type="button">Prompt</button>
+            <button class="prompt-tab" data-target="negative-prompt" type="button">Undesired</button>
+          </div>
+          <textarea id="prompt" class="field-textarea field-textarea--prompt" rows="6" placeholder="Describe your vision… e.g. a girl standing in a field of sunflowers at golden hour" spellcheck="false"></textarea>
+          <textarea id="negative-prompt" class="field-textarea field-textarea--negative" rows="6" placeholder="What to exclude…" spellcheck="false" style="display:none">lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page, @_@, mismatched pupils, glowing eyes, bad anatomy</textarea>
         </div>
 
         <div class="control-group">
-          <label class="field-label" for="negative-prompt">Undesired Content</label>
-          <textarea id="negative-prompt" class="field-textarea field-textarea--negative" rows="3" placeholder="What to exclude…" spellcheck="false">lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page, @_@, mismatched pupils, glowing eyes, bad anatomy</textarea>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="two-col">
-          <div class="control-group">
-            <label class="field-label" for="sampler">Sampler</label>
-            <select id="sampler" class="field-select"></select>
-          </div>
-          <div class="control-group">
-            <label class="field-label" for="resolution">Resolution</label>
-            <select id="resolution" class="field-select"></select>
-          </div>
+          <label class="field-label" for="resolution">Canvas Size</label>
+          <select id="resolution" class="field-select"></select>
         </div>
 
         <div class="control-group">
           <div class="slider-header">
-            <label class="field-label" for="steps">Steps</label>
+            <label class="field-label" for="steps">Quality</label>
             <span class="slider-value" id="steps-val">28</span>
           </div>
           <input type="range" id="steps" class="field-range" min="1" max="50" value="28">
+          <div class="slider-endpoints"><span>Draft</span><span>Best</span></div>
         </div>
 
         <div class="control-group">
-          <div class="slider-header">
-            <label class="field-label" for="scale">CFG Scale</label>
-            <span class="slider-value" id="scale-val">5.0</span>
-          </div>
-          <input type="range" id="scale" class="field-range" min="0" max="10" step="0.1" value="5.0">
-        </div>
-
-        <div class="control-group">
-          <label class="field-label" for="seed">Seed <span class="field-label-hint">0 = random</span></label>
+          <label class="field-label" for="seed">Seed <span class="field-label-hint">0 = surprise me</span></label>
           <input type="number" id="seed" class="field-number" value="0" min="0" placeholder="0">
         </div>
 
@@ -72,12 +56,32 @@
         <details class="accordion">
           <summary class="accordion-header">
             <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
-            Advanced
+            Fine-tuning
           </summary>
           <div class="accordion-body">
-            <div class="checkbox-row">
-              <label class="checkbox-label"><input type="checkbox" id="smea" class="field-checkbox"><span class="checkbox-custom"></span>SMEA</label>
-              <label class="checkbox-label"><input type="checkbox" id="smea-dyn" class="field-checkbox"><span class="checkbox-custom"></span>SMEA DYN</label>
+            <div class="control-group control-group--tight">
+              <label class="field-label" for="sampler">Style Engine</label>
+              <select id="sampler" class="field-select"></select>
+            </div>
+            <div class="control-group control-group--tight">
+              <div class="slider-header">
+                <label class="field-label" for="scale">Prompt Adherence</label>
+                <span class="slider-value" id="scale-val">5.0</span>
+              </div>
+              <input type="range" id="scale" class="field-range" min="0" max="10" step="0.1" value="5.0">
+              <div class="slider-endpoints"><span>Creative</span><span>Precise</span></div>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <span class="toggle-label">HD Enhancement</span>
+                <span class="toggle-description">Sharpens detail at higher resolutions</span>
+              </div>
+              <label class="toggle-switch" aria-label="HD Enhancement">
+                <input type="checkbox" id="hd-enhancement" class="toggle-input">
+                <input type="checkbox" id="smea" class="field-checkbox" style="display:none">
+                <input type="checkbox" id="smea-dyn" class="field-checkbox" style="display:none">
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              </label>
             </div>
           </div>
         </details>
@@ -85,7 +89,7 @@
         <details class="accordion">
           <summary class="accordion-header">
             <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
-            Image to Image
+            Start from an Image
           </summary>
           <div class="accordion-body">
             <div class="upload-zone" id="img2img-zone">
@@ -98,12 +102,14 @@
             </div>
             <button id="img2img-clear" class="btn-clear" style="display:none">Remove image</button>
             <div class="control-group control-group--tight">
-              <div class="slider-header"><label class="field-label" for="strength">Strength</label><span class="slider-value" id="strength-val">0.70</span></div>
+              <div class="slider-header"><label class="field-label" for="strength">Transformation Amount</label><span class="slider-value" id="strength-val">0.70</span></div>
               <input type="range" id="strength" class="field-range" min="0" max="1" step="0.05" value="0.7">
+              <div class="slider-endpoints"><span>Subtle</span><span>Dramatic</span></div>
             </div>
             <div class="control-group control-group--tight">
-              <div class="slider-header"><label class="field-label" for="noise">Noise</label><span class="slider-value" id="noise-val">0.00</span></div>
+              <div class="slider-header"><label class="field-label" for="noise">Added Variation</label><span class="slider-value" id="noise-val">0.00</span></div>
               <input type="range" id="noise" class="field-range" min="0" max="1" step="0.05" value="0.0">
+              <div class="slider-endpoints"><span>None</span><span>Maximum</span></div>
             </div>
           </div>
         </details>
@@ -111,7 +117,7 @@
         <details class="accordion">
           <summary class="accordion-header">
             <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
-            Vibe Transfer
+            Style Reference
           </summary>
           <div class="accordion-body">
             <div class="upload-zone" id="vibe-zone">
@@ -124,19 +130,21 @@
             </div>
             <button id="vibe-clear" class="btn-clear" style="display:none">Remove image</button>
             <div class="control-group control-group--tight">
-              <div class="slider-header"><label class="field-label" for="ref-strength">Reference Strength</label><span class="slider-value" id="ref-strength-val">0.60</span></div>
+              <div class="slider-header"><label class="field-label" for="ref-strength">Vibe Intensity</label><span class="slider-value" id="ref-strength-val">0.60</span></div>
               <input type="range" id="ref-strength" class="field-range" min="0" max="1" step="0.05" value="0.6">
+              <div class="slider-endpoints"><span>Faint</span><span>Strong</span></div>
             </div>
             <div class="control-group control-group--tight">
-              <div class="slider-header"><label class="field-label" for="ref-info">Information Extracted</label><span class="slider-value" id="ref-info-val">1.00</span></div>
+              <div class="slider-header"><label class="field-label" for="ref-info">Style Influence</label><span class="slider-value" id="ref-info-val">1.00</span></div>
               <input type="range" id="ref-info" class="field-range" min="0" max="1" step="0.05" value="1.0">
+              <div class="slider-endpoints"><span>Less</span><span>More</span></div>
             </div>
           </div>
         </details>
 
         <button id="generate-btn" class="btn-generate" type="button">
           <span class="btn-generate-label">Generate</span>
-          <span class="btn-generate-hint">⌘ Enter</span>
+          <span class="btn-generate-hint">Cmd + Enter</span>
         </button>
 
       </aside>
@@ -148,7 +156,7 @@
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
             </div>
             <p class="placeholder-title">Your creation awaits</p>
-            <p class="placeholder-sub">Press Generate or Cmd/Ctrl + Enter</p>
+            <p class="placeholder-sub">Press Generate or Cmd / Ctrl + Enter</p>
           </div>
         </div>
         <div id="error-slot" class="error-slot"></div>
@@ -169,6 +177,6 @@
 
     </main>
   </div>
-  <script src="js/app.js?v=4"></script>
+  <script src="js/app.js?v=7"></script>
 </body>
 </html>

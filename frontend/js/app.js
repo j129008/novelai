@@ -2,6 +2,15 @@
 
 const $ = (sel) => document.querySelector(sel);
 
+const SAMPLER_LABELS = {
+  "k_euler":              "Fast",
+  "k_euler_ancestral":    "Creative",
+  "k_dpmpp_2s_ancestral": "Balanced",
+  "k_dpmpp_2m":           "High Quality",
+  "k_dpmpp_2m_sde":       "High Quality (Smooth)",
+  "k_dpmpp_sde":          "Smooth",
+};
+
 const state = {
   img2img: null,
   vibe: null,
@@ -14,8 +23,14 @@ async function init() {
     const resp = await fetch("/api/options");
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
     const data = await resp.json();
-    populateSelect("#sampler", data.samplers.map((s) => ({ value: s, label: s })));
-    populateSelect("#resolution", data.resolutions.map((r) => ({ value: `${r.width}x${r.height}`, label: r.label })));
+    populateSelect("#sampler", data.samplers.map((s) => ({
+      value: s,
+      label: SAMPLER_LABELS[s] || s,
+    })));
+    populateSelect("#resolution", data.resolutions.map((r) => ({
+      value: `${r.width}x${r.height}`,
+      label: r.label,
+    })));
   } catch (e) {
     showError(`Failed to load options: ${e.message}`);
   }
@@ -30,6 +45,9 @@ async function init() {
   setupFileUpload("img2img-upload", "img2img-preview", "img2img-placeholder", "img2img-clear", "img2img");
   setupFileUpload("vibe-upload", "vibe-preview", "vibe-placeholder", "vibe-clear", "vibe");
 
+  setupPromptTabs();
+  setupHdEnhancement();
+
   $("#generate-btn").addEventListener("click", generate);
   $("#btn-reuse-seed").addEventListener("click", reuseSeed);
   $("#btn-download").addEventListener("click", downloadImage);
@@ -39,6 +57,38 @@ async function init() {
       e.preventDefault();
       generate();
     }
+  });
+}
+
+function setupPromptTabs() {
+  const tabs = document.querySelectorAll(".prompt-tab");
+  const prompt = $("#prompt");
+  const negative = $("#negative-prompt");
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      tabs.forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      if (tab.dataset.target === "prompt") {
+        prompt.style.display = "";
+        negative.style.display = "none";
+      } else {
+        prompt.style.display = "none";
+        negative.style.display = "";
+      }
+    });
+  });
+}
+
+function setupHdEnhancement() {
+  const toggle = $("#hd-enhancement");
+  const smea = $("#smea");
+  const smeaDyn = $("#smea-dyn");
+  if (!toggle || !smea || !smeaDyn) return;
+
+  toggle.addEventListener("change", () => {
+    smea.checked = toggle.checked;
+    smeaDyn.checked = toggle.checked;
   });
 }
 

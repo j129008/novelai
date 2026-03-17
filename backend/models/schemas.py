@@ -12,7 +12,6 @@ VALID_SAMPLERS = Literal[
     "k_dpmpp_2m",
     "k_dpmpp_2m_sde",
     "k_dpmpp_sde",
-    "ddim",
 ]
 
 
@@ -24,7 +23,7 @@ class GenerateRequest(BaseModel):
     height: int = Field(default=1216, ge=64, le=2048)
     steps: int = Field(default=28, ge=1, le=50)
     scale: float = Field(default=5.0, ge=0, le=10)
-    sampler: VALID_SAMPLERS = "k_euler"
+    sampler: VALID_SAMPLERS = "k_euler_ancestral"
     seed: int = Field(default=0, ge=0)
     sm: bool = False
     sm_dyn: bool = False
