@@ -57,7 +57,7 @@ async function init() {
   setupHdEnhancement();
   setupTagAutocomplete();
   setupAutoSavePrompt();
-  setupGallerySearch();
+  setupHistoryTabs();
   loadGallery();
 
   $("#generate-btn").addEventListener("click", generate);
@@ -526,13 +526,52 @@ function downloadImage() {
 /* ── GALLERY ──────────────────────────────────────────────── */
 
 let _galleryData = [];
+let _settingsLoadedToast = null;
 
-function setupGallerySearch() {
-  const input = $("#gallery-search");
-  if (!input) return;
-  input.addEventListener("input", () => {
-    renderGallery(_galleryData, input.value.toLowerCase());
-  });
+function setupHistoryTabs() {
+  const tabCanvas = $("#tab-canvas");
+  const tabHistory = $("#tab-history");
+  const panelCanvas = $("#panel-canvas");
+  const panelHistory = $("#panel-history");
+  const searchWrap = $("#history-search-wrap");
+  const searchInput = $("#gallery-search");
+
+  _settingsLoadedToast = document.createElement("div");
+  _settingsLoadedToast.className = "settings-loaded-toast";
+  _settingsLoadedToast.textContent = "Settings loaded — ready to iterate";
+  document.body.appendChild(_settingsLoadedToast);
+
+  function showCanvas() {
+    tabCanvas.classList.add("canvas-tab--active");
+    tabHistory.classList.remove("canvas-tab--active");
+    panelCanvas.style.display = "flex";
+    panelHistory.style.display = "none";
+    searchWrap.style.display = "none";
+  }
+
+  function showHistory() {
+    tabHistory.classList.add("canvas-tab--active");
+    tabCanvas.classList.remove("canvas-tab--active");
+    panelHistory.style.display = "flex";
+    panelCanvas.style.display = "none";
+    searchWrap.style.display = "flex";
+    searchInput.focus();
+  }
+
+  tabCanvas.addEventListener("click", showCanvas);
+  tabHistory.addEventListener("click", showHistory);
+
+  if (searchInput) {
+    searchInput.addEventListener("input", () => {
+      renderGallery(_galleryData, searchInput.value.toLowerCase());
+    });
+  }
+}
+
+function showSettingsLoadedToast() {
+  if (!_settingsLoadedToast) return;
+  _settingsLoadedToast.classList.add("visible");
+  setTimeout(() => _settingsLoadedToast.classList.remove("visible"), 2400);
 }
 
 async function loadGallery() {
@@ -547,7 +586,10 @@ async function loadGallery() {
     const files = await resp.json();
 
     _galleryData = files;
-    count.textContent = files.length ? `(${files.length})` : "";
+    if (count) {
+      count.textContent = files.length || "";
+      count.classList.toggle("visible", files.length > 0);
+    }
     const searchVal = ($("#gallery-search")?.value || "").toLowerCase();
     renderGallery(files, searchVal);
   } catch { /* ignore */ }
@@ -575,74 +617,84 @@ function renderGallery(files, filter) {
     return;
   }
 
-  list.style.display = "flex";
+  list.style.display = "grid";
   empty.style.display = "none";
   list.innerHTML = "";
 
   for (const file of filtered) {
     const meta = file.meta || {};
-    const item = document.createElement("div");
-    item.className = "gallery-item";
+    const card = document.createElement("div");
+    card.className = "history-card";
 
-    const thumb = document.createElement("div");
-    thumb.className = "gallery-thumb";
     const img = document.createElement("img");
+    img.className = "history-card-img";
     img.src = `/api/gallery/${file.name}`;
     img.alt = file.name;
     img.loading = "lazy";
-    thumb.appendChild(img);
 
-    const info = document.createElement("div");
-    info.className = "gallery-info";
-    const promptText = document.createElement("div");
-    promptText.className = "gallery-prompt";
-    promptText.textContent = meta.prompt || file.name;
-    const metaRow = document.createElement("div");
-    metaRow.className = "gallery-meta";
-    if (meta.seed) metaRow.innerHTML += `<span>Seed: ${meta.seed}</span>`;
-    if (meta.steps) metaRow.innerHTML += `<span>${meta.steps} steps</span>`;
-    if (meta.width) metaRow.innerHTML += `<span>${meta.width}×${meta.height}</span>`;
-    info.appendChild(promptText);
-    info.appendChild(metaRow);
+    const overlay = document.createElement("div");
+    overlay.className = "history-card-overlay";
 
-    const actions = document.createElement("div");
-    actions.className = "gallery-actions";
+    if (meta.prompt) {
+      const promptEl = document.createElement("div");
+      promptEl.className = "history-card-prompt";
+      promptEl.textContent = meta.prompt;
+      overlay.appendChild(promptEl);
+    }
+
+    const metaEl = document.createElement("div");
+    metaEl.className = "history-card-meta";
+    if (meta.seed) metaEl.innerHTML += `<span>Seed ${meta.seed}</span>`;
+    if (meta.steps) metaEl.innerHTML += `<span>${meta.steps} steps</span>`;
+    if (meta.width) metaEl.innerHTML += `<span>${meta.width}\u00d7${meta.height}</span>`;
+    overlay.appendChild(metaEl);
+
+    const actionsEl = document.createElement("div");
+    actionsEl.className = "history-card-actions";
 
     const loadBtn = document.createElement("button");
-    loadBtn.className = "gallery-btn";
-    loadBtn.title = "Load settings";
-    loadBtn.innerHTML = "↩";
+    loadBtn.className = "history-card-btn history-card-btn--load";
+    loadBtn.type = "button";
+    loadBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.84"/></svg> Load`;
     loadBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       loadSettingsFromMeta(meta);
+      card.classList.add("settings-loaded");
+      setTimeout(() => card.classList.remove("settings-loaded"), 1800);
+      showSettingsLoadedToast();
+      $("#tab-canvas").click();
     });
 
     const delBtn = document.createElement("button");
-    delBtn.className = "gallery-btn gallery-btn--delete";
-    delBtn.title = "Delete";
-    delBtn.textContent = "×";
+    delBtn.className = "history-card-btn history-card-btn--delete";
+    delBtn.type = "button";
+    delBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg> Delete`;
     delBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
+      card.style.opacity = "0.4";
+      card.style.pointerEvents = "none";
       const r = await fetch(`/api/gallery/${file.name}`, { method: "DELETE" });
       if (r.ok) loadGallery();
+      else { card.style.opacity = ""; card.style.pointerEvents = ""; }
     });
 
-    actions.appendChild(loadBtn);
-    actions.appendChild(delBtn);
+    actionsEl.appendChild(loadBtn);
+    actionsEl.appendChild(delBtn);
+    overlay.appendChild(actionsEl);
 
-    item.addEventListener("click", () => {
+    card.addEventListener("click", () => {
       const output = $("#output");
       const previewImg = document.createElement("img");
       previewImg.src = `/api/gallery/${file.name}`;
       previewImg.alt = "Preview";
       output.innerHTML = "";
       output.appendChild(previewImg);
+      $("#tab-canvas").click();
     });
 
-    item.appendChild(thumb);
-    item.appendChild(info);
-    item.appendChild(actions);
-    list.appendChild(item);
+    card.appendChild(img);
+    card.appendChild(overlay);
+    list.appendChild(card);
   }
 }
 
