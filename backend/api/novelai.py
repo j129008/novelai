@@ -9,6 +9,19 @@ from typing import Optional
 API_URL = "https://image.novelai.net/ai/generate-image"
 
 
+def _feather_mask(mask_b64: str, blur_radius: int = 15) -> str:
+    """Blur mask edges, keep center white. For API to generate edge-aware content."""
+    import numpy as np
+    mask_bytes = _b64.b64decode(mask_b64)
+    mask_img = Image.open(io.BytesIO(mask_bytes)).convert("L")
+    sharp = np.array(mask_img)
+    blurred = np.array(mask_img.filter(ImageFilter.GaussianBlur(blur_radius)))
+    result = np.maximum(sharp, blurred).astype(np.uint8)
+    buf = io.BytesIO()
+    Image.fromarray(result, mode="L").save(buf, "PNG")
+    return _b64.b64encode(buf.getvalue()).decode()
+
+
 def _restore_outside_mask(orig_b64: str, result_bytes: bytes, mask_b64: str) -> bytes:
     """Paste original pixels back outside the mask. Inside mask = API result."""
     import numpy as np
@@ -39,7 +52,7 @@ def _restore_outside_mask(orig_b64: str, result_bytes: bytes, mask_b64: str) -> 
     # to smooth the content transition. Does NOT change interior or exterior.
     mask_float = mask_arr.astype(np.float32) / 255.0
     blurred_mask = np.array(
-        Image.fromarray(mask_arr).filter(ImageFilter.GaussianBlur(3))
+        Image.fromarray(mask_arr).filter(ImageFilter.GaussianBlur(15))
     ).astype(np.float32) / 255.0
     # Only blend where blurred differs from hard mask (the boundary band)
     blend = orig_arr.astype(np.float32) * (1 - blurred_mask[:, :, np.newaxis]) + \
@@ -141,14 +154,16 @@ async def generate_image(
     _inpaint_orig_b64 = None
     _inpaint_mask_b64 = None
     if action == "infill" and image and mask:
+        # Send blurred mask to API so it generates edge-aware content
+        api_mask = _feather_mask(mask, blur_radius=15)
         params["image"] = image
-        params["mask"] = mask
+        params["mask"] = api_mask
         params["strength"] = strength
         params["add_original_image"] = True
         params["inpaintImg2ImgStrength"] = 1
         params["uncond_scale"] = 1
         _inpaint_orig_b64 = image
-        _inpaint_mask_b64 = mask
+        _inpaint_mask_b64 = mask  # keep original hard mask for post-process
     elif action == "img2img" and image:
         params["image"] = image
         params["strength"] = strength
