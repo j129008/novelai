@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+.claude/settings.local.json
+/tmp/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+node_modules/
