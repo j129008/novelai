@@ -375,6 +375,24 @@
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" id="gallery-search" class="history-search" placeholder="Search prompts, seeds…" spellcheck="false">
           </div>
+          <button id="btn-tag-browser" class="btn-action" type="button" title="Browse tags by category" aria-expanded="false">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+            Tags
+          </button>
+        </div>
+
+        <!-- Tag Browser Drawer -->
+        <div id="tag-browser" class="tag-browser" style="display:none">
+          <div class="tag-browser-header">
+            <span class="tag-browser-title">Tag Browser</span>
+            <button id="tag-browser-close" class="guide-close" type="button">&times;</button>
+          </div>
+          <div class="tag-browser-search-wrap">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="tag-browser-search" class="history-search" placeholder="Filter tags…" spellcheck="false">
+          </div>
+          <div id="tag-browser-rail" class="tag-browser-rail"></div>
+          <div id="tag-browser-grid" class="tag-browser-grid"></div>
         </div>
 
         <div id="panel-canvas" class="canvas-panel">

@@ -63,6 +63,15 @@ if _tag_file.exists():
                     continue
     _tags.sort(key=lambda t: t["count"], reverse=True)
 
+# Load tag categories once at startup
+_tag_categories = {"categories": []}
+_tag_cat_file = Path(__file__).resolve().parent.parent / "data" / "tag_categories.json"
+if _tag_cat_file.exists():
+    try:
+        _tag_categories = json.loads(_tag_cat_file.read_text())
+    except (json.JSONDecodeError, OSError):
+        pass
+
 SAMPLERS = [
     "k_euler_ancestral",
     "k_euler",
@@ -91,23 +100,35 @@ async def get_options():
     }
 
 
+@router.get("/tags/categories")
+async def get_tag_categories():
+    return _tag_categories
+
+
 @router.get("/tags")
 async def search_tags(q: str = Query(min_length=1), limit: int = Query(default=15, le=30)):
     query = q.lower().replace(" ", "_")
     results = []
+
+    # 1. Prefix matches (tag name or any alias starts with query)
     for tag in _tags:
         if len(results) >= limit:
             break
-        if tag["name"].startswith(query) or query in tag["aliases"].lower():
+        aliases = tag["aliases"].lower().split(",") if tag["aliases"] else []
+        if tag["name"].startswith(query) or any(a.startswith(query) for a in aliases if a):
             results.append(tag)
-    # If not enough prefix matches, do substring search
+
+    # 2. Substring matches (if more results needed)
     if len(results) < limit:
         seen = {r["name"] for r in results}
         for tag in _tags:
             if len(results) >= limit:
                 break
-            if tag["name"] not in seen and query in tag["name"]:
-                results.append(tag)
+            if tag["name"] not in seen:
+                aliases = tag["aliases"].lower().split(",") if tag["aliases"] else []
+                if query in tag["name"] or any(query in a for a in aliases if a):
+                    results.append(tag)
+                    
     return results
 
 

@@ -91,6 +91,7 @@ async function init() {
   $("#btn-reuse-seed").addEventListener("click", reuseSeed);
   $("#btn-download").addEventListener("click", downloadImage);
 
+  setupTagBrowser();
   setupGuide();
   setupSettings();
 
@@ -1021,6 +1022,192 @@ function downloadImage() {
   a.click();
   document.body.removeChild(a);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   TAG BROWSER
+   ═══════════════════════════════════════════════════════════ */
+
+let _tagCategories = [];
+
+async function loadTagCategories() {
+  try {
+    const resp = await fetch("/api/tags/categories");
+    if (!resp.ok) return;
+    const data = await resp.json();
+    _tagCategories = data.categories || [];
+  } catch { /* silent */ }
+}
+
+function setupTagBrowser() {
+  const btn = $("#btn-tag-browser");
+  const drawer = $("#tag-browser");
+  const closeBtn = $("#tag-browser-close");
+  const rail = $("#tag-browser-rail");
+  const grid = $("#tag-browser-grid");
+  const searchInput = $("#tag-browser-search");
+  const canvas = drawer.closest(".canvas");
+
+  let activeCategory = "all";
+
+  function isOpen() { return drawer.style.display !== "none"; }
+
+  function open() {
+    drawer.classList.remove("tag-browser--closing");
+    drawer.style.display = "flex";
+    canvas.classList.add("tag-browser-open");
+    btn.classList.add("btn-action--primary");
+    btn.setAttribute("aria-expanded", "true");
+    if (!_tagCategories.length) {
+      loadTagCategories().then(() => { buildRail(); renderGrid(); });
+    } else {
+      buildRail();
+      renderGrid();
+    }
+  }
+
+  function close() {
+    if (!isOpen()) return;
+    canvas.classList.remove("tag-browser-open");
+    btn.classList.remove("btn-action--primary");
+    btn.setAttribute("aria-expanded", "false");
+    drawer.classList.add("tag-browser--closing");
+    drawer.addEventListener("animationend", function handler() {
+      drawer.removeEventListener("animationend", handler);
+      drawer.style.display = "none";
+      drawer.classList.remove("tag-browser--closing");
+    });
+  }
+
+  btn.addEventListener("click", () => { isOpen() ? close() : open(); });
+  closeBtn.addEventListener("click", close);
+
+  // Close on outside click
+  canvas.addEventListener("pointerdown", (e) => {
+    if (!isOpen()) return;
+    if (drawer.contains(e.target) || btn.contains(e.target)) return;
+    close();
+  });
+
+  function buildRail() {
+    rail.innerHTML = "";
+    const allBtn = document.createElement("button");
+    allBtn.className = "tag-browser-rail-btn active";
+    allBtn.textContent = "All";
+    allBtn.addEventListener("click", () => selectCategory("all"));
+    rail.appendChild(allBtn);
+
+    for (const cat of _tagCategories) {
+      const b = document.createElement("button");
+      b.className = "tag-browser-rail-btn";
+      b.textContent = cat.label;
+      b.dataset.id = cat.id;
+      b.addEventListener("click", () => selectCategory(cat.id));
+      rail.appendChild(b);
+    }
+  }
+
+  function selectCategory(id) {
+    activeCategory = id;
+    rail.querySelectorAll(".tag-browser-rail-btn").forEach((b) => {
+      b.classList.toggle("active", (b.dataset.id || "all") === id);
+    });
+    // First pill has no dataset.id, it's "all"
+    if (id === "all") rail.firstChild.classList.add("active");
+    renderGrid();
+  }
+
+  function renderGrid() {
+    const filter = searchInput.value.trim().toLowerCase().replace(/ /g, "_");
+    grid.innerHTML = "";
+
+    const cats = activeCategory === "all"
+      ? _tagCategories
+      : _tagCategories.filter((c) => c.id === activeCategory);
+
+    let anyTags = false;
+    for (const cat of cats) {
+      const tags = filter
+        ? cat.tags.filter((t) => t.includes(filter))
+        : cat.tags;
+      if (!tags.length) continue;
+      anyTags = true;
+
+      if (activeCategory === "all") {
+        const label = document.createElement("div");
+        label.className = "tag-browser-section-label";
+        label.textContent = cat.label;
+        grid.appendChild(label);
+      }
+
+      const wrap = document.createElement("div");
+      wrap.className = "tag-browser-chips";
+      for (const tag of tags) {
+        const chip = document.createElement("button");
+        chip.className = "tag-chip";
+        chip.textContent = tag.replace(/_/g, " ");
+        chip.addEventListener("click", () => insertBrowserTag(tag, chip));
+        wrap.appendChild(chip);
+      }
+      grid.appendChild(wrap);
+    }
+
+    if (!anyTags) {
+      const empty = document.createElement("p");
+      empty.className = "tag-browser-empty";
+      empty.textContent = "No tags found";
+      grid.appendChild(empty);
+    }
+  }
+
+  // Save cursor position on blur so we can restore it when chips steal focus
+  let _savedCursor = { el: null, pos: -1 };
+  $("#prompt").addEventListener("blur", function() { _savedCursor = { el: this, pos: this.selectionStart }; });
+  $("#negative-prompt").addEventListener("blur", function() { _savedCursor = { el: this, pos: this.selectionStart }; });
+
+  function insertBrowserTag(tag, chipEl) {
+    // Determine which textarea is active
+    const promptEl = $("#prompt").style.display !== "none" ? $("#prompt") : $("#negative-prompt");
+    const display = tag.replace(/_/g, " ");
+    const val = promptEl.value;
+
+    // Use saved cursor if it belongs to this textarea, otherwise append
+    const pos = (_savedCursor.el === promptEl && _savedCursor.pos >= 0)
+      ? _savedCursor.pos
+      : val.length;
+    const atEnd = pos === val.length;
+
+    if (atEnd) {
+      const prefix = val.length > 0 && !val.trimEnd().endsWith(",") ? ", " : val.length > 0 ? " " : "";
+      promptEl.value = val + prefix + display;
+    } else {
+      const before = val.slice(0, pos);
+      const after = val.slice(pos);
+      const prefix = before.length > 0 && !before.trimEnd().endsWith(",") ? ", " : before.length > 0 ? " " : "";
+      const suffix = after.length > 0 && !after.trimStart().startsWith(",") ? ", " : "";
+      promptEl.value = before + prefix + display + suffix + after;
+    }
+
+    // Update saved cursor past the insertion
+    _savedCursor = { el: promptEl, pos: promptEl.value.length };
+
+    promptEl.dispatchEvent(new Event("input"));
+
+    // Visual feedback — chip flash
+    chipEl.classList.add("tag-chip--inserted");
+    setTimeout(() => chipEl.classList.remove("tag-chip--inserted"), 300);
+
+    // Prompt box border flash
+    const box = promptEl.closest(".prompt-box");
+    if (box) {
+      box.style.borderColor = "var(--accent)";
+      box.style.boxShadow = "0 0 0 3px var(--accent-dim)";
+      setTimeout(() => { box.style.borderColor = ""; box.style.boxShadow = ""; }, 300);
+    }
+  }
+
+  searchInput.addEventListener("input", renderGrid);
+}
+
 
 /* ═══════════════════════════════════════════════════════════
    GALLERY
