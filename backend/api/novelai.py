@@ -1,67 +1,10 @@
-import base64 as _b64
 import httpx
 import io
 import random
 import zipfile
-from PIL import Image, ImageFilter
 from typing import Optional
 
 API_URL = "https://image.novelai.net/ai/generate-image"
-
-
-def _feather_mask(mask_b64: str, blur_radius: int = 15) -> str:
-    """Blur mask edges, keep center white. For API to generate edge-aware content."""
-    import numpy as np
-    mask_bytes = _b64.b64decode(mask_b64)
-    mask_img = Image.open(io.BytesIO(mask_bytes)).convert("L")
-    sharp = np.array(mask_img)
-    blurred = np.array(mask_img.filter(ImageFilter.GaussianBlur(blur_radius)))
-    result = np.maximum(sharp, blurred).astype(np.uint8)
-    buf = io.BytesIO()
-    Image.fromarray(result, mode="L").save(buf, "PNG")
-    return _b64.b64encode(buf.getvalue()).decode()
-
-
-def _restore_outside_mask(orig_b64: str, result_bytes: bytes, mask_b64: str) -> bytes:
-    """Paste original pixels back outside the mask. Inside mask = API result."""
-    import numpy as np
-    orig_img = Image.open(io.BytesIO(_b64.b64decode(orig_b64))).convert("RGB")
-    result_img = Image.open(io.BytesIO(result_bytes)).convert("RGB")
-    mask_img = Image.open(io.BytesIO(_b64.b64decode(mask_b64))).convert("L")
-    print(f"[inpaint] orig={orig_img.size} mode={orig_img.mode}, result={result_img.size} mode={result_img.mode}, mask={mask_img.size}")
-    print(f"[inpaint] mask white={np.sum(np.array(mask_img) > 128)}, black={np.sum(np.array(mask_img) <= 128)}")
-    # Debug: save before/after to compare
-    orig_arr = np.array(orig_img)
-    result_arr = np.array(result_img)
-    mask_arr = np.array(mask_img)
-    outside = mask_arr <= 128
-    diff_outside = np.abs(orig_arr[outside].astype(float) - result_arr[outside].astype(float))
-    print(f"[inpaint] API result outside-mask diff: mean={diff_outside.mean():.2f}, max={diff_outside.max():.0f}")
-    final = np.where(mask_arr[:, :, np.newaxis] > 128, result_arr, orig_arr)
-    diff_final = np.abs(orig_arr[outside].astype(float) - final[outside].astype(float))
-    print(f"[inpaint] After restore outside-mask diff: mean={diff_final.mean():.4f}, max={diff_final.max():.0f}")
-
-    orig_arr = np.array(orig_img)
-    result_arr = np.array(result_img)
-    mask_arr = np.array(mask_img)
-
-    # Hard composite: outside=original, inside=API result
-    hard = np.where(mask_arr[:, :, np.newaxis] > 128, result_arr, orig_arr)
-
-    # Blend outside mask edge only — inside = 100% API result
-    blurred_mask = np.array(
-        Image.fromarray(mask_arr).filter(ImageFilter.GaussianBlur(15))
-    ).astype(np.float32) / 255.0
-    sharp_bool = mask_arr > 128
-    blend_mask = np.where(sharp_bool, 1.0, blurred_mask)
-    final = (orig_arr.astype(np.float32) * (1 - blend_mask[:, :, np.newaxis]) +
-             result_arr.astype(np.float32) * blend_mask[:, :, np.newaxis])
-    final = np.clip(final, 0, 255).astype(np.uint8)
-
-    out = Image.fromarray(final.astype(np.uint8), mode="RGB")
-    buf = io.BytesIO()
-    out.save(buf, "PNG")
-    return buf.getvalue()
 
 
 # V4+ models require v4_prompt/v4_negative_prompt structure
@@ -71,12 +14,6 @@ V4_MODELS = {
     "nai-diffusion-4-5-curated",
     "nai-diffusion-4-5-full",
 }
-
-# Model name mapping for inpainting
-INPAINTING_MODELS = {
-    "nai-diffusion-4-5-full": "nai-diffusion-4-5-full-inpainting",
-}
-
 
 async def generate_image(
     token: str,
@@ -93,7 +30,6 @@ async def generate_image(
     sm: bool = False,
     sm_dyn: bool = False,
     image: Optional[str] = None,
-    mask: Optional[str] = None,
     strength: float = 0.7,
     noise: float = 0.0,
     reference_image: Optional[str] = None,
@@ -147,18 +83,7 @@ async def generate_image(
         }
         params["characterPrompts"] = []
 
-    _inpaint_orig_b64 = None
-    _inpaint_mask_b64 = None
-    if action == "infill" and image and mask:
-        params["image"] = image
-        params["mask"] = mask  # send exact user mask, no modification
-        params["strength"] = strength
-        params["add_original_image"] = True
-        params["inpaintImg2ImgStrength"] = 1
-        params["uncond_scale"] = 1
-        _inpaint_orig_b64 = image
-        _inpaint_mask_b64 = mask  # keep original hard mask for post-process
-    elif action == "img2img" and image:
+    if action == "img2img" and image:
         params["image"] = image
         params["strength"] = strength
         params["noise"] = noise
@@ -168,12 +93,9 @@ async def generate_image(
         params["reference_information_extracted"] = reference_information_extracted
         params["reference_strength"] = reference_strength
 
-    # Use inpainting-specific model for infill action
-    api_model = INPAINTING_MODELS.get(model, model + "-inpainting") if action == "infill" else model
-
     payload = {
         "input": prompt,
-        "model": api_model,
+        "model": model,
         "action": action,
         "parameters": params,
     }
@@ -194,9 +116,5 @@ async def generate_image(
         with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
             name = zf.namelist()[0]
             image_data = zf.read(name)
-
-    # Restore original pixels outside mask — guarantees no background changes
-    if _inpaint_orig_b64 and _inpaint_mask_b64:
-        image_data = _restore_outside_mask(_inpaint_orig_b64, image_data, _inpaint_mask_b64)
 
     return image_data, seed

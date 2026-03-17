@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 from typing import Literal, Optional
 
 VALID_MODELS = Literal[
@@ -27,21 +27,14 @@ class GenerateRequest(BaseModel):
     seed: int = Field(default=0, ge=0)
     sm: bool = False
     sm_dyn: bool = False
-    # img2img / inpainting
+    # img2img
     image: Optional[str] = None  # base64
-    mask: Optional[str] = None  # base64, white = repaint area
     strength: float = Field(default=0.7, ge=0, le=1)
     noise: float = Field(default=0.0, ge=0, le=1)
     # vibe transfer
     reference_image: Optional[str] = None  # base64
     reference_information_extracted: float = Field(default=1.0, ge=0, le=1)
     reference_strength: float = Field(default=0.6, ge=0, le=1)
-
-    @model_validator(mode="after")
-    def mask_requires_image(self):
-        if self.mask and not self.image:
-            raise ValueError("mask requires image to be set")
-        return self
 
 
 class GenerateResponse(BaseModel):
