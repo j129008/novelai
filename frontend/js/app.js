@@ -1411,38 +1411,35 @@ async function confirmInpaint() {
   const mw = inpaint.maskCanvas.width;
   const mh = inpaint.maskCanvas.height;
 
-  // Step 1: blur the mask to feather edges (multi-pass box blur, works on all browsers)
+  // Feather mask for smooth inpainting edges:
+  // 1. Dilate (expand) the mask so blur doesn't shrink the painted area
+  // 2. Heavy Gaussian blur for wide soft transition
+  // 3. No sharp overlay — let the blur do all the work
+
+  const dilated = document.createElement("canvas");
+  dilated.width = mw;
+  dilated.height = mh;
+  const dilCtx = dilated.getContext("2d");
+  // Dilate by drawing mask at small offsets
+  const dilateR = 8;
+  for (let ox = -dilateR; ox <= dilateR; ox += 4) {
+    for (let oy = -dilateR; oy <= dilateR; oy += 4) {
+      if (ox * ox + oy * oy <= dilateR * dilateR) {
+        dilCtx.drawImage(inpaint.maskCanvas, ox, oy);
+      }
+    }
+  }
+
+  // Blur the dilated mask
   const blurredMaskCanvas = document.createElement("canvas");
   blurredMaskCanvas.width = mw;
   blurredMaskCanvas.height = mh;
   const blurCtx = blurredMaskCanvas.getContext("2d");
+  blurCtx.filter = "blur(40px)";
+  blurCtx.drawImage(dilated, 0, 0);
+  blurCtx.filter = "none";
 
-  // Try native filter first, fall back to manual blur
-  const supportsFilter = typeof blurCtx.filter !== "undefined" && blurCtx.filter !== undefined;
-  if (supportsFilter) {
-    blurCtx.filter = "blur(24px)";
-    blurCtx.drawImage(inpaint.maskCanvas, 0, 0);
-    blurCtx.filter = "none";
-  } else {
-    // Manual multi-pass blur: draw at offsets with low opacity (3 passes)
-    blurCtx.globalAlpha = 0.1;
-    const r = 24;
-    for (let pass = 0; pass < 3; pass++) {
-      for (let ox = -r; ox <= r; ox += 4) {
-        for (let oy = -r; oy <= r; oy += 4) {
-          if (ox * ox + oy * oy <= r * r) {
-            blurCtx.drawImage(inpaint.maskCanvas, ox, oy);
-          }
-        }
-      }
-    }
-    blurCtx.globalAlpha = 1;
-  }
-
-  // Step 2: composite sharp mask on top (ensures painted center is fully white)
-  blurCtx.drawImage(inpaint.maskCanvas, 0, 0);
-
-  // Step 3: render onto black background for API
+  // Render onto black background for API
   const exportMask = document.createElement("canvas");
   exportMask.width = mw;
   exportMask.height = mh;
