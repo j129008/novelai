@@ -1421,25 +1421,25 @@ async function confirmInpaint() {
   const mw = inpaint.maskCanvas.width;
   const mh = inpaint.maskCanvas.height;
 
-  // Light feather (8px) to soften hard edges from rectangle/lasso tools
-  // This mimics how NovelAI's own soft brush naturally feathers
-  const feathered = document.createElement("canvas");
-  feathered.width = mw;
-  feathered.height = mh;
-  const fCtx = feathered.getContext("2d");
-  fCtx.filter = "blur(8px)";
-  fCtx.drawImage(inpaint.maskCanvas, 0, 0);
-  fCtx.filter = "none";
-  // Overdraw sharp center so only edges are softened
-  fCtx.drawImage(inpaint.maskCanvas, 0, 0);
-
+  // Threshold mask to pure black/white — canvas anti-aliasing creates
+  // gray edge pixels that the API treats as "partially repaint",
+  // which causes visible border artifacts
   const exportMask = document.createElement("canvas");
   exportMask.width = mw;
   exportMask.height = mh;
   const emCtx = exportMask.getContext("2d");
   emCtx.fillStyle = "black";
   emCtx.fillRect(0, 0, mw, mh);
-  emCtx.drawImage(feathered, 0, 0);
+  emCtx.drawImage(inpaint.maskCanvas, 0, 0);
+
+  const imgData = emCtx.getImageData(0, 0, mw, mh);
+  const d = imgData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    // If any channel > 128, make pure white; otherwise pure black
+    const v = d[i] > 128 || d[i + 1] > 128 || d[i + 2] > 128 || d[i + 3] > 128 ? 255 : 0;
+    d[i] = v; d[i + 1] = v; d[i + 2] = v; d[i + 3] = 255;
+  }
+  emCtx.putImageData(imgData, 0, 0);
 
   const maskBase64 = exportMask.toDataURL("image/png").split(",")[1];
 
