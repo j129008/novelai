@@ -9,19 +9,24 @@ from typing import Optional
 API_URL = "https://image.novelai.net/ai/generate-image"
 
 
-def _feather_mask(mask_b64: str, blur_radius: int = 12) -> str:
-    """Feather mask edges only — center stays pure white. Returns base64 PNG."""
+def _restore_outside_mask(orig_b64: str, result_bytes: bytes, mask_b64: str) -> bytes:
+    """Paste original pixels back outside the mask. Inside mask = API result."""
     import numpy as np
-    mask_bytes = _b64.b64decode(mask_b64)
-    mask_img = Image.open(io.BytesIO(mask_bytes)).convert("L")
-    sharp = np.array(mask_img)
-    blurred = np.array(mask_img.filter(ImageFilter.GaussianBlur(blur_radius)))
-    # max(sharp, blurred): center stays 255, edges get soft gradient
-    result = np.maximum(sharp, blurred).astype(np.uint8)
-    result_img = Image.fromarray(result, mode="L")
+    orig_img = Image.open(io.BytesIO(_b64.b64decode(orig_b64))).convert("RGB")
+    result_img = Image.open(io.BytesIO(result_bytes)).convert("RGB")
+    mask_img = Image.open(io.BytesIO(_b64.b64decode(mask_b64))).convert("L")
+
+    orig_arr = np.array(orig_img)
+    result_arr = np.array(result_img)
+    mask_arr = np.array(mask_img)
+
+    # Outside mask (black) → original, inside mask (white) → API result
+    final = np.where(mask_arr[:, :, np.newaxis] > 128, result_arr, orig_arr)
+
+    out = Image.fromarray(final.astype(np.uint8), mode="RGB")
     buf = io.BytesIO()
-    result_img.save(buf, "PNG")
-    return _b64.b64encode(buf.getvalue()).decode()
+    out.save(buf, "PNG")
+    return buf.getvalue()
 
 
 # V4+ models require v4_prompt/v4_negative_prompt structure
@@ -107,13 +112,17 @@ async def generate_image(
         }
         params["characterPrompts"] = []
 
+    _inpaint_orig_b64 = None
+    _inpaint_mask_b64 = None
     if action == "infill" and image and mask:
         params["image"] = image
-        params["mask"] = _feather_mask(mask)
+        params["mask"] = mask
         params["strength"] = strength
         params["add_original_image"] = True
         params["inpaintImg2ImgStrength"] = 1
         params["uncond_scale"] = 1
+        _inpaint_orig_b64 = image
+        _inpaint_mask_b64 = mask
     elif action == "img2img" and image:
         params["image"] = image
         params["strength"] = strength
@@ -150,5 +159,9 @@ async def generate_image(
         with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
             name = zf.namelist()[0]
             image_data = zf.read(name)
+
+    # Restore original pixels outside mask — guarantees no background changes
+    if _inpaint_orig_b64 and _inpaint_mask_b64:
+        image_data = _restore_outside_mask(_inpaint_orig_b64, image_data, _inpaint_mask_b64)
 
     return image_data, seed
