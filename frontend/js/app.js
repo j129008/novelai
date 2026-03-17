@@ -76,8 +76,7 @@ async function init() {
   // Vibe/style-reference upload (sidebar, unchanged)
   setupFileUpload("vibe-upload", "vibe-preview", "vibe-placeholder", "vibe-clear", "vibe");
 
-  // NEW: img2img via canvas drop zone
-  setupImg2ImgDrop();
+  setupImg2ImgControls();
 
   setupPromptTabs();
   setupHdEnhancement();
@@ -87,6 +86,7 @@ async function init() {
   loadGallery();
 
   $("#generate-btn").addEventListener("click", generate);
+  $("#btn-iterate").addEventListener("click", iterateOnResult);
   $("#btn-reuse-seed").addEventListener("click", reuseSeed);
   $("#btn-download").addEventListener("click", downloadImage);
 
@@ -110,64 +110,21 @@ async function init() {
    IMG2IMG — DROP ZONE SETUP
    ═══════════════════════════════════════════════════════════ */
 
-function setupImg2ImgDrop() {
-  const dropTarget = $("#canvas-drop-target");
-  const fileInput  = $("#img2img-file-input");
-  const clearBadge = $("#img2img-badge-clear");
-  const changeBtn  = $("#img2img-change");
+function setupImg2ImgControls() {
+  const fileInput = $("#img2img-file-input");
+  const uploadBtn = $("#btn-upload-img2img");
+  const clearBtn  = $("#img2img-badge-clear");
+  const changeBtn = $("#img2img-change");
 
-  if (!dropTarget) return;
+  if (uploadBtn) uploadBtn.addEventListener("click", () => fileInput && fileInput.click());
+  if (changeBtn) changeBtn.addEventListener("click", () => fileInput && fileInput.click());
+  if (clearBtn)  clearBtn.addEventListener("click", clearImg2Img);
 
-  // ── Drag events on the canvas drop target ──────────────
-  let dragCounter = 0; // track nested enter/leave
-
-  dropTarget.addEventListener("dragenter", (e) => {
-    e.preventDefault();
-    dragCounter++;
-    if (dragCounter === 1) dropTarget.classList.add("drag-over");
-  });
-
-  dropTarget.addEventListener("dragleave", () => {
-    dragCounter--;
-    if (dragCounter <= 0) {
-      dragCounter = 0;
-      dropTarget.classList.remove("drag-over");
-    }
-  });
-
-  dropTarget.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
-  });
-
-  dropTarget.addEventListener("drop", (e) => {
-    e.preventDefault();
-    dragCounter = 0;
-    dropTarget.classList.remove("drag-over");
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith("image/")) {
-      loadImageFile(file);
-    }
-  });
-
-  // ── Hidden file input (triggered by change button) ────
   if (fileInput) {
     fileInput.addEventListener("change", (e) => {
       const file = e.target.files[0];
       if (file) loadImageFile(file);
-      fileInput.value = ""; // reset so same file can be picked again
-    });
-  }
-
-  // ── Badge clear (exit img2img mode) ───────────────────
-  if (clearBadge) {
-    clearBadge.addEventListener("click", clearImg2Img);
-  }
-
-  // ── Thumbnail "change" button ──────────────────────────
-  if (changeBtn) {
-    changeBtn.addEventListener("click", () => {
-      if (fileInput) fileInput.click();
+      fileInput.value = "";
     });
   }
 }
@@ -177,24 +134,54 @@ function loadImageFile(file) {
   reader.onload = (ev) => {
     const img = new Image();
     img.onload = () => {
-      openCropOverlay(img);
+      const resVal = $("#resolution").value || "832x1216";
+      const [tw, th] = resVal.split("x").map(Number);
+      // Skip crop if image already matches target resolution
+      if (img.naturalWidth === tw && img.naturalHeight === th) {
+        const canvas = document.createElement("canvas");
+        canvas.width = tw;
+        canvas.height = th;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        state.img2img = canvas.toDataURL("image/png").split(",")[1];
+        state.img2imgThumbDataUrl = ev.target.result;
+        activateImg2ImgMode();
+      } else {
+        openCropOverlay(img);
+      }
     };
     img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
 }
 
+function iterateOnResult() {
+  if (!state.lastImageBase64) return;
+  state.img2img = state.lastImageBase64;
+  const outputImg = $("#output img");
+  if (outputImg) {
+    const thumb = document.createElement("canvas");
+    thumb.width = 128; thumb.height = 128;
+    thumb.getContext("2d").drawImage(outputImg, 0, 0, 128, 128);
+    state.img2imgThumbDataUrl = thumb.toDataURL("image/jpeg", 0.8);
+  }
+  activateImg2ImgMode();
+  const accordion = $("#img2img-accordion");
+  if (accordion && !accordion.open) accordion.open = true;
+}
+
 function clearImg2Img() {
   state.img2img = null;
   state.img2imgThumbDataUrl = null;
 
-  const badge    = $("#img2img-badge");
-  const controls = $("#img2img-controls");
-  const thumb    = $("#img2img-source-thumb");
+  const sourceEmpty  = $("#img2img-source-empty");
+  const sourceActive = $("#img2img-source-active");
+  const thumb        = $("#img2img-source-thumb");
+  const badge        = $("#img2img-sidebar-badge");
 
-  if (badge)    badge.style.display = "none";
-  if (controls) controls.style.display = "none";
-  if (thumb)    thumb.src = "";
+  if (sourceEmpty)  sourceEmpty.style.display  = "flex";
+  if (sourceActive) sourceActive.style.display = "none";
+  if (thumb)        thumb.src = "";
+  if (badge)        badge.style.display        = "none";
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -507,21 +494,14 @@ function confirmCrop() {
 }
 
 function activateImg2ImgMode() {
-  const badge    = $("#img2img-badge");
-  const controls = $("#img2img-controls");
-  const thumb    = $("#img2img-source-thumb");
+  const sourceEmpty  = $("#img2img-source-empty");
+  const sourceActive = $("#img2img-source-active");
+  const thumb        = $("#img2img-source-thumb");
+  const badge        = $("#img2img-sidebar-badge");
 
-  if (badge) {
-    badge.style.display = "inline-flex";
-    // Re-trigger animation by removing and re-adding it
-    badge.style.animation = "none";
-    badge.offsetHeight; // force reflow
-    badge.style.animation = "";
-  }
-
-  if (controls) {
-    controls.style.display = "block";
-  }
+  if (sourceEmpty)  sourceEmpty.style.display  = "none";
+  if (sourceActive) sourceActive.style.display = "block";
+  if (badge)        badge.style.display        = "inline-block";
 
   if (thumb && state.img2imgThumbDataUrl) {
     thumb.src = state.img2imgThumbDataUrl;
