@@ -29,11 +29,15 @@ def _feather_mask(mask_b64: str, blur_radius: int = 20) -> tuple[str, np.ndarray
 
     blurred = np.array(mask_img.filter(ImageFilter.GaussianBlur(blur_radius))).astype(np.float32)
 
-    # API mask: keep interior white, soft gradient on edges only
-    api_arr = np.where(sharp > 128, sharp, blurred.astype(np.uint8)).astype(np.uint8)
-    api_img = Image.fromarray(api_arr, mode="L")
+    # API mask: dilate the user's mask so the API's seam artifact falls
+    # OUTSIDE our composite mask's transition zone. The seam gets covered
+    # by original pixels during compositing.
+    dilate_size = blur_radius * 2 + 1
+    if dilate_size % 2 == 0:
+        dilate_size += 1
+    dilated = mask_img.filter(ImageFilter.MaxFilter(dilate_size))
     buf = io.BytesIO()
-    api_img.save(buf, "PNG")
+    dilated.save(buf, "PNG")
     api_mask_b64 = _b64.b64encode(buf.getvalue()).decode()
 
     # Compositing mask using signed distance + sigmoid for perfectly smooth transition
