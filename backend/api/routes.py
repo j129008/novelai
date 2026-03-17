@@ -1,9 +1,14 @@
 import base64
 import csv
+import json
 import os
+import subprocess
+import time
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from models.schemas import GenerateRequest, GenerateResponse
 from api.novelai import generate_image
@@ -11,6 +16,33 @@ from api.novelai import generate_image
 router = APIRouter(prefix="/api")
 
 TOKEN = os.getenv("NOVELAI_TOKEN", "")
+
+# Settings file for persistent config
+_settings_file = Path(__file__).resolve().parent.parent.parent / ".app-settings.json"
+_default_output = Path(__file__).resolve().parent.parent.parent / "output"
+
+
+def _load_settings():
+    if _settings_file.exists():
+        return json.loads(_settings_file.read_text())
+    return {}
+
+
+def _save_settings(data):
+    existing = _load_settings()
+    existing.update(data)
+    _settings_file.write_text(json.dumps(existing, indent=2))
+
+
+def _get_output_dir() -> Path:
+    settings = _load_settings()
+    p = Path(settings.get("output_dir", str(_default_output)))
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+# Ensure default output dir exists
+_default_output.mkdir(exist_ok=True)
 
 # Load tag database once at startup
 TAG_CATEGORIES = {"0": "general", "1": "artist", "3": "series", "4": "character", "5": "meta"}
@@ -109,7 +141,82 @@ async def generate(req: GenerateRequest):
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"NovelAI API error: {e}")
 
+    # Auto-save to output/
+    timestamp = int(time.time())
+    filename = f"{timestamp}-s{seed}.png"
+    filepath = _get_output_dir() / filename
+    filepath.write_bytes(image_data)
+
     return GenerateResponse(
         image=base64.b64encode(image_data).decode(),
         seed=seed,
     )
+
+
+@router.get("/gallery")
+async def list_gallery():
+    out = _get_output_dir()
+    files = sorted(out.glob("*.png"), key=lambda f: f.stat().st_mtime, reverse=True)
+    return [{"name": f.name, "size": f.stat().st_size} for f in files]
+
+
+@router.get("/gallery/{filename}")
+async def get_gallery_image(filename: str):
+    out = _get_output_dir()
+    filepath = out / filename
+    if not filepath.exists() or not filepath.is_relative_to(out):
+        raise HTTPException(status_code=404, detail="Image not found")
+    return FileResponse(filepath, media_type="image/png")
+
+
+@router.delete("/gallery/{filename}")
+async def delete_gallery_image(filename: str):
+    out = _get_output_dir()
+    filepath = out / filename
+    if not filepath.exists() or not filepath.is_relative_to(out):
+        raise HTTPException(status_code=404, detail="Image not found")
+    filepath.unlink()
+    return {"deleted": filename}
+
+
+class SettingsUpdate(BaseModel):
+    output_dir: str | None = None
+
+
+@router.get("/settings")
+async def get_settings():
+    settings = _load_settings()
+    return {
+        "output_dir": settings.get("output_dir", str(_default_output)),
+    }
+
+
+@router.put("/settings")
+async def update_settings(req: SettingsUpdate):
+    if req.output_dir is not None:
+        p = Path(req.output_dir).expanduser().resolve()
+        p.mkdir(parents=True, exist_ok=True)
+        _save_settings({"output_dir": str(p)})
+    return await get_settings()
+
+
+@router.post("/settings/browse")
+async def browse_folder():
+    try:
+        result = subprocess.run(
+            ["osascript", "-e", 'POSIX path of (choose folder with prompt "Select output folder")'],
+            capture_output=True, text=True, timeout=60,
+        )
+        if result.returncode == 0:
+            folder = result.stdout.strip().rstrip("/")
+            return {"path": folder}
+        return {"path": None}
+    except Exception:
+        raise HTTPException(status_code=500, detail="Folder picker not available")
+
+
+@router.post("/settings/open-folder")
+async def open_output_folder():
+    out = _get_output_dir()
+    subprocess.Popen(["open", str(out)])
+    return {"opened": str(out)}

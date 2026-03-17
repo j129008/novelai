@@ -9,3 +9,5 @@ build/
 .venv/
 venv/
 node_modules/
+output/
+.app-settings.json

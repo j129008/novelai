@@ -56,18 +56,75 @@ async function init() {
   setupPromptTabs();
   setupHdEnhancement();
   setupTagAutocomplete();
+  setupAutoSavePrompt();
+  loadGallery();
 
   $("#generate-btn").addEventListener("click", generate);
   $("#btn-reuse-seed").addEventListener("click", reuseSeed);
   $("#btn-download").addEventListener("click", downloadImage);
 
   setupGuide();
+  setupSettings();
 
   document.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
       generate();
     }
+  });
+}
+
+function setupSettings() {
+  const overlay = $("#settings-overlay");
+  const openBtn = $("#settings-btn");
+  const closeBtn = $("#settings-close");
+  const pathInput = $("#settings-output-dir");
+  const browseBtn = $("#settings-browse");
+  const openFolderBtn = $("#settings-open-folder");
+  if (!overlay || !openBtn) return;
+
+  async function loadSettings() {
+    const resp = await fetch("/api/settings");
+    if (resp.ok) {
+      const data = await resp.json();
+      pathInput.value = data.output_dir;
+    }
+  }
+
+  openBtn.addEventListener("click", () => {
+    overlay.style.display = "flex";
+    loadSettings();
+  });
+  closeBtn.addEventListener("click", () => { overlay.style.display = "none"; });
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.style.display = "none";
+  });
+
+  browseBtn.addEventListener("click", async () => {
+    browseBtn.textContent = "Choosing...";
+    browseBtn.disabled = true;
+    try {
+      const resp = await fetch("/api/settings/browse", { method: "POST" });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.path) {
+          pathInput.value = data.path;
+          await fetch("/api/settings", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ output_dir: data.path }),
+          });
+          loadGallery();
+        }
+      }
+    } finally {
+      browseBtn.textContent = "Browse";
+      browseBtn.disabled = false;
+    }
+  });
+
+  openFolderBtn.addEventListener("click", () => {
+    fetch("/api/settings/open-folder", { method: "POST" });
   });
 }
 
@@ -83,8 +140,10 @@ function setupGuide() {
     if (e.target === overlay) overlay.style.display = "none";
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && overlay.style.display !== "none") {
-      overlay.style.display = "none";
+    if (e.key === "Escape") {
+      if (overlay.style.display !== "none") overlay.style.display = "none";
+      const settingsOverlay = $("#settings-overlay");
+      if (settingsOverlay && settingsOverlay.style.display !== "none") settingsOverlay.style.display = "none";
     }
   });
 }
@@ -130,6 +189,27 @@ function setupHdEnhancement() {
   toggle.addEventListener("change", () => {
     smea.checked = toggle.checked;
     smeaDyn.checked = toggle.checked;
+  });
+}
+
+/* ── AUTO-SAVE PROMPT ─────────────────────────────────────── */
+
+function setupAutoSavePrompt() {
+  const prompt = $("#prompt");
+  const negative = $("#negative-prompt");
+
+  // Restore saved values
+  const savedPrompt = localStorage.getItem("nai-prompt");
+  const savedNegative = localStorage.getItem("nai-negative");
+  if (savedPrompt !== null) prompt.value = savedPrompt;
+  if (savedNegative !== null) negative.value = savedNegative;
+
+  // Save on input
+  prompt.addEventListener("input", () => {
+    localStorage.setItem("nai-prompt", prompt.value);
+  });
+  negative.addEventListener("input", () => {
+    localStorage.setItem("nai-negative", negative.value);
   });
 }
 
@@ -415,6 +495,8 @@ async function generate() {
     const actions = $("#image-actions");
     actions.style.display = "flex";
     $("#info-seed").textContent = `Seed: ${data.seed}`;
+
+    loadGallery();
   } catch (e) {
     console.error("Generate error:", e);
     showError(e.message);
@@ -438,6 +520,71 @@ function downloadImage() {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+/* ── GALLERY ──────────────────────────────────────────────── */
+
+async function loadGallery() {
+  const grid = $("#gallery-grid");
+  const empty = $("#gallery-empty");
+  const count = $("#gallery-count");
+  if (!grid) return;
+
+  try {
+    const resp = await fetch("/api/gallery");
+    if (!resp.ok) return;
+    const files = await resp.json();
+
+    count.textContent = files.length ? `(${files.length})` : "";
+
+    if (!files.length) {
+      grid.style.display = "none";
+      empty.style.display = "block";
+      return;
+    }
+
+    grid.style.display = "grid";
+    empty.style.display = "none";
+    grid.innerHTML = "";
+
+    for (const file of files) {
+      const item = document.createElement("div");
+      item.className = "gallery-item";
+
+      const img = document.createElement("img");
+      img.src = `/api/gallery/${file.name}`;
+      img.alt = file.name;
+      img.loading = "lazy";
+
+      // Click to preview
+      img.addEventListener("click", () => {
+        const output = $("#output");
+        const previewImg = document.createElement("img");
+        previewImg.src = img.src;
+        previewImg.alt = "Preview";
+        output.innerHTML = "";
+        output.appendChild(previewImg);
+      });
+
+      const actions = document.createElement("div");
+      actions.className = "gallery-item-actions";
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "gallery-item-btn gallery-item-btn--delete";
+      delBtn.title = "Delete";
+      delBtn.textContent = "×";
+      delBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const resp = await fetch(`/api/gallery/${file.name}`, { method: "DELETE" });
+        if (resp.ok) loadGallery();
+      });
+
+      actions.appendChild(delBtn);
+      item.appendChild(img);
+      item.appendChild(actions);
+      grid.appendChild(item);
+    }
+  } catch { /* ignore */ }
 }
 
 function showError(msg) {
