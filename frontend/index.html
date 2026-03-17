@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=7">
+  <link rel="stylesheet" href="css/style.css?v=10">
 </head>
 <body>
   <div class="app">
@@ -27,9 +27,22 @@
           <div class="prompt-tabs">
             <button class="prompt-tab active" data-target="prompt" type="button">Prompt</button>
             <button class="prompt-tab" data-target="negative-prompt" type="button">Undesired</button>
+            <div class="prompt-tab-actions">
+              <label class="pill-toggle" id="quality-tags-pill" title="Auto-prepend quality boost tags">
+                <input type="checkbox" id="quality-tags" checked>
+                <span class="pill-label">Quality</span>
+              </label>
+              <select id="uc-preset" class="uc-preset-select" style="display:none" aria-label="Undesired content preset">
+                <option value="human-focus">Human Focus</option>
+                <option value="heavy">Heavy</option>
+                <option value="light">Light</option>
+                <option value="furry-focus">Furry Focus</option>
+                <option value="none">None</option>
+              </select>
+            </div>
           </div>
           <textarea id="prompt" class="field-textarea field-textarea--prompt" rows="6" placeholder="Describe your vision… e.g. a girl standing in a field of sunflowers at golden hour" spellcheck="false"></textarea>
-          <textarea id="negative-prompt" class="field-textarea field-textarea--negative" rows="6" placeholder="What to exclude…" spellcheck="false" style="display:none">lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page, @_@, mismatched pupils, glowing eyes, bad anatomy</textarea>
+          <textarea id="negative-prompt" class="field-textarea field-textarea--negative" rows="6" placeholder="What to exclude…" spellcheck="false" style="display:none">nsfw, lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page, @_@, mismatched pupils, glowing eyes, bad anatomy</textarea>
         </div>
 
         <div class="control-group">
@@ -177,6 +190,6 @@
 
     </main>
   </div>
-  <script src="js/app.js?v=7"></script>
+  <script src="js/app.js?v=10"></script>
 </body>
 </html>

@@ -11,6 +11,14 @@ const SAMPLER_LABELS = {
   "k_dpmpp_sde":          "Smooth",
 };
 
+const UC_PRESETS = {
+  "heavy": "nsfw, lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page",
+  "light": "nsfw, lowres, artistic error, scan artifacts, worst quality, bad quality, jpeg artifacts, multiple views, very displeasing, too many watermarks, negative space, blank page",
+  "human-focus": "nsfw, lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page, @_@, mismatched pupils, glowing eyes, bad anatomy",
+  "furry-focus": "nsfw, {worst quality}, distracting watermark, unfinished, bad quality, {widescreen}, upscale, {sequence}, {{grandfathered content}}, blurred foreground, chromatic aberration, sketch, everyone, [sketch background], simple, [flat colors], ych (character), outline, multiple scenes, [[horror (theme)]], comic",
+  "none": "",
+};
+
 const state = {
   img2img: null,
   vibe: null,
@@ -64,6 +72,7 @@ function setupPromptTabs() {
   const tabs = document.querySelectorAll(".prompt-tab");
   const prompt = $("#prompt");
   const negative = $("#negative-prompt");
+  const ucPreset = $("#uc-preset");
 
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
@@ -72,12 +81,23 @@ function setupPromptTabs() {
       if (tab.dataset.target === "prompt") {
         prompt.style.display = "";
         negative.style.display = "none";
+        if (ucPreset) ucPreset.style.display = "none";
       } else {
         prompt.style.display = "none";
         negative.style.display = "";
+        if (ucPreset) ucPreset.style.display = "";
       }
     });
   });
+
+  if (ucPreset) {
+    ucPreset.addEventListener("change", () => {
+      const text = UC_PRESETS[ucPreset.value];
+      if (text !== undefined) {
+        negative.value = text;
+      }
+    });
+  }
 }
 
 function setupHdEnhancement() {
@@ -161,8 +181,11 @@ async function generate() {
   const resVal = $("#resolution").value;
   const [width, height] = resVal ? resVal.split("x").map(Number) : [832, 1216];
 
+  const qualityTags = "best quality, amazing quality, very aesthetic, absurdres";
+  const finalPrompt = $("#quality-tags").checked ? `${qualityTags}, ${prompt}` : prompt;
+
   const body = {
-    prompt,
+    prompt: finalPrompt,
     negative_prompt: $("#negative-prompt").value,
     width: width || 832,
     height: height || 1216,
