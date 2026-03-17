@@ -1171,12 +1171,19 @@ function renderGallery(files, filter) {
 function loadSettingsFromMeta(meta) {
   if (!meta || !meta.prompt) return;
 
-  const qTag = ", location, very aesthetic, masterpiece, no text";
+  // Known quality tag patterns (our app, NAI official, V4 format)
+  const QUALITY_PATTERNS = [
+    ", location, very aesthetic, masterpiece, no text",
+    ", very aesthetic, masterpiece, no text",
+    ", no text, best quality, very aesthetic, absurdres",
+    ", best quality, amazing quality, very aesthetic, absurdres",
+  ];
   let prompt = meta.prompt;
-  // Strip quality tags — they may appear before a | or at end
-  // Just remove the substring wherever it appears in the prompt
-  if (prompt.includes(qTag)) {
-    prompt = prompt.replace(qTag, "");
+  for (const pat of QUALITY_PATTERNS) {
+    if (prompt.includes(pat)) {
+      prompt = prompt.replace(pat, "");
+      break;
+    }
   }
 
   $("#prompt").value = prompt;
