@@ -87,8 +87,11 @@ async function init() {
 
   $("#generate-btn").addEventListener("click", generate);
   $("#btn-iterate").addEventListener("click", iterateOnResult);
-  $("#btn-inpaint").addEventListener("click", openInpaintMode);
+  $("#btn-inpaint").addEventListener("click", () => openInpaintMode());
   $("#btn-random-seed").addEventListener("click", () => { $("#seed").value = 0; });
+  $("#img2img-inpaint").addEventListener("click", () => {
+    if (state.img2img) openInpaintMode(state.img2img);
+  });
   $("#btn-reuse-seed").addEventListener("click", reuseSeed);
   $("#btn-download").addEventListener("click", downloadImage);
 
@@ -1035,13 +1038,16 @@ const inpaint = {
   lastY: 0,
 };
 
-function openInpaintMode() {
-  if (!state.lastImageBase64) return;
+function openInpaintMode(sourceBase64) {
+  const base64 = sourceBase64 || state.lastImageBase64;
+  if (!base64) return;
 
   const overlay = $("#inpaint-overlay");
   if (!overlay) return;
 
-  // Load source image
+  // Store which base64 we're inpainting on
+  inpaint.sourceBase64 = base64;
+
   const img = new Image();
   img.onload = () => {
     inpaint.sourceImg = img;
@@ -1054,7 +1060,7 @@ function openInpaintMode() {
       requestAnimationFrame(() => initInpaintCanvas());
     });
   };
-  img.src = `data:image/png;base64,${state.lastImageBase64}`;
+  img.src = `data:image/png;base64,${base64}`;
 }
 
 function initInpaintCanvas() {
@@ -1270,7 +1276,7 @@ async function confirmInpaint() {
     seed: parseInt($("#seed").value) || 0,
     sm: false,
     sm_dyn: false,
-    image: state.lastImageBase64,
+    image: inpaint.sourceBase64,
     mask: maskBase64,
     strength: parseFloat($("#strength").value),
   };
