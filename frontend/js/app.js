@@ -896,8 +896,19 @@ async function generate() {
   const resVal = $("#resolution").value;
   const [width, height] = resVal ? resVal.split("x").map(Number) : [832, 1216];
 
-  const qualityTags = "location, very aesthetic, masterpiece, no text";
-  const finalPrompt = $("#quality-tags").checked ? `${qualityTags}, ${prompt}` : prompt;
+  const qualityTags = ", location, very aesthetic, masterpiece, no text";
+  let finalPrompt = prompt;
+  if ($("#quality-tags").checked) {
+    // Append quality tags to base prompt (before first | separator)
+    const pipeIdx = prompt.indexOf("|");
+    if (pipeIdx >= 0) {
+      const base = prompt.slice(0, pipeIdx).trimEnd();
+      const rest = prompt.slice(pipeIdx);
+      finalPrompt = base + qualityTags + " " + rest;
+    } else {
+      finalPrompt = prompt + qualityTags;
+    }
+  }
 
   const body = {
     prompt: finalPrompt,
@@ -1161,13 +1172,25 @@ function renderGallery(files, filter) {
 function loadSettingsFromMeta(meta) {
   if (!meta || !meta.prompt) return;
 
-  const qualitySuffix = ", location, very aesthetic, masterpiece, no text";
-  const qualityPrefix = "location, very aesthetic, masterpiece, no text, ";
+  const qTag = ", location, very aesthetic, masterpiece, no text";
   let prompt = meta.prompt;
-  if (prompt.startsWith(qualityPrefix)) {
-    prompt = prompt.slice(qualityPrefix.length);
-  } else if (prompt.endsWith(qualitySuffix)) {
-    prompt = prompt.slice(0, -qualitySuffix.length);
+  // Quality tags may be appended to base prompt (before |) or at end
+  const pipeIdx = prompt.indexOf("|");
+  if (pipeIdx >= 0) {
+    // Multi-character prompt: strip from base part only
+    let base = prompt.slice(0, pipeIdx);
+    const rest = prompt.slice(pipeIdx);
+    if (base.includes(qTag)) {
+      base = base.replace(qTag, "");
+    }
+    prompt = base.trimEnd() + " " + rest;
+  } else {
+    // Single prompt: strip from end or start
+    if (prompt.endsWith(qTag)) {
+      prompt = prompt.slice(0, -qTag.length);
+    } else if (prompt.startsWith(qTag.slice(2) + ", ")) {
+      prompt = prompt.slice(qTag.length - 2 + 2);
+    }
   }
 
   $("#prompt").value = prompt;
