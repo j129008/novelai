@@ -1412,25 +1412,25 @@ async function confirmInpaint() {
   const mh = inpaint.maskCanvas.height;
 
   // Step 1: blur the mask to feather edges
-  const blurred = document.createElement("canvas");
-  blurred.width = mw;
-  blurred.height = mh;
-  const blurCtx = blurred.getContext("2d");
-  blurCtx.filter = "blur(16px)";
+  const blurredMaskCanvas = document.createElement("canvas");
+  blurredMaskCanvas.width = mw;
+  blurredMaskCanvas.height = mh;
+  const blurCtx = blurredMaskCanvas.getContext("2d");
+  blurCtx.filter = "blur(20px)";
   blurCtx.drawImage(inpaint.maskCanvas, 0, 0);
   blurCtx.filter = "none";
 
   // Step 2: composite sharp mask on top of blurred (ensures center is fully white)
   blurCtx.drawImage(inpaint.maskCanvas, 0, 0);
 
-  // Step 3: render onto black background
+  // Step 3: render onto black background for API
   const exportMask = document.createElement("canvas");
   exportMask.width = mw;
   exportMask.height = mh;
   const emCtx = exportMask.getContext("2d");
   emCtx.fillStyle = "black";
   emCtx.fillRect(0, 0, mw, mh);
-  emCtx.drawImage(blurred, 0, 0);
+  emCtx.drawImage(blurredMaskCanvas, 0, 0);
 
   const maskBase64 = exportMask.toDataURL("image/png").split(",")[1];
 
@@ -1482,11 +1482,15 @@ async function confirmInpaint() {
 
     const data = await resp.json();
     state.lastSeed = data.seed;
-    state.lastImageBase64 = data.image;
+
+    // Composite: blend API result with original using feathered mask
+    // This eliminates any edge artifacts from the API
+    const composited = await compositeInpaint(inpaint.sourceBase64, data.image, blurredMaskCanvas);
+    state.lastImageBase64 = composited;
 
     const output = $("#output");
     const img = document.createElement("img");
-    img.src = `data:image/png;base64,${data.image}`;
+    img.src = `data:image/png;base64,${composited}`;
     img.alt = "Inpainted image";
     output.innerHTML = "";
     output.appendChild(img);
@@ -1502,6 +1506,69 @@ async function confirmInpaint() {
     confirmBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Generate Inpaint`;
     confirmBtn.disabled = false;
   }
+}
+
+// Pixel-level composite: original * (1 - mask) + result * mask
+// This ensures perfect blending regardless of API edge behavior
+function compositeInpaint(origBase64, resultBase64, featheredMaskCanvas) {
+  return new Promise((resolve) => {
+    const origImg = new Image();
+    const resultImg = new Image();
+    let loaded = 0;
+
+    function onLoad() {
+      loaded++;
+      if (loaded < 2) return;
+
+      const w = origImg.naturalWidth;
+      const h = origImg.naturalHeight;
+
+      // Draw original
+      const origCanvas = document.createElement("canvas");
+      origCanvas.width = w; origCanvas.height = h;
+      const origCtx = origCanvas.getContext("2d");
+      origCtx.drawImage(origImg, 0, 0);
+      const origData = origCtx.getImageData(0, 0, w, h);
+
+      // Draw result
+      const resCanvas = document.createElement("canvas");
+      resCanvas.width = w; resCanvas.height = h;
+      const resCtx = resCanvas.getContext("2d");
+      resCtx.drawImage(resultImg, 0, 0);
+      const resData = resCtx.getImageData(0, 0, w, h);
+
+      // Get feathered mask as grayscale
+      const maskCanvas = document.createElement("canvas");
+      maskCanvas.width = w; maskCanvas.height = h;
+      const maskCtx = maskCanvas.getContext("2d");
+      maskCtx.fillStyle = "black";
+      maskCtx.fillRect(0, 0, w, h);
+      maskCtx.drawImage(featheredMaskCanvas, 0, 0);
+      const maskData = maskCtx.getImageData(0, 0, w, h);
+
+      // Blend pixel by pixel
+      const out = origCtx.createImageData(w, h);
+      for (let i = 0; i < out.data.length; i += 4) {
+        const alpha = maskData.data[i] / 255; // R channel of mask (grayscale)
+        out.data[i]     = origData.data[i]     * (1 - alpha) + resData.data[i]     * alpha;
+        out.data[i + 1] = origData.data[i + 1] * (1 - alpha) + resData.data[i + 1] * alpha;
+        out.data[i + 2] = origData.data[i + 2] * (1 - alpha) + resData.data[i + 2] * alpha;
+        out.data[i + 3] = 255;
+      }
+
+      const outCanvas = document.createElement("canvas");
+      outCanvas.width = w; outCanvas.height = h;
+      const outCtx = outCanvas.getContext("2d");
+      outCtx.putImageData(out, 0, 0);
+
+      resolve(outCanvas.toDataURL("image/png").split(",")[1]);
+    }
+
+    origImg.onload = onLoad;
+    resultImg.onload = onLoad;
+    origImg.src = `data:image/png;base64,${origBase64}`;
+    resultImg.src = `data:image/png;base64,${resultBase64}`;
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════
