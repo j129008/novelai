@@ -896,7 +896,7 @@ async function generate() {
   const resVal = $("#resolution").value;
   const [width, height] = resVal ? resVal.split("x").map(Number) : [832, 1216];
 
-  const qualityTags = ", location, very aesthetic, masterpiece, no text";
+  const qualityTags = ", very aesthetic, masterpiece, no text";
   let finalPrompt = prompt;
   if ($("#quality-tags").checked) {
     // Append quality tags to base prompt content (before first | separator)
