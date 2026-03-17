@@ -94,6 +94,8 @@ async def generate_image(
         params["mask"] = mask
         params["strength"] = strength
         params["add_original_image"] = True
+        params["inpaintImg2ImgStrength"] = 1
+        params["uncond_scale"] = 1
     elif action == "img2img" and image:
         params["image"] = image
         params["strength"] = strength
