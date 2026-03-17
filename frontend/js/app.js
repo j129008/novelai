@@ -1435,8 +1435,8 @@ async function confirmInpaint() {
   const imgData = emCtx.getImageData(0, 0, mw, mh);
   const d = imgData.data;
   for (let i = 0; i < d.length; i += 4) {
-    // If any channel > 128, make pure white; otherwise pure black
-    const v = d[i] > 128 || d[i + 1] > 128 || d[i + 2] > 128 || d[i + 3] > 128 ? 255 : 0;
+    // Check RGB only (alpha is always 255 on black background)
+    const v = d[i] > 128 || d[i + 1] > 128 || d[i + 2] > 128 ? 255 : 0;
     d[i] = v; d[i + 1] = v; d[i + 2] = v; d[i + 3] = 255;
   }
   emCtx.putImageData(imgData, 0, 0);
