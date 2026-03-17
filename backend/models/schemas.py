@@ -27,8 +27,9 @@ class GenerateRequest(BaseModel):
     seed: int = Field(default=0, ge=0)
     sm: bool = False
     sm_dyn: bool = False
-    # img2img
+    # img2img / inpainting
     image: Optional[str] = None  # base64
+    mask: Optional[str] = None  # base64, white = repaint area
     strength: float = Field(default=0.7, ge=0, le=1)
     noise: float = Field(default=0.0, ge=0, le=1)
     # vibe transfer

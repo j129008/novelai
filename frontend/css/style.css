@@ -690,6 +690,10 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   gap: 8px;
 }
 
+/* Inpaint tools */
+.inpaint-tools { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.inpaint-brush-size { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-secondary); }
+
 .btn-action--confirm {
   background: var(--accent);
   border-color: var(--accent);

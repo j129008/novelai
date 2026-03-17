@@ -30,6 +30,7 @@ async def generate_image(
     sm: bool = False,
     sm_dyn: bool = False,
     image: Optional[str] = None,
+    mask: Optional[str] = None,
     strength: float = 0.7,
     noise: float = 0.0,
     reference_image: Optional[str] = None,
@@ -83,7 +84,12 @@ async def generate_image(
         }
         params["characterPrompts"] = []
 
-    if action == "img2img" and image:
+    if action == "infill" and image and mask:
+        params["image"] = image
+        params["mask"] = mask
+        params["strength"] = strength
+        params["add_original_image"] = True
+    elif action == "img2img" and image:
         params["image"] = image
         params["strength"] = strength
         params["noise"] = noise

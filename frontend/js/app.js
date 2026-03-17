@@ -87,6 +87,7 @@ async function init() {
 
   $("#generate-btn").addEventListener("click", generate);
   $("#btn-iterate").addEventListener("click", iterateOnResult);
+  $("#btn-inpaint").addEventListener("click", openInpaintMode);
   $("#btn-random-seed").addEventListener("click", () => { $("#seed").value = 0; });
   $("#btn-reuse-seed").addEventListener("click", reuseSeed);
   $("#btn-download").addEventListener("click", downloadImage);
@@ -1020,6 +1021,297 @@ function downloadImage() {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INPAINT
+   ═══════════════════════════════════════════════════════════ */
+
+const inpaint = {
+  sourceImg: null,
+  maskCanvas: null,
+  painting: false,
+  lastX: 0,
+  lastY: 0,
+};
+
+function openInpaintMode() {
+  if (!state.lastImageBase64) return;
+
+  const overlay = $("#inpaint-overlay");
+  if (!overlay) return;
+
+  // Load source image
+  const img = new Image();
+  img.onload = () => {
+    inpaint.sourceImg = img;
+    overlay.style.display = "flex";
+
+    const resLabel = $("#inpaint-resolution-label");
+    if (resLabel) resLabel.textContent = `${img.naturalWidth} × ${img.naturalHeight}`;
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => initInpaintCanvas());
+    });
+  };
+  img.src = `data:image/png;base64,${state.lastImageBase64}`;
+}
+
+function initInpaintCanvas() {
+  const canvasEl = $("#inpaint-canvas");
+  if (!canvasEl || !inpaint.sourceImg) return;
+
+  const stageWrap = canvasEl.parentElement;
+  const rect = stageWrap.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+
+  canvasEl.width = rect.width * dpr;
+  canvasEl.height = rect.height * dpr;
+  canvasEl.style.width = rect.width + "px";
+  canvasEl.style.height = rect.height + "px";
+
+  // Create offscreen mask canvas at image resolution
+  inpaint.maskCanvas = document.createElement("canvas");
+  inpaint.maskCanvas.width = inpaint.sourceImg.naturalWidth;
+  inpaint.maskCanvas.height = inpaint.sourceImg.naturalHeight;
+  const maskCtx = inpaint.maskCanvas.getContext("2d");
+  maskCtx.fillStyle = "black";
+  maskCtx.fillRect(0, 0, inpaint.maskCanvas.width, inpaint.maskCanvas.height);
+
+  renderInpaintCanvas();
+  setupInpaintInteraction();
+}
+
+function renderInpaintCanvas() {
+  const canvasEl = $("#inpaint-canvas");
+  if (!canvasEl || !inpaint.sourceImg) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const ctx = canvasEl.getContext("2d");
+  const W = canvasEl.width;
+  const H = canvasEl.height;
+  const screenW = W / dpr;
+  const screenH = H / dpr;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.save();
+  ctx.scale(dpr, dpr);
+
+  // Fit image to stage
+  const img = inpaint.sourceImg;
+  const scale = Math.min(screenW / img.naturalWidth, screenH / img.naturalHeight);
+  const drawW = img.naturalWidth * scale;
+  const drawH = img.naturalHeight * scale;
+  const drawX = (screenW - drawW) / 2;
+  const drawY = (screenH - drawH) / 2;
+
+  // Draw source image
+  ctx.drawImage(img, drawX, drawY, drawW, drawH);
+
+  // Draw mask overlay (semi-transparent red)
+  if (inpaint.maskCanvas) {
+    ctx.globalAlpha = 0.45;
+    ctx.globalCompositeOperation = "source-atop";
+    // We need to draw only the white parts of the mask as red
+    // Create a temp canvas for the colored mask
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = inpaint.maskCanvas.width;
+    tempCanvas.height = inpaint.maskCanvas.height;
+    const tempCtx = tempCanvas.getContext("2d");
+    tempCtx.drawImage(inpaint.maskCanvas, 0, 0);
+    tempCtx.globalCompositeOperation = "source-in";
+    tempCtx.fillStyle = "#ff4444";
+    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 0.45;
+    ctx.drawImage(tempCanvas, drawX, drawY, drawW, drawH);
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.restore();
+}
+
+function setupInpaintInteraction() {
+  const canvasEl = $("#inpaint-canvas");
+  const brushSlider = $("#inpaint-brush");
+  const brushVal = $("#inpaint-brush-val");
+  const clearBtn = $("#inpaint-clear-mask");
+  const confirmBtn = $("#inpaint-confirm");
+  const cancelBtn = $("#inpaint-cancel");
+
+  if (brushSlider && brushVal) {
+    brushVal.textContent = brushSlider.value;
+    brushSlider.addEventListener("input", () => {
+      brushVal.textContent = brushSlider.value;
+    });
+  }
+
+  function getImageCoords(e) {
+    const rect = canvasEl.getBoundingClientRect();
+    const screenW = rect.width;
+    const screenH = rect.height;
+    const img = inpaint.sourceImg;
+    const scale = Math.min(screenW / img.naturalWidth, screenH / img.naturalHeight);
+    const drawW = img.naturalWidth * scale;
+    const drawH = img.naturalHeight * scale;
+    const drawX = (screenW - drawW) / 2;
+    const drawY = (screenH - drawH) / 2;
+
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+
+    return {
+      x: (sx - drawX) / scale,
+      y: (sy - drawY) / scale,
+      brushR: parseInt(brushSlider.value) / 2,
+    };
+  }
+
+  function paintMask(x, y, brushR) {
+    if (!inpaint.maskCanvas) return;
+    const ctx = inpaint.maskCanvas.getContext("2d");
+    ctx.fillStyle = "white";
+    ctx.beginPath();
+    ctx.arc(x, y, brushR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function paintLine(x1, y1, x2, y2, brushR) {
+    if (!inpaint.maskCanvas) return;
+    const ctx = inpaint.maskCanvas.getContext("2d");
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = brushR * 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+
+  canvasEl.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    inpaint.painting = true;
+    const { x, y, brushR } = getImageCoords(e);
+    inpaint.lastX = x;
+    inpaint.lastY = y;
+    paintMask(x, y, brushR);
+    renderInpaintCanvas();
+    canvasEl.setPointerCapture(e.pointerId);
+  });
+
+  canvasEl.addEventListener("pointermove", (e) => {
+    if (!inpaint.painting) return;
+    const { x, y, brushR } = getImageCoords(e);
+    paintLine(inpaint.lastX, inpaint.lastY, x, y, brushR);
+    inpaint.lastX = x;
+    inpaint.lastY = y;
+    renderInpaintCanvas();
+  });
+
+  canvasEl.addEventListener("pointerup", () => { inpaint.painting = false; });
+  canvasEl.addEventListener("pointercancel", () => { inpaint.painting = false; });
+
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      if (!inpaint.maskCanvas) return;
+      const ctx = inpaint.maskCanvas.getContext("2d");
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, inpaint.maskCanvas.width, inpaint.maskCanvas.height);
+      renderInpaintCanvas();
+    });
+  }
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", () => {
+      $("#inpaint-overlay").style.display = "none";
+    });
+  }
+
+  if (confirmBtn) {
+    confirmBtn.addEventListener("click", confirmInpaint);
+  }
+}
+
+async function confirmInpaint() {
+  if (!inpaint.sourceImg || !inpaint.maskCanvas) return;
+
+  const overlay = $("#inpaint-overlay");
+  const confirmBtn = $("#inpaint-confirm");
+
+  // Get mask as base64
+  const maskDataUrl = inpaint.maskCanvas.toDataURL("image/png");
+  const maskBase64 = maskDataUrl.split(",")[1];
+
+  // Build request
+  const prompt = $("#prompt").value.trim();
+  if (!prompt) { showError("Please enter a prompt."); return; }
+
+  const qualityTags = ", very aesthetic, masterpiece, no text";
+  let finalPrompt = prompt;
+  if ($("#quality-tags").checked) {
+    const pipeMatch = prompt.match(/^([\s\S]*?\S)([\s\n]*\|[\s\S]*)$/);
+    if (pipeMatch) {
+      finalPrompt = pipeMatch[1] + qualityTags + pipeMatch[2];
+    } else {
+      finalPrompt = prompt.replace(/\s+$/, "") + qualityTags;
+    }
+  }
+
+  const body = {
+    prompt: finalPrompt,
+    negative_prompt: $("#negative-prompt").value,
+    width: inpaint.sourceImg.naturalWidth,
+    height: inpaint.sourceImg.naturalHeight,
+    steps: parseInt($("#steps").value),
+    scale: parseFloat($("#scale").value),
+    sampler: $("#sampler").value,
+    seed: parseInt($("#seed").value) || 0,
+    sm: false,
+    sm_dyn: false,
+    image: state.lastImageBase64,
+    mask: maskBase64,
+    strength: parseFloat($("#strength").value),
+  };
+
+  confirmBtn.textContent = "Generating...";
+  confirmBtn.disabled = true;
+
+  try {
+    const resp = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      throw new Error(err.detail || "Inpaint failed");
+    }
+
+    const data = await resp.json();
+    state.lastSeed = data.seed;
+    state.lastImageBase64 = data.image;
+
+    const output = $("#output");
+    const img = document.createElement("img");
+    img.src = `data:image/png;base64,${data.image}`;
+    img.alt = "Inpainted image";
+    output.innerHTML = "";
+    output.appendChild(img);
+
+    $("#image-actions").style.display = "flex";
+    $("#info-seed").textContent = `Seed: ${data.seed}`;
+
+    overlay.style.display = "none";
+    loadGallery();
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    confirmBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Generate Inpaint`;
+    confirmBtn.disabled = false;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
