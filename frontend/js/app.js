@@ -1491,11 +1491,14 @@ async function confirmInpaint() {
 
     const data = await resp.json();
     state.lastSeed = data.seed;
-    state.lastImageBase64 = data.image;
+
+    // Smooth the seam: blend API result with original at mask boundary only
+    const finalImage = await smoothInpaintSeam(inpaint.sourceBase64, data.image, inpaint.maskCanvas);
+    state.lastImageBase64 = finalImage;
 
     const output = $("#output");
     const img = document.createElement("img");
-    img.src = `data:image/png;base64,${data.image}`;
+    img.src = `data:image/png;base64,${finalImage}`;
     img.alt = "Inpainted image";
     output.innerHTML = "";
     output.appendChild(img);
@@ -1511,6 +1514,85 @@ async function confirmInpaint() {
     confirmBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Generate Inpaint`;
     confirmBtn.disabled = false;
   }
+}
+
+// Smooth seam at mask boundary by blending API result with original
+// using a slightly blurred version of the mask. Only affects the edge
+// (~6px band). Interior and exterior are untouched.
+function smoothInpaintSeam(origBase64, resultBase64, maskCanvas) {
+  return new Promise((resolve) => {
+    const origImg = new Image();
+    const resultImg = new Image();
+    let loaded = 0;
+
+    function onLoad() {
+      if (++loaded < 2) return;
+      const w = origImg.naturalWidth;
+      const h = origImg.naturalHeight;
+
+      // Create soft mask: blur the sharp mask by 6px
+      const soft = document.createElement("canvas");
+      soft.width = w; soft.height = h;
+      const sCtx = soft.getContext("2d");
+      sCtx.filter = "blur(6px)";
+      sCtx.drawImage(maskCanvas, 0, 0);
+      sCtx.filter = "none";
+      const softData = sCtx.getImageData(0, 0, w, h).data;
+
+      // Get sharp mask for comparison
+      const sharp = document.createElement("canvas");
+      sharp.width = w; sharp.height = h;
+      const shCtx = sharp.getContext("2d");
+      shCtx.drawImage(maskCanvas, 0, 0);
+      const sharpData = shCtx.getImageData(0, 0, w, h).data;
+
+      // Draw original and result
+      const oC = document.createElement("canvas");
+      oC.width = w; oC.height = h;
+      oC.getContext("2d").drawImage(origImg, 0, 0);
+      const oData = oC.getContext("2d").getImageData(0, 0, w, h);
+
+      const rC = document.createElement("canvas");
+      rC.width = w; rC.height = h;
+      rC.getContext("2d").drawImage(resultImg, 0, 0);
+      const rData = rC.getContext("2d").getImageData(0, 0, w, h).data;
+
+      // Only blend at the edge: where soft mask differs from sharp mask
+      const out = oData;
+      for (let i = 0; i < out.data.length; i += 4) {
+        const softAlpha = softData[i] / 255;   // R channel of blurred mask
+        const sharpAlpha = sharpData[i] / 255;  // R channel of sharp mask
+
+        // Inside mask (sharp=1, soft~=1): use API result
+        // Outside mask (sharp=0, soft~=0): use original (already from API)
+        // Edge (sharp != soft): blend
+        if (sharpAlpha > 0.5) {
+          // Inside or edge-inside: use API result
+          out.data[i] = rData[i];
+          out.data[i + 1] = rData[i + 1];
+          out.data[i + 2] = rData[i + 2];
+        } else if (softAlpha > 0.01) {
+          // Edge-outside: blend original with API result
+          const a = softAlpha;
+          out.data[i] = oData.data[i] * (1 - a) + rData[i] * a;
+          out.data[i + 1] = oData.data[i + 1] * (1 - a) + rData[i + 1] * a;
+          out.data[i + 2] = oData.data[i + 2] * (1 - a) + rData[i + 2] * a;
+        }
+        // else: outside mask, keep original (oData already has it)
+        out.data[i + 3] = 255;
+      }
+
+      const outC = document.createElement("canvas");
+      outC.width = w; outC.height = h;
+      outC.getContext("2d").putImageData(out, 0, 0);
+      resolve(outC.toDataURL("image/png").split(",")[1]);
+    }
+
+    origImg.onload = onLoad;
+    resultImg.onload = onLoad;
+    origImg.src = `data:image/png;base64,${origBase64}`;
+    resultImg.src = `data:image/png;base64,${resultBase64}`;
+  });
 }
 
 // Pixel-level composite: original * (1 - mask) + result * mask
