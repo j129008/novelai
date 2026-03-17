@@ -14,6 +14,14 @@ V4_MODELS = {
     "nai-diffusion-4-5-full",
 }
 
+# Model name mapping for inpainting
+INPAINTING_MODELS = {
+    "nai-diffusion-4-5-full": "nai-diffusion-4-5-full-inpainting",
+    "nai-diffusion-4-5-curated": "nai-diffusion-4-5-curated-inpainting",
+    "nai-diffusion-4-full": "nai-diffusion-4-full-inpainting",
+    "nai-diffusion-4-curated-preview": "nai-diffusion-4-curated-preview-inpainting",
+}
+
 
 async def generate_image(
     token: str,
@@ -99,9 +107,12 @@ async def generate_image(
         params["reference_information_extracted"] = reference_information_extracted
         params["reference_strength"] = reference_strength
 
+    # Use inpainting-specific model for infill action
+    api_model = INPAINTING_MODELS.get(model, model + "-inpainting") if action == "infill" else model
+
     payload = {
         "input": prompt,
-        "model": model,
+        "model": api_model,
         "action": action,
         "parameters": params,
     }
