@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=10">
+  <link rel="stylesheet" href="css/style.css?v=11">
 </head>
 <body>
   <div class="app">
@@ -17,7 +17,96 @@
         <span>NovelAI</span>
       </div>
       <span class="app-tagline">Image Generator</span>
+      <button id="guide-btn" class="header-btn" type="button" title="Prompt Guide">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>Prompt Guide</span>
+      </button>
     </header>
+
+    <!-- Prompt Guide Overlay -->
+    <div id="guide-overlay" class="guide-overlay" style="display:none">
+      <div class="guide-panel">
+        <div class="guide-header">
+          <h2>Prompt Guide — V4.5 Full</h2>
+          <button id="guide-close" class="guide-close" type="button">&times;</button>
+        </div>
+        <div class="guide-body">
+
+          <section class="guide-section">
+            <h3>Tag 順序</h3>
+            <p class="guide-formula">人數 → 角色/系列 → 外觀 → 動作/表情 → 場景 → 風格</p>
+            <code class="guide-example">1girl, character name, blonde hair, blue eyes, smile, garden, soft lighting</code>
+          </section>
+
+          <section class="guide-section">
+            <h3>強調語法</h3>
+            <table class="guide-table">
+              <tr><td><code>{text}</code></td><td>加強 ×1.05</td><td><code>{red hair}</code></td></tr>
+              <tr><td><code>{{text}}</code></td><td>加強 ×1.10</td><td><code>{{masterpiece}}</code></td></tr>
+              <tr><td><code>[text]</code></td><td>減弱 ×0.95</td><td><code>[background]</code></td></tr>
+              <tr><td><code>1.5::text::</code></td><td>精確權重</td><td><code>1.5::rain, night::</code></td></tr>
+              <tr><td><code>-1::text::</code></td><td>反向移除</td><td><code>-1::monochrome::</code></td></tr>
+            </table>
+          </section>
+
+          <section class="guide-section">
+            <h3>多角色</h3>
+            <p>用 <code>|</code> 分隔 base prompt 和各角色：</p>
+            <code class="guide-example">2girls, park | girl, blonde hair, red dress | girl, black hair, blue dress</code>
+            <p class="guide-note">互動標籤：<code>source#hug</code>（發起）、<code>target#hug</code>（接受）、<code>mutual#holding hands</code>（雙向）</p>
+          </section>
+
+          <section class="guide-section">
+            <h3>特殊標籤</h3>
+            <table class="guide-table">
+              <tr><td><code>fur dataset,</code></td><td>放最前面，切換毛茸茸風格</td></tr>
+              <tr><td><code>background dataset,</code></td><td>放最前面，純風景/靜物（無人物）</td></tr>
+              <tr><td><code>year 2024</code></td><td>調整畫風年代感</td></tr>
+            </table>
+          </section>
+
+          <section class="guide-section">
+            <h3>Quality Tags（自動加入）</h3>
+            <p>開啟時自動在 prompt 末尾加：</p>
+            <code class="guide-example">, location, very aesthetic, masterpiece, no text</code>
+          </section>
+
+          <section class="guide-section">
+            <h3>範例</h3>
+            <div class="guide-examples">
+              <div>
+                <span class="guide-tag">角色</span>
+                <code>1girl, long white hair, blue eyes, elegant dress, sitting, garden, roses, soft lighting</code>
+              </div>
+              <div>
+                <span class="guide-tag">動態</span>
+                <code>1boy, action pose, sword, jumping, ruined castle, dramatic lighting, cape flowing</code>
+              </div>
+              <div>
+                <span class="guide-tag">風景</span>
+                <code>background dataset, mountain lake, sunrise, fog, pine trees, reflection</code>
+              </div>
+              <div>
+                <span class="guide-tag">多角色</span>
+                <code>2girls, cafe | girl, short pink hair, cheerful, waving | girl, glasses, reading book, calm</code>
+              </div>
+            </div>
+          </section>
+
+          <section class="guide-section">
+            <h3>小技巧</h3>
+            <ul class="guide-tips">
+              <li>越前面的 tag 影響力越強</li>
+              <li>V4.5 支援自然語言描述，不一定要用 tag</li>
+              <li>Undesired Content 裡的 <code>{}</code> 會加強迴避效果</li>
+              <li>prompt 上限約 512 tokens（含角色 prompt）</li>
+              <li>不支援 Unicode（emoji、日文等）</li>
+            </ul>
+          </section>
+
+        </div>
+      </div>
+    </div>
 
     <main class="workspace">
 
@@ -190,6 +279,6 @@
 
     </main>
   </div>
-  <script src="js/app.js?v=10"></script>
+  <script src="js/app.js?v=11"></script>
 </body>
 </html>

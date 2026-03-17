@@ -60,10 +60,30 @@ async function init() {
   $("#btn-reuse-seed").addEventListener("click", reuseSeed);
   $("#btn-download").addEventListener("click", downloadImage);
 
+  setupGuide();
+
   document.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
       generate();
+    }
+  });
+}
+
+function setupGuide() {
+  const overlay = $("#guide-overlay");
+  const openBtn = $("#guide-btn");
+  const closeBtn = $("#guide-close");
+  if (!overlay || !openBtn) return;
+
+  openBtn.addEventListener("click", () => { overlay.style.display = "flex"; });
+  closeBtn.addEventListener("click", () => { overlay.style.display = "none"; });
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.style.display = "none";
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && overlay.style.display !== "none") {
+      overlay.style.display = "none";
     }
   });
 }
@@ -181,7 +201,7 @@ async function generate() {
   const resVal = $("#resolution").value;
   const [width, height] = resVal ? resVal.split("x").map(Number) : [832, 1216];
 
-  const qualityTags = "best quality, amazing quality, very aesthetic, absurdres";
+  const qualityTags = "location, very aesthetic, masterpiece, no text";
   const finalPrompt = $("#quality-tags").checked ? `${qualityTags}, ${prompt}` : prompt;
 
   const body = {
