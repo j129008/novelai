@@ -899,14 +899,13 @@ async function generate() {
   const qualityTags = ", location, very aesthetic, masterpiece, no text";
   let finalPrompt = prompt;
   if ($("#quality-tags").checked) {
-    // Append quality tags to base prompt (before first | separator)
-    const pipeIdx = prompt.indexOf("|");
-    if (pipeIdx >= 0) {
-      const base = prompt.slice(0, pipeIdx).trimEnd();
-      const rest = prompt.slice(pipeIdx);
-      finalPrompt = base + qualityTags + " " + rest;
+    // Append quality tags to base prompt content (before first | separator)
+    // Use regex to find the last non-whitespace position before | (or end)
+    const pipeMatch = prompt.match(/^([\s\S]*?\S)([\s\n]*\|[\s\S]*)$/);
+    if (pipeMatch) {
+      finalPrompt = pipeMatch[1] + qualityTags + pipeMatch[2];
     } else {
-      finalPrompt = prompt + qualityTags;
+      finalPrompt = prompt.replace(/\s+$/, "") + qualityTags;
     }
   }
 
@@ -1174,23 +1173,10 @@ function loadSettingsFromMeta(meta) {
 
   const qTag = ", location, very aesthetic, masterpiece, no text";
   let prompt = meta.prompt;
-  // Quality tags may be appended to base prompt (before |) or at end
-  const pipeIdx = prompt.indexOf("|");
-  if (pipeIdx >= 0) {
-    // Multi-character prompt: strip from base part only
-    let base = prompt.slice(0, pipeIdx);
-    const rest = prompt.slice(pipeIdx);
-    if (base.includes(qTag)) {
-      base = base.replace(qTag, "");
-    }
-    prompt = base.trimEnd() + " " + rest;
-  } else {
-    // Single prompt: strip from end or start
-    if (prompt.endsWith(qTag)) {
-      prompt = prompt.slice(0, -qTag.length);
-    } else if (prompt.startsWith(qTag.slice(2) + ", ")) {
-      prompt = prompt.slice(qTag.length - 2 + 2);
-    }
+  // Strip quality tags — they may appear before a | or at end
+  // Just remove the substring wherever it appears in the prompt
+  if (prompt.includes(qTag)) {
+    prompt = prompt.replace(qTag, "");
   }
 
   $("#prompt").value = prompt;
