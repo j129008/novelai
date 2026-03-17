@@ -49,8 +49,8 @@ def _feather_mask(mask_b64: str, blur_radius: int = 20) -> tuple[str, np.ndarray
     signed_dist = dist_outside - dist_inside  # negative=inside, positive=outside
     # Shift sigmoid outward so mask interior stays ~1.0
     # Transition happens OUTSIDE the mask boundary
-    shift = blur_radius * 0.4  # shift center outward
-    steepness = 6.0 / blur_radius
+    shift = blur_radius * 1.2  # shift center far outside mask edge
+    steepness = 4.0 / blur_radius
     composite_mask = 1.0 / (1.0 + np.exp((signed_dist - shift) * steepness))
     composite_mask = composite_mask.astype(np.float32)
 
