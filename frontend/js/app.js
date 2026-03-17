@@ -1076,16 +1076,31 @@ function initInpaintCanvas() {
   canvasEl.style.width = rect.width + "px";
   canvasEl.style.height = rect.height + "px";
 
-  // Create offscreen mask canvas at image resolution
+  // Create offscreen mask canvas at image resolution (transparent = no mask, white = repaint)
   inpaint.maskCanvas = document.createElement("canvas");
   inpaint.maskCanvas.width = inpaint.sourceImg.naturalWidth;
   inpaint.maskCanvas.height = inpaint.sourceImg.naturalHeight;
-  const maskCtx = inpaint.maskCanvas.getContext("2d");
-  maskCtx.fillStyle = "black";
-  maskCtx.fillRect(0, 0, inpaint.maskCanvas.width, inpaint.maskCanvas.height);
+  // Starts fully transparent — user paints white areas to mark for regeneration
 
   renderInpaintCanvas();
   setupInpaintInteraction();
+}
+
+function getInpaintLayout() {
+  const canvasEl = $("#inpaint-canvas");
+  const dpr = window.devicePixelRatio || 1;
+  const screenW = canvasEl.width / dpr;
+  const screenH = canvasEl.height / dpr;
+  const img = inpaint.sourceImg;
+  const scale = Math.min(screenW / img.naturalWidth, screenH / img.naturalHeight);
+  const drawW = img.naturalWidth * scale;
+  const drawH = img.naturalHeight * scale;
+  return {
+    scale,
+    drawW, drawH,
+    drawX: (screenW - drawW) / 2,
+    drawY: (screenH - drawH) / 2,
+  };
 }
 
 function renderInpaintCanvas() {
@@ -1094,45 +1109,44 @@ function renderInpaintCanvas() {
 
   const dpr = window.devicePixelRatio || 1;
   const ctx = canvasEl.getContext("2d");
-  const W = canvasEl.width;
-  const H = canvasEl.height;
-  const screenW = W / dpr;
-  const screenH = H / dpr;
-
-  ctx.clearRect(0, 0, W, H);
+  ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
   ctx.save();
   ctx.scale(dpr, dpr);
 
-  // Fit image to stage
-  const img = inpaint.sourceImg;
-  const scale = Math.min(screenW / img.naturalWidth, screenH / img.naturalHeight);
-  const drawW = img.naturalWidth * scale;
-  const drawH = img.naturalHeight * scale;
-  const drawX = (screenW - drawW) / 2;
-  const drawY = (screenH - drawH) / 2;
+  const { drawX, drawY, drawW, drawH } = getInpaintLayout();
 
-  // Draw source image
-  ctx.drawImage(img, drawX, drawY, drawW, drawH);
+  // 1. Draw source image
+  ctx.drawImage(inpaint.sourceImg, drawX, drawY, drawW, drawH);
 
-  // Draw mask overlay (semi-transparent red)
+  // 2. Draw mask as semi-transparent red overlay
   if (inpaint.maskCanvas) {
-    ctx.globalAlpha = 0.45;
-    ctx.globalCompositeOperation = "source-atop";
-    // We need to draw only the white parts of the mask as red
-    // Create a temp canvas for the colored mask
-    const tempCanvas = document.createElement("canvas");
-    tempCanvas.width = inpaint.maskCanvas.width;
-    tempCanvas.height = inpaint.maskCanvas.height;
-    const tempCtx = tempCanvas.getContext("2d");
-    tempCtx.drawImage(inpaint.maskCanvas, 0, 0);
-    tempCtx.globalCompositeOperation = "source-in";
-    tempCtx.fillStyle = "#ff4444";
-    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    // Tint: draw mask (white on transparent), composite with red
+    const temp = document.createElement("canvas");
+    temp.width = inpaint.maskCanvas.width;
+    temp.height = inpaint.maskCanvas.height;
+    const tc = temp.getContext("2d");
+    // Fill red
+    tc.fillStyle = "rgba(255, 60, 60, 1)";
+    tc.fillRect(0, 0, temp.width, temp.height);
+    // Keep red only where mask has white pixels (mask is white on transparent)
+    tc.globalCompositeOperation = "destination-in";
+    tc.drawImage(inpaint.maskCanvas, 0, 0);
 
-    ctx.globalCompositeOperation = "source-over";
-    ctx.globalAlpha = 0.45;
-    ctx.drawImage(tempCanvas, drawX, drawY, drawW, drawH);
+    ctx.globalAlpha = 0.5;
+    ctx.drawImage(temp, drawX, drawY, drawW, drawH);
     ctx.globalAlpha = 1;
+  }
+
+  // 3. Draw brush cursor
+  if (inpaint.cursorX !== undefined && inpaint.cursorY !== undefined) {
+    const brushR = parseInt($("#inpaint-brush").value) / 2;
+    const { scale } = getInpaintLayout();
+    const screenR = brushR * scale;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(inpaint.cursorX, inpaint.cursorY, screenR, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   ctx.restore();
@@ -1155,18 +1169,12 @@ function setupInpaintInteraction() {
 
   function getImageCoords(e) {
     const rect = canvasEl.getBoundingClientRect();
-    const screenW = rect.width;
-    const screenH = rect.height;
-    const img = inpaint.sourceImg;
-    const scale = Math.min(screenW / img.naturalWidth, screenH / img.naturalHeight);
-    const drawW = img.naturalWidth * scale;
-    const drawH = img.naturalHeight * scale;
-    const drawX = (screenW - drawW) / 2;
-    const drawY = (screenH - drawH) / 2;
-
+    const { scale, drawX, drawY } = getInpaintLayout();
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
-
+    // Update cursor position for visual feedback
+    inpaint.cursorX = sx;
+    inpaint.cursorY = sy;
     return {
       x: (sx - drawX) / scale,
       y: (sy - drawY) / scale,
@@ -1219,12 +1227,25 @@ function setupInpaintInteraction() {
   canvasEl.addEventListener("pointerup", () => { inpaint.painting = false; });
   canvasEl.addEventListener("pointercancel", () => { inpaint.painting = false; });
 
+  // Show brush cursor on hover
+  canvasEl.addEventListener("pointermove", (e) => {
+    if (inpaint.painting) return; // already handled above
+    const rect = canvasEl.getBoundingClientRect();
+    inpaint.cursorX = e.clientX - rect.left;
+    inpaint.cursorY = e.clientY - rect.top;
+    renderInpaintCanvas();
+  });
+  canvasEl.addEventListener("pointerleave", () => {
+    inpaint.cursorX = undefined;
+    inpaint.cursorY = undefined;
+    renderInpaintCanvas();
+  });
+
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
       if (!inpaint.maskCanvas) return;
       const ctx = inpaint.maskCanvas.getContext("2d");
-      ctx.fillStyle = "black";
-      ctx.fillRect(0, 0, inpaint.maskCanvas.width, inpaint.maskCanvas.height);
+      ctx.clearRect(0, 0, inpaint.maskCanvas.width, inpaint.maskCanvas.height);
       renderInpaintCanvas();
     });
   }
@@ -1246,9 +1267,15 @@ async function confirmInpaint() {
   const overlay = $("#inpaint-overlay");
   const confirmBtn = $("#inpaint-confirm");
 
-  // Get mask as base64
-  const maskDataUrl = inpaint.maskCanvas.toDataURL("image/png");
-  const maskBase64 = maskDataUrl.split(",")[1];
+  // Export mask as black (keep) + white (repaint) PNG for API
+  const exportMask = document.createElement("canvas");
+  exportMask.width = inpaint.maskCanvas.width;
+  exportMask.height = inpaint.maskCanvas.height;
+  const emCtx = exportMask.getContext("2d");
+  emCtx.fillStyle = "black";
+  emCtx.fillRect(0, 0, exportMask.width, exportMask.height);
+  emCtx.drawImage(inpaint.maskCanvas, 0, 0);
+  const maskBase64 = exportMask.toDataURL("image/png").split(",")[1];
 
   // Build request
   const prompt = $("#prompt").value.trim();
