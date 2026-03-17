@@ -701,11 +701,14 @@ function renderGallery(files, filter) {
 function loadSettingsFromMeta(meta) {
   if (!meta || !meta.prompt) return;
 
-  // Remove quality tags prefix if present
+  // Remove quality tags (prepended or appended) if present
+  const qualitySuffix = ", location, very aesthetic, masterpiece, no text";
   const qualityPrefix = "location, very aesthetic, masterpiece, no text, ";
   let prompt = meta.prompt;
-  if (prompt.endsWith(", location, very aesthetic, masterpiece, no text")) {
-    prompt = prompt.replace(/, location, very aesthetic, masterpiece, no text$/, "");
+  if (prompt.startsWith(qualityPrefix)) {
+    prompt = prompt.slice(qualityPrefix.length);
+  } else if (prompt.endsWith(qualitySuffix)) {
+    prompt = prompt.slice(0, -qualitySuffix.length);
   }
 
   $("#prompt").value = prompt;
