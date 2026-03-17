@@ -87,6 +87,7 @@ async function init() {
 
   $("#generate-btn").addEventListener("click", generate);
   $("#btn-iterate").addEventListener("click", iterateOnResult);
+  $("#btn-random-seed").addEventListener("click", () => { $("#seed").value = 0; });
   $("#btn-reuse-seed").addEventListener("click", reuseSeed);
   $("#btn-download").addEventListener("click", downloadImage);
 
@@ -1194,7 +1195,7 @@ function loadSettingsFromMeta(meta) {
     localStorage.setItem("nai-negative", meta.uc);
   }
 
-  if (meta.seed) $("#seed").value = meta.seed;
+  // Don't load seed — keep current value so user gets fresh results
   if (meta.steps) {
     $("#steps").value = meta.steps;
     $("#steps-val").textContent = meta.steps;
