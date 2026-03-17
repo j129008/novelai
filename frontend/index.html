@@ -319,18 +319,9 @@
               <input type="range" id="scale" class="field-range" min="0" max="10" step="0.1" value="5.0">
               <div class="slider-endpoints"><span>Creative</span><span>Precise</span></div>
             </div>
-            <div class="toggle-row">
-              <div class="toggle-info">
-                <span class="toggle-label">HD Enhancement</span>
-                <span class="toggle-description">Sharpens detail at higher resolutions</span>
-              </div>
-              <label class="toggle-switch" aria-label="HD Enhancement">
-                <input type="checkbox" id="hd-enhancement" class="toggle-input">
-                <input type="checkbox" id="smea" class="field-checkbox" style="display:none">
-                <input type="checkbox" id="smea-dyn" class="field-checkbox" style="display:none">
-                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-              </label>
-            </div>
+            <!-- SMEA hidden, not supported on V4.5 -->
+            <input type="checkbox" id="smea" style="display:none">
+            <input type="checkbox" id="smea-dyn" style="display:none">
           </div>
         </details>
 
