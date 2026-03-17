@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=14">
+  <link rel="stylesheet" href="css/style.css?v=16">
 </head>
 <body>
   <div class="app">
@@ -312,11 +312,14 @@
         <details class="accordion gallery-accordion" id="gallery-section">
           <summary class="accordion-header">
             <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
-            Saved Images
+            History
             <span id="gallery-count" class="gallery-count"></span>
           </summary>
-          <div class="accordion-body">
-            <div id="gallery-grid" class="gallery-grid"></div>
+          <div class="accordion-body gallery-body">
+            <div class="gallery-search-bar">
+              <input type="text" id="gallery-search" class="gallery-search" placeholder="Search prompts…" spellcheck="false">
+            </div>
+            <div id="gallery-list" class="gallery-list"></div>
             <p id="gallery-empty" class="gallery-empty">No saved images yet</p>
           </div>
         </details>
@@ -325,6 +328,6 @@
 
     </main>
   </div>
-  <script src="js/app.js?v=14"></script>
+  <script src="js/app.js?v=16"></script>
 </body>
 </html>

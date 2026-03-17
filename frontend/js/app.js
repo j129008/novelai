@@ -57,6 +57,7 @@ async function init() {
   setupHdEnhancement();
   setupTagAutocomplete();
   setupAutoSavePrompt();
+  setupGallerySearch();
   loadGallery();
 
   $("#generate-btn").addEventListener("click", generate);
@@ -524,67 +525,175 @@ function downloadImage() {
 
 /* ── GALLERY ──────────────────────────────────────────────── */
 
+let _galleryData = [];
+
+function setupGallerySearch() {
+  const input = $("#gallery-search");
+  if (!input) return;
+  input.addEventListener("input", () => {
+    renderGallery(_galleryData, input.value.toLowerCase());
+  });
+}
+
 async function loadGallery() {
-  const grid = $("#gallery-grid");
+  const list = $("#gallery-list");
   const empty = $("#gallery-empty");
   const count = $("#gallery-count");
-  if (!grid) return;
+  if (!list) return;
 
   try {
     const resp = await fetch("/api/gallery");
     if (!resp.ok) return;
     const files = await resp.json();
 
+    _galleryData = files;
     count.textContent = files.length ? `(${files.length})` : "";
-
-    if (!files.length) {
-      grid.style.display = "none";
-      empty.style.display = "block";
-      return;
-    }
-
-    grid.style.display = "grid";
-    empty.style.display = "none";
-    grid.innerHTML = "";
-
-    for (const file of files) {
-      const item = document.createElement("div");
-      item.className = "gallery-item";
-
-      const img = document.createElement("img");
-      img.src = `/api/gallery/${file.name}`;
-      img.alt = file.name;
-      img.loading = "lazy";
-
-      // Click to preview
-      img.addEventListener("click", () => {
-        const output = $("#output");
-        const previewImg = document.createElement("img");
-        previewImg.src = img.src;
-        previewImg.alt = "Preview";
-        output.innerHTML = "";
-        output.appendChild(previewImg);
-      });
-
-      const actions = document.createElement("div");
-      actions.className = "gallery-item-actions";
-
-      const delBtn = document.createElement("button");
-      delBtn.className = "gallery-item-btn gallery-item-btn--delete";
-      delBtn.title = "Delete";
-      delBtn.textContent = "×";
-      delBtn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const resp = await fetch(`/api/gallery/${file.name}`, { method: "DELETE" });
-        if (resp.ok) loadGallery();
-      });
-
-      actions.appendChild(delBtn);
-      item.appendChild(img);
-      item.appendChild(actions);
-      grid.appendChild(item);
-    }
+    const searchVal = ($("#gallery-search")?.value || "").toLowerCase();
+    renderGallery(files, searchVal);
   } catch { /* ignore */ }
+}
+
+function renderGallery(files, filter) {
+  const list = $("#gallery-list");
+  const empty = $("#gallery-empty");
+  if (!list) return;
+
+  const filtered = filter
+    ? files.filter((f) => {
+        const meta = f.meta || {};
+        return (meta.prompt || "").toLowerCase().includes(filter)
+          || (meta.uc || "").toLowerCase().includes(filter)
+          || String(meta.seed || "").includes(filter)
+          || f.name.toLowerCase().includes(filter);
+      })
+    : files;
+
+  if (!filtered.length) {
+    list.style.display = "none";
+    empty.style.display = "block";
+    empty.textContent = filter ? "No matching images" : "No saved images yet";
+    return;
+  }
+
+  list.style.display = "flex";
+  empty.style.display = "none";
+  list.innerHTML = "";
+
+  for (const file of filtered) {
+    const meta = file.meta || {};
+    const item = document.createElement("div");
+    item.className = "gallery-item";
+
+    const thumb = document.createElement("div");
+    thumb.className = "gallery-thumb";
+    const img = document.createElement("img");
+    img.src = `/api/gallery/${file.name}`;
+    img.alt = file.name;
+    img.loading = "lazy";
+    thumb.appendChild(img);
+
+    const info = document.createElement("div");
+    info.className = "gallery-info";
+    const promptText = document.createElement("div");
+    promptText.className = "gallery-prompt";
+    promptText.textContent = meta.prompt || file.name;
+    const metaRow = document.createElement("div");
+    metaRow.className = "gallery-meta";
+    if (meta.seed) metaRow.innerHTML += `<span>Seed: ${meta.seed}</span>`;
+    if (meta.steps) metaRow.innerHTML += `<span>${meta.steps} steps</span>`;
+    if (meta.width) metaRow.innerHTML += `<span>${meta.width}×${meta.height}</span>`;
+    info.appendChild(promptText);
+    info.appendChild(metaRow);
+
+    const actions = document.createElement("div");
+    actions.className = "gallery-actions";
+
+    const loadBtn = document.createElement("button");
+    loadBtn.className = "gallery-btn";
+    loadBtn.title = "Load settings";
+    loadBtn.innerHTML = "↩";
+    loadBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      loadSettingsFromMeta(meta);
+    });
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "gallery-btn gallery-btn--delete";
+    delBtn.title = "Delete";
+    delBtn.textContent = "×";
+    delBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const r = await fetch(`/api/gallery/${file.name}`, { method: "DELETE" });
+      if (r.ok) loadGallery();
+    });
+
+    actions.appendChild(loadBtn);
+    actions.appendChild(delBtn);
+
+    item.addEventListener("click", () => {
+      const output = $("#output");
+      const previewImg = document.createElement("img");
+      previewImg.src = `/api/gallery/${file.name}`;
+      previewImg.alt = "Preview";
+      output.innerHTML = "";
+      output.appendChild(previewImg);
+    });
+
+    item.appendChild(thumb);
+    item.appendChild(info);
+    item.appendChild(actions);
+    list.appendChild(item);
+  }
+}
+
+function loadSettingsFromMeta(meta) {
+  if (!meta || !meta.prompt) return;
+
+  // Remove quality tags prefix if present
+  const qualityPrefix = "location, very aesthetic, masterpiece, no text, ";
+  let prompt = meta.prompt;
+  if (prompt.endsWith(", location, very aesthetic, masterpiece, no text")) {
+    prompt = prompt.replace(/, location, very aesthetic, masterpiece, no text$/, "");
+  }
+
+  $("#prompt").value = prompt;
+  localStorage.setItem("nai-prompt", prompt);
+
+  if (meta.uc) {
+    $("#negative-prompt").value = meta.uc;
+    localStorage.setItem("nai-negative", meta.uc);
+  }
+
+  if (meta.seed) $("#seed").value = meta.seed;
+  if (meta.steps) {
+    $("#steps").value = meta.steps;
+    $("#steps-val").textContent = meta.steps;
+  }
+  if (meta.scale !== undefined) {
+    $("#scale").value = meta.scale;
+    $("#scale-val").textContent = parseFloat(meta.scale).toFixed(1);
+  }
+  if (meta.sampler) {
+    const sampler = $("#sampler");
+    for (const opt of sampler.options) {
+      if (opt.value === meta.sampler) { sampler.value = meta.sampler; break; }
+    }
+  }
+  if (meta.width && meta.height) {
+    const res = `${meta.width}x${meta.height}`;
+    const resolution = $("#resolution");
+    for (const opt of resolution.options) {
+      if (opt.value === res) { resolution.value = res; break; }
+    }
+  }
+  if (meta.sm !== undefined) {
+    const hd = $("#hd-enhancement");
+    const smea = $("#smea");
+    const smeaDyn = $("#smea-dyn");
+    hd.checked = meta.sm || meta.sm_dyn;
+    smea.checked = !!meta.sm;
+    smeaDyn.checked = !!meta.sm_dyn;
+  }
 }
 
 function showError(msg) {

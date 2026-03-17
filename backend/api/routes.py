@@ -153,11 +153,42 @@ async def generate(req: GenerateRequest):
     )
 
 
+def _read_png_meta(filepath: Path) -> dict:
+    try:
+        from PIL import Image
+        img = Image.open(filepath)
+        if "Comment" in img.info:
+            import json as _json
+            meta = _json.loads(img.info["Comment"])
+            return {
+                "prompt": meta.get("prompt", ""),
+                "uc": meta.get("uc", ""),
+                "seed": meta.get("seed", 0),
+                "steps": meta.get("steps", 28),
+                "scale": meta.get("scale", 5.0),
+                "sampler": meta.get("sampler", "k_euler_ancestral"),
+                "width": meta.get("width", 832),
+                "height": meta.get("height", 1216),
+                "sm": meta.get("sm", False),
+                "sm_dyn": meta.get("sm_dyn", False),
+            }
+    except Exception:
+        pass
+    return {}
+
+
 @router.get("/gallery")
 async def list_gallery():
     out = _get_output_dir()
     files = sorted(out.glob("*.png"), key=lambda f: f.stat().st_mtime, reverse=True)
-    return [{"name": f.name, "size": f.stat().st_size} for f in files]
+    results = []
+    for f in files:
+        item = {"name": f.name, "size": f.stat().st_size}
+        meta = _read_png_meta(f)
+        if meta:
+            item["meta"] = meta
+        results.append(item)
+    return results
 
 
 @router.get("/gallery/{filename}")
