@@ -128,6 +128,36 @@ function setupImg2ImgControls() {
       fileInput.value = "";
     });
   }
+
+  // Canvas drop zone — shortcut to img2img
+  const dropTarget = $("#canvas-drop-target");
+  if (dropTarget) {
+    let dragCounter = 0;
+    dropTarget.addEventListener("dragenter", (e) => {
+      e.preventDefault();
+      dragCounter++;
+      if (dragCounter === 1) dropTarget.classList.add("drag-over");
+    });
+    dropTarget.addEventListener("dragleave", () => {
+      dragCounter--;
+      if (dragCounter <= 0) { dragCounter = 0; dropTarget.classList.remove("drag-over"); }
+    });
+    dropTarget.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    });
+    dropTarget.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      dropTarget.classList.remove("drag-over");
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith("image/")) {
+        loadImageFile(file);
+        const accordion = $("#img2img-accordion");
+        if (accordion && !accordion.open) accordion.open = true;
+      }
+    });
+  }
 }
 
 function loadImageFile(file) {
