@@ -6,6 +6,31 @@ from typing import Optional
 
 API_URL = "https://image.novelai.net/ai/generate-image"
 
+
+def _feather_mask(mask_b64: str, blur_radius: int = 12) -> str:
+    """Feather mask edges with Gaussian blur to prevent inpainting seams."""
+    from PIL import Image, ImageFilter
+    import base64 as b64mod
+
+    mask_bytes = b64mod.b64decode(mask_b64)
+    mask_img = Image.open(io.BytesIO(mask_bytes)).convert("L")
+
+    # Blur to feather edges
+    blurred = mask_img.filter(ImageFilter.GaussianBlur(blur_radius))
+
+    # Composite: keep sharp center, soft edges
+    # Where original mask is white (>128), use white; else use blurred value
+    import numpy as np
+    sharp = np.array(mask_img)
+    soft = np.array(blurred)
+    # Sharp center stays white, edges get the blur gradient
+    result = np.where(sharp > 128, sharp, soft)
+    result_img = Image.fromarray(result.astype(np.uint8), mode="L")
+
+    buf = io.BytesIO()
+    result_img.save(buf, "PNG")
+    return b64mod.b64encode(buf.getvalue()).decode()
+
 # V4+ models require v4_prompt/v4_negative_prompt structure
 V4_MODELS = {
     "nai-diffusion-4-curated-preview",
@@ -91,7 +116,7 @@ async def generate_image(
 
     if action == "infill" and image and mask:
         params["image"] = image
-        params["mask"] = mask
+        params["mask"] = _feather_mask(mask, blur_radius=20)
         params["strength"] = strength
         params["add_original_image"] = True
         params["inpaintImg2ImgStrength"] = 1
