@@ -1396,27 +1396,31 @@ async function confirmInpaint() {
   const overlay = $("#inpaint-overlay");
   const confirmBtn = $("#inpaint-confirm");
 
-  // Export mask as black (keep) + white (repaint) PNG for API
-  // Apply gaussian-like blur to feather mask edges and avoid seams
+  // Export mask: black (keep) + white (repaint), with feathered edges
+  const mw = inpaint.maskCanvas.width;
+  const mh = inpaint.maskCanvas.height;
+
+  // Step 1: blur the mask to feather edges
+  const blurred = document.createElement("canvas");
+  blurred.width = mw;
+  blurred.height = mh;
+  const blurCtx = blurred.getContext("2d");
+  blurCtx.filter = "blur(16px)";
+  blurCtx.drawImage(inpaint.maskCanvas, 0, 0);
+  blurCtx.filter = "none";
+
+  // Step 2: composite sharp mask on top of blurred (ensures center is fully white)
+  blurCtx.drawImage(inpaint.maskCanvas, 0, 0);
+
+  // Step 3: render onto black background
   const exportMask = document.createElement("canvas");
-  exportMask.width = inpaint.maskCanvas.width;
-  exportMask.height = inpaint.maskCanvas.height;
+  exportMask.width = mw;
+  exportMask.height = mh;
   const emCtx = exportMask.getContext("2d");
   emCtx.fillStyle = "black";
-  emCtx.fillRect(0, 0, exportMask.width, exportMask.height);
-  // Feather: draw the mask multiple times at slight offsets with low opacity
-  emCtx.globalAlpha = 0.2;
-  const featherRadius = 12;
-  for (let ox = -featherRadius; ox <= featherRadius; ox += 4) {
-    for (let oy = -featherRadius; oy <= featherRadius; oy += 4) {
-      if (ox * ox + oy * oy <= featherRadius * featherRadius) {
-        emCtx.drawImage(inpaint.maskCanvas, ox, oy);
-      }
-    }
-  }
-  // Draw the sharp mask on top at full opacity
-  emCtx.globalAlpha = 1;
-  emCtx.drawImage(inpaint.maskCanvas, 0, 0);
+  emCtx.fillRect(0, 0, mw, mh);
+  emCtx.drawImage(blurred, 0, 0);
+
   const maskBase64 = exportMask.toDataURL("image/png").split(",")[1];
 
   // Build request
