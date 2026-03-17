@@ -1,7 +1,6 @@
 import base64 as _b64
 import httpx
 import io
-import numpy as np
 import random
 import zipfile
 from PIL import Image, ImageFilter
@@ -10,93 +9,14 @@ from typing import Optional
 API_URL = "https://image.novelai.net/ai/generate-image"
 
 
-def _feather_mask(mask_b64: str, blur_radius: int = 20) -> tuple[str, np.ndarray]:
-    """Feather mask edges with Gaussian blur.
-
-    Returns:
-        (api_mask_b64, compositing_mask_float32)
-
-    Two distinct masks:
-    - api_mask_b64: clamped so the interior stays fully white; gives the model
-      a solid region to fill with soft edges to guide context.
-    - compositing_mask_float32: normalized Gaussian blur (0.0 outside, 1.0 at
-      center) used for post-process alpha compositing. No hard step at the
-      boundary -- pure smooth gradient.
-    """
+def _feather_mask(mask_b64: str, blur_radius: int = 10) -> str:
+    """Lightly feather mask edges with Gaussian blur. Returns base64 PNG."""
     mask_bytes = _b64.b64decode(mask_b64)
     mask_img = Image.open(io.BytesIO(mask_bytes)).convert("L")
-    sharp = np.array(mask_img)
-
-    blurred = np.array(mask_img.filter(ImageFilter.GaussianBlur(blur_radius))).astype(np.float32)
-
-    # API mask: dilate the user's mask so the API's seam artifact falls
-    # OUTSIDE our composite mask's transition zone. The seam gets covered
-    # by original pixels during compositing.
-    dilate_size = blur_radius * 2 + 1
-    if dilate_size % 2 == 0:
-        dilate_size += 1
-    dilated = mask_img.filter(ImageFilter.MaxFilter(dilate_size))
+    blurred = mask_img.filter(ImageFilter.GaussianBlur(blur_radius))
     buf = io.BytesIO()
-    dilated.save(buf, "PNG")
-    api_mask_b64 = _b64.b64encode(buf.getvalue()).decode()
-
-    # Compositing mask based on the DILATED mask (same as what API receives)
-    # This way our blend zone aligns with the API's seam location
-    from scipy.ndimage import distance_transform_edt
-    dilated_arr = np.array(dilated)
-    dilated_bool = dilated_arr > 128
-    dist_outside = distance_transform_edt(~dilated_bool)
-    dist_inside = distance_transform_edt(dilated_bool)
-    signed_dist = dist_outside - dist_inside
-    steepness = 6.0 / blur_radius
-    composite_mask = 1.0 / (1.0 + np.exp(signed_dist * steepness))
-    composite_mask = composite_mask.astype(np.float32)
-
-    return api_mask_b64, composite_mask
-
-
-def _composite_inpaint(
-    orig_b64: str,
-    api_result_bytes: bytes,
-    mask_float: np.ndarray,
-) -> bytes:
-    """Alpha-blend API result over original using the feathered mask.
-
-    final = orig * (1 - mask) + result * mask
-
-    The mask is a smooth Gaussian gradient so there is no hard discontinuity
-    at the boundary. Outside the mask is mathematically exactly the original.
-    Inside at the center is mathematically exactly the API result.
-    The boundary zone is a smooth blend.
-    """
-    orig_img = Image.open(io.BytesIO(_b64.b64decode(orig_b64))).convert("RGB")
-    result_img = Image.open(io.BytesIO(api_result_bytes)).convert("RGB")
-
-    # Resize result to match original in case of any dimension mismatch.
-    if result_img.size != orig_img.size:
-        result_img = result_img.resize(orig_img.size, Image.LANCZOS)
-
-    # Resize mask to match image dimensions if needed.
-    h, w = orig_img.height, orig_img.width
-    if mask_float.shape != (h, w):
-        mask_pil = Image.fromarray(
-            (mask_float * 255).astype(np.uint8), mode="L"
-        ).resize((w, h), Image.LANCZOS)
-        mask_float = np.array(mask_pil).astype(np.float32) / 255.0
-
-    orig_arr = np.array(orig_img).astype(np.float32)
-    result_arr = np.array(result_img).astype(np.float32)
-
-    # Expand mask from (H, W) to (H, W, 3) for broadcasting.
-    m = mask_float[:, :, np.newaxis]
-
-    composited = orig_arr * (1.0 - m) + result_arr * m
-    composited = np.clip(composited, 0, 255).astype(np.uint8)
-
-    out_img = Image.fromarray(composited, mode="RGB")
-    buf = io.BytesIO()
-    out_img.save(buf, "PNG")
-    return buf.getvalue()
+    blurred.save(buf, "PNG")
+    return _b64.b64encode(buf.getvalue()).decode()
 
 
 # V4+ models require v4_prompt/v4_negative_prompt structure
@@ -182,20 +102,13 @@ async def generate_image(
         }
         params["characterPrompts"] = []
 
-    # Track data needed for post-process compositing.
-    _orig_image_b64: Optional[str] = None
-    _composite_mask: Optional[np.ndarray] = None
-
     if action == "infill" and image and mask:
-        api_mask_b64, composite_mask = _feather_mask(mask, blur_radius=20)
         params["image"] = image
-        params["mask"] = api_mask_b64
+        params["mask"] = _feather_mask(mask)
         params["strength"] = strength
         params["add_original_image"] = True
         params["inpaintImg2ImgStrength"] = 1
         params["uncond_scale"] = 1
-        _orig_image_b64 = image
-        _composite_mask = composite_mask
     elif action == "img2img" and image:
         params["image"] = image
         params["strength"] = strength
@@ -232,11 +145,5 @@ async def generate_image(
         with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
             name = zf.namelist()[0]
             image_data = zf.read(name)
-
-    # Post-process: composite API result over original using smooth feathered mask.
-    # final = orig * (1 - mask) + result * mask
-    # This mathematically eliminates the seam the API leaves at mask boundaries.
-    if _orig_image_b64 is not None and _composite_mask is not None:
-        image_data = _composite_inpaint(_orig_image_b64, image_data, _composite_mask)
 
     return image_data, seed
