@@ -1411,42 +1411,14 @@ async function confirmInpaint() {
   const mw = inpaint.maskCanvas.width;
   const mh = inpaint.maskCanvas.height;
 
-  // Feather mask for smooth inpainting edges:
-  // 1. Dilate (expand) the mask so blur doesn't shrink the painted area
-  // 2. Heavy Gaussian blur for wide soft transition
-  // 3. No sharp overlay — let the blur do all the work
-
-  const dilated = document.createElement("canvas");
-  dilated.width = mw;
-  dilated.height = mh;
-  const dilCtx = dilated.getContext("2d");
-  // Dilate by drawing mask at small offsets
-  const dilateR = 8;
-  for (let ox = -dilateR; ox <= dilateR; ox += 4) {
-    for (let oy = -dilateR; oy <= dilateR; oy += 4) {
-      if (ox * ox + oy * oy <= dilateR * dilateR) {
-        dilCtx.drawImage(inpaint.maskCanvas, ox, oy);
-      }
-    }
-  }
-
-  // Blur the dilated mask
-  const blurredMaskCanvas = document.createElement("canvas");
-  blurredMaskCanvas.width = mw;
-  blurredMaskCanvas.height = mh;
-  const blurCtx = blurredMaskCanvas.getContext("2d");
-  blurCtx.filter = "blur(40px)";
-  blurCtx.drawImage(dilated, 0, 0);
-  blurCtx.filter = "none";
-
-  // Render onto black background for API
+  // Send clean black+white mask — let NovelAI's inpainting model handle edge blending
   const exportMask = document.createElement("canvas");
   exportMask.width = mw;
   exportMask.height = mh;
   const emCtx = exportMask.getContext("2d");
   emCtx.fillStyle = "black";
   emCtx.fillRect(0, 0, mw, mh);
-  emCtx.drawImage(blurredMaskCanvas, 0, 0);
+  emCtx.drawImage(inpaint.maskCanvas, 0, 0);
 
   const maskBase64 = exportMask.toDataURL("image/png").split(",")[1];
 
