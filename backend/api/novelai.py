@@ -15,13 +15,39 @@ def _restore_outside_mask(orig_b64: str, result_bytes: bytes, mask_b64: str) -> 
     orig_img = Image.open(io.BytesIO(_b64.b64decode(orig_b64))).convert("RGB")
     result_img = Image.open(io.BytesIO(result_bytes)).convert("RGB")
     mask_img = Image.open(io.BytesIO(_b64.b64decode(mask_b64))).convert("L")
+    print(f"[inpaint] orig={orig_img.size} mode={orig_img.mode}, result={result_img.size} mode={result_img.mode}, mask={mask_img.size}")
+    print(f"[inpaint] mask white={np.sum(np.array(mask_img) > 128)}, black={np.sum(np.array(mask_img) <= 128)}")
+    # Debug: save before/after to compare
+    orig_arr = np.array(orig_img)
+    result_arr = np.array(result_img)
+    mask_arr = np.array(mask_img)
+    outside = mask_arr <= 128
+    diff_outside = np.abs(orig_arr[outside].astype(float) - result_arr[outside].astype(float))
+    print(f"[inpaint] API result outside-mask diff: mean={diff_outside.mean():.2f}, max={diff_outside.max():.0f}")
+    final = np.where(mask_arr[:, :, np.newaxis] > 128, result_arr, orig_arr)
+    diff_final = np.abs(orig_arr[outside].astype(float) - final[outside].astype(float))
+    print(f"[inpaint] After restore outside-mask diff: mean={diff_final.mean():.4f}, max={diff_final.max():.0f}")
 
     orig_arr = np.array(orig_img)
     result_arr = np.array(result_img)
     mask_arr = np.array(mask_img)
 
-    # Outside mask (black) → original, inside mask (white) → API result
-    final = np.where(mask_arr[:, :, np.newaxis] > 128, result_arr, orig_arr)
+    # Hard composite: outside=original, inside=API result
+    hard = np.where(mask_arr[:, :, np.newaxis] > 128, result_arr, orig_arr)
+
+    # Tiny feather at boundary only: 3px Gaussian blend at the mask edge
+    # to smooth the content transition. Does NOT change interior or exterior.
+    mask_float = mask_arr.astype(np.float32) / 255.0
+    blurred_mask = np.array(
+        Image.fromarray(mask_arr).filter(ImageFilter.GaussianBlur(3))
+    ).astype(np.float32) / 255.0
+    # Only blend where blurred differs from hard mask (the boundary band)
+    blend = orig_arr.astype(np.float32) * (1 - blurred_mask[:, :, np.newaxis]) + \
+            result_arr.astype(np.float32) * blurred_mask[:, :, np.newaxis]
+    # Use hard composite everywhere EXCEPT the thin boundary band
+    is_boundary = (blurred_mask > 0.01) & (blurred_mask < 0.99)
+    final = hard.copy()
+    final[is_boundary] = np.clip(blend[is_boundary], 0, 255).astype(np.uint8)
 
     out = Image.fromarray(final.astype(np.uint8), mode="RGB")
     buf = io.BytesIO()
