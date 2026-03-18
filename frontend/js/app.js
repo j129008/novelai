@@ -2212,6 +2212,16 @@ function loadSettingsFromMeta(meta) {
       const accordion = $("#characters-accordion");
       if (accordion) accordion.open = true;
 
+      // Hide empty state, show inline add button
+      const emptyState = $("#char-empty-state");
+      if (emptyState) emptyState.style.display = "none";
+      const addBtnInline = $("#btn-add-character-inline");
+      if (addBtnInline) addBtnInline.style.display = "";
+
+      // Update scene label
+      const sceneLabel = $("#scene-label");
+      if (sceneLabel) sceneLabel.style.display = "";
+
       // Update badge and markers
       const badge = $("#char-count-badge");
       if (badge) {
