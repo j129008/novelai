@@ -2120,16 +2120,15 @@ function loadSettingsFromMeta(meta) {
     smeaDyn.checked = !!meta.sm_dyn;
   }
 
-  // Always clear existing characters first, then restore from metadata if available
+  // Restore characters only when metadata contains char_captions
   {
+    const charCaptions = (meta.char_captions && Array.isArray(meta.char_captions)) ? meta.char_captions : [];
+    if (charCaptions.length > 0) {
     const slotsEl = $("#character-slots");
     if (slotsEl) {
       characters.length = 0;
       slotsEl.innerHTML = "";
       _activeMarkerIdx = -1;
-
-      // Rebuild from metadata if char_captions exist
-      const charCaptions = (meta.char_captions && Array.isArray(meta.char_captions)) ? meta.char_captions : [];
       charCaptions.forEach((cc) => {
         const charData = {
           prompt: cc.char_caption || "",
@@ -2233,6 +2232,7 @@ function loadSettingsFromMeta(meta) {
       }
       renderCharacterMarkers();
       saveCharactersToCache();
+    }
     }
   }
 }
@@ -2664,26 +2664,16 @@ function buildInteractionsSection(charData) {
   chipsEl.className = "char-interactions-chips";
   body.appendChild(chipsEl);
 
-  function addInteraction() {
-    const action = actionInput.value.trim().replace(/,/g, "").replace(/ /g, "_");
-    if (!action) return;
-    const directive = directiveSelect.value;
-    const interaction = { directive, action };
-    charData.interactions.push(interaction);
-    saveCharactersToCache();
-
-    // Render chip
+  function renderChip(interaction) {
     const chip = document.createElement("span");
     chip.className = "char-interaction-chip";
-
     const label = document.createElement("span");
-    label.textContent = directive + action.replace(/_/g, " ");
+    label.textContent = interaction.directive + interaction.action.replace(/_/g, " ");
     chip.appendChild(label);
-
     const removeX = document.createElement("button");
     removeX.type = "button";
     removeX.className = "char-interaction-chip-remove";
-    removeX.setAttribute("aria-label", `Remove ${directive}${action}`);
+    removeX.setAttribute("aria-label", `Remove ${interaction.directive}${interaction.action}`);
     removeX.textContent = "\u00d7";
     removeX.addEventListener("click", () => {
       const iIdx = charData.interactions.indexOf(interaction);
@@ -2693,7 +2683,21 @@ function buildInteractionsSection(charData) {
     });
     chip.appendChild(removeX);
     chipsEl.appendChild(chip);
+  }
 
+  // Render pre-existing interactions as chips
+  for (const interaction of charData.interactions) {
+    renderChip(interaction);
+  }
+
+  function addInteraction() {
+    const action = actionInput.value.trim().replace(/,/g, "").replace(/ /g, "_");
+    if (!action) return;
+    const directive = directiveSelect.value;
+    const interaction = { directive, action };
+    charData.interactions.push(interaction);
+    saveCharactersToCache();
+    renderChip(interaction);
     actionInput.value = "";
     actionInput.focus();
   }
