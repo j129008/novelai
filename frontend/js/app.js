@@ -915,6 +915,8 @@ const _tagAC = (() => {
       items.forEach((el, i) => el.classList.toggle("selected", i === selectedIdx));
       if (selectedIdx >= 0) items[selectedIdx].scrollIntoView({ block: "nearest" });
     } else if (e.key === "Tab" || e.key === "Enter") {
+      // If nothing selected, auto-select the first item
+      if (selectedIdx < 0 && items.length > 0) selectedIdx = 0;
       if (selectedIdx >= 0) {
         e.preventDefault();
         const name = items[selectedIdx].querySelector(".tag-item-name").textContent;
