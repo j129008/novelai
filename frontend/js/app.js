@@ -2120,16 +2120,17 @@ function loadSettingsFromMeta(meta) {
     smeaDyn.checked = !!meta.sm_dyn;
   }
 
-  // Restore character slots from v4_prompt char_captions
-  if (meta.char_captions && Array.isArray(meta.char_captions) && meta.char_captions.length > 0) {
-    // Clear existing characters
+  // Always clear existing characters first, then restore from metadata if available
+  {
     const slotsEl = $("#character-slots");
     if (slotsEl) {
       characters.length = 0;
       slotsEl.innerHTML = "";
+      _activeMarkerIdx = -1;
 
-      // Rebuild from metadata
-      meta.char_captions.forEach((cc) => {
+      // Rebuild from metadata if char_captions exist
+      const charCaptions = (meta.char_captions && Array.isArray(meta.char_captions)) ? meta.char_captions : [];
+      charCaptions.forEach((cc) => {
         const charData = {
           prompt: cc.char_caption || "",
           x: (cc.centers && cc.centers[0]) ? cc.centers[0].x : 0.5,
@@ -2208,19 +2209,21 @@ function loadSettingsFromMeta(meta) {
         slotsEl.appendChild(card);
       });
 
-      // Open the accordion and update UI
-      const accordion = $("#characters-accordion");
-      if (accordion) accordion.open = true;
+      const hasChars = characters.length > 0;
 
-      // Hide empty state, show inline add button
+      // Open accordion only if characters were restored
+      const accordion = $("#characters-accordion");
+      if (accordion && hasChars) accordion.open = true;
+
+      // Toggle empty state vs inline add button
       const emptyState = $("#char-empty-state");
-      if (emptyState) emptyState.style.display = "none";
+      if (emptyState) emptyState.style.display = hasChars ? "none" : "flex";
       const addBtnInline = $("#btn-add-character-inline");
-      if (addBtnInline) addBtnInline.style.display = "";
+      if (addBtnInline) addBtnInline.style.display = hasChars ? "" : "none";
 
       // Update scene label
       const sceneLabel = $("#scene-label");
-      if (sceneLabel) sceneLabel.style.display = "";
+      if (sceneLabel) sceneLabel.style.display = hasChars ? "" : "none";
 
       // Update badge and markers
       const badge = $("#char-count-badge");
