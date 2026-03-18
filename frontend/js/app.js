@@ -1241,8 +1241,11 @@ async function recordRecentCharacters(rawPrompt) {
       .trim()
   );
 
-  // 3. Filter: keep tokens longer than 3 chars that contain _ or (
-  const candidates = stripped.filter((t) => t.length > 3 && (t.includes("_") || t.includes("(")));
+  // 3. Normalize: spaces → underscores (tags.csv uses underscores)
+  // Then filter: keep tokens longer than 3 chars that contain _ or (
+  const candidates = stripped
+    .map((t) => t.replace(/ /g, "_"))
+    .filter((t) => t.length > 3 && (t.includes("_") || t.includes("(")));
   if (!candidates.length) return;
 
   // 4. Check which are real character tags
