@@ -158,6 +158,7 @@ async def generate(req: GenerateRequest):
             reference_image=req.reference_image,
             reference_information_extracted=req.reference_information_extracted,
             reference_strength=req.reference_strength,
+            char_captions=req.char_captions,
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"NovelAI API error: {e}")

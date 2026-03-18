@@ -25,7 +25,17 @@ const state = {
   vibe: null,
   lastSeed: null,
   lastImageBase64: null,
+  // canvas-displayed image (may be a gallery preview, not necessarily last generated)
+  canvasImageBase64: null,
+  canvasImageWidth: null,
+  canvasImageHeight: null,
 };
+
+// ── CHARACTER SLOTS ──────────────────────────────────────────
+const characters = [];  // array of { prompt, x, y } — managed by setupCharacters()
+
+// ── ABORT CONTROLLER ────────────────────────────────────────
+let _generateAbortController = null;
 
 // ── CROP STATE ──────────────────────────────────────────────
 // Lives here so openCropOverlay and the interaction handlers share it cleanly.
@@ -94,6 +104,9 @@ async function init() {
   setupTagBrowser();
   setupGuide();
   setupSettings();
+  setupCharacters();
+
+  $("#btn-set-as-source").addEventListener("click", setCanvasImageAsSource);
 
   document.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
@@ -915,8 +928,33 @@ function setupFileUpload(inputId, previewId, placeholderId, clearId, stateKey) {
    GENERATE
    ═══════════════════════════════════════════════════════════ */
 
+function setGenerateButtonStop() {
+  const btn = $("#generate-btn");
+  btn.classList.remove("loading");
+  btn.classList.add("stopping");
+  btn.disabled = false;
+  btn.querySelector(".btn-generate-label").textContent = "Stop";
+  btn.querySelector(".btn-generate-hint").textContent = "";
+}
+
+function resetGenerateButton() {
+  const btn = $("#generate-btn");
+  btn.classList.remove("loading", "stopping");
+  btn.disabled = false;
+  btn.querySelector(".btn-generate-label").textContent = "Generate";
+  btn.querySelector(".btn-generate-hint").textContent = "Cmd + Enter";
+  _generateAbortController = null;
+}
+
 async function generate() {
   const btn = $("#generate-btn");
+
+  // If we're in stopping state, trigger abort
+  if (btn.classList.contains("stopping")) {
+    if (_generateAbortController) _generateAbortController.abort();
+    return;
+  }
+
   if (btn.disabled) return;
 
   const prompt = $("#prompt").value.trim();
@@ -932,7 +970,6 @@ async function generate() {
   let finalPrompt = prompt;
   if ($("#quality-tags").checked) {
     // Append quality tags to base prompt content (before first | separator)
-    // Use regex to find the last non-whitespace position before | (or end)
     const pipeMatch = prompt.match(/^([\s\S]*?\S)([\s\n]*\|[\s\S]*)$/);
     if (pipeMatch) {
       finalPrompt = pipeMatch[1] + qualityTags + pipeMatch[2];
@@ -954,6 +991,7 @@ async function generate() {
     sm_dyn: $("#smea-dyn").checked,
     strength: parseFloat($("#strength").value),
     noise: parseFloat($("#noise").value),
+    char_captions: collectCharacterPayload(),
   };
 
   if (state.img2img) {
@@ -970,12 +1008,22 @@ async function generate() {
   btn.classList.add("loading");
   clearError();
 
+  _generateAbortController = new AbortController();
+
+  // After a brief moment switch to Stop button so user can cancel
+  const stopTimeout = setTimeout(() => {
+    if (_generateAbortController) setGenerateButtonStop();
+  }, 400);
+
   try {
     const resp = await fetch("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal: _generateAbortController.signal,
     });
+
+    clearTimeout(stopTimeout);
 
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({ detail: resp.statusText }));
@@ -985,6 +1033,9 @@ async function generate() {
     const data = await resp.json();
     state.lastSeed = data.seed;
     state.lastImageBase64 = data.image;
+    state.canvasImageBase64 = data.image;
+    state.canvasImageWidth = width;
+    state.canvasImageHeight = height;
 
     const output = $("#output");
     const img = document.createElement("img");
@@ -999,11 +1050,16 @@ async function generate() {
 
     loadGallery();
   } catch (e) {
-    console.error("Generate error:", e);
-    showError(e.message);
+    clearTimeout(stopTimeout);
+    if (e.name === "AbortError") {
+      // User cancelled — show neutral status, not an error
+      showStatus("Cancelled");
+    } else {
+      console.error("Generate error:", e);
+      showError(e.message);
+    }
   } finally {
-    btn.disabled = false;
-    btn.classList.remove("loading");
+    resetGenerateButton();
   }
 }
 
@@ -1021,6 +1077,50 @@ function downloadImage() {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+function setCanvasImageAsSource() {
+  if (!state.canvasImageBase64) return;
+
+  // Use the canvas-displayed image as img2img source
+  state.img2img = state.canvasImageBase64;
+
+  // Generate thumbnail from the output img element
+  const outputImg = $("#output img");
+  if (outputImg) {
+    const thumb = document.createElement("canvas");
+    thumb.width = 128; thumb.height = 128;
+    thumb.getContext("2d").drawImage(outputImg, 0, 0, 128, 128);
+    state.img2imgThumbDataUrl = thumb.toDataURL("image/jpeg", 0.8);
+  }
+
+  // Check if resolution matches — if so, skip crop overlay
+  const resVal = $("#resolution").value || "832x1216";
+  const [tw, th] = resVal.split("x").map(Number);
+  const iw = state.canvasImageWidth;
+  const ih = state.canvasImageHeight;
+
+  if (iw && ih && iw === tw && ih === th) {
+    // Resolution matches — activate directly
+    activateImg2ImgMode();
+    const accordion = $("#img2img-accordion");
+    if (accordion && !accordion.open) accordion.open = true;
+  } else if (iw && ih) {
+    // Resolution differs — show crop overlay
+    const img = new Image();
+    img.onload = () => {
+      activateImg2ImgMode();
+      const accordion = $("#img2img-accordion");
+      if (accordion && !accordion.open) accordion.open = true;
+      openCropOverlay(img);
+    };
+    img.src = `data:image/png;base64,${state.canvasImageBase64}`;
+  } else {
+    // No size info — activate directly without crop
+    activateImg2ImgMode();
+    const accordion = $("#img2img-accordion");
+    if (accordion && !accordion.open) accordion.open = true;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1202,14 +1302,48 @@ function setupTagBrowser() {
     } catch { /* silent */ }
   }
 
-  // Save cursor position on blur so we can restore it when chips steal focus
+  // ── Insertion target lock (Spec 1A/1B) ─────────────────────
+  // Default: whichever prompt tab is active
+  let _insertTarget = "prompt"; // "prompt" or "negative"
   let _savedCursor = { el: null, pos: -1 };
-  $("#prompt").addEventListener("blur", function() { _savedCursor = { el: this, pos: this.selectionStart }; });
-  $("#negative-prompt").addEventListener("blur", function() { _savedCursor = { el: this, pos: this.selectionStart }; });
+
+  const pillPrompt   = $("#tag-insert-prompt");
+  const pillNegative = $("#tag-insert-negative");
+
+  function setInsertTarget(target) {
+    _insertTarget = target;
+    pillPrompt.classList.toggle("active", target === "prompt");
+    pillNegative.classList.toggle("active", target === "negative");
+    // Sync saved cursor element
+    _savedCursor = {
+      el: target === "prompt" ? $("#prompt") : $("#negative-prompt"),
+      pos: _savedCursor.pos,
+    };
+  }
+
+  if (pillPrompt) pillPrompt.addEventListener("click", () => setInsertTarget("prompt"));
+  if (pillNegative) pillNegative.addEventListener("click", () => setInsertTarget("negative"));
+
+  // When prompt tabs are switched, sync the insert target pill
+  document.querySelectorAll(".prompt-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      if (tab.dataset.target === "prompt") setInsertTarget("prompt");
+      else setInsertTarget("negative");
+    });
+  });
+
+  // Save cursor position on blur for accurate insertion
+  $("#prompt").addEventListener("blur", function() {
+    _savedCursor = { el: this, pos: this.selectionStart };
+    // Update pill if this was the active textarea
+  });
+  $("#negative-prompt").addEventListener("blur", function() {
+    _savedCursor = { el: this, pos: this.selectionStart };
+  });
 
   function insertBrowserTag(tag, chipEl) {
-    // Determine which textarea is active
-    const promptEl = $("#prompt").style.display !== "none" ? $("#prompt") : $("#negative-prompt");
+    // Use locked target, not visibility-based detection
+    const promptEl = _insertTarget === "negative" ? $("#negative-prompt") : $("#prompt");
     const display = tag.replace(/_/g, " ");
     const val = promptEl.value;
 
@@ -1219,19 +1353,24 @@ function setupTagBrowser() {
       : val.length;
     const atEnd = pos === val.length;
 
+    let insertedLen;
     if (atEnd) {
       const prefix = val.length > 0 && !val.trimEnd().endsWith(",") ? ", " : val.length > 0 ? " " : "";
-      promptEl.value = val + prefix + display;
+      const insert = prefix + display;
+      promptEl.value = val + insert;
+      insertedLen = val.length + insert.length;
     } else {
       const before = val.slice(0, pos);
       const after = val.slice(pos);
       const prefix = before.length > 0 && !before.trimEnd().endsWith(",") ? ", " : before.length > 0 ? " " : "";
       const suffix = after.length > 0 && !after.trimStart().startsWith(",") ? ", " : "";
-      promptEl.value = before + prefix + display + suffix + after;
+      const insert = prefix + display + suffix;
+      promptEl.value = before + insert + after;
+      insertedLen = before.length + insert.length;
     }
 
-    // Update saved cursor past the insertion
-    _savedCursor = { el: promptEl, pos: promptEl.value.length };
+    // Move cursor to just after insertion and save it
+    _savedCursor = { el: promptEl, pos: insertedLen };
 
     promptEl.dispatchEvent(new Event("input"));
 
@@ -1357,12 +1496,18 @@ function renderGallery(files, filter) {
     const card = document.createElement("div");
     card.className = "history-card";
 
+    // Thumbnail area — clicking it previews in Canvas
+    const imgWrap = document.createElement("div");
+    imgWrap.className = "history-card-img-wrap";
+
     const img = document.createElement("img");
     img.className = "history-card-img";
     img.src = `/api/gallery/${file.name}`;
     img.alt = file.name;
     img.loading = "lazy";
+    imgWrap.appendChild(img);
 
+    // Hover overlay with prompt + meta text (for context, no buttons)
     const overlay = document.createElement("div");
     overlay.className = "history-card-overlay";
 
@@ -1376,30 +1521,49 @@ function renderGallery(files, filter) {
     const metaEl = document.createElement("div");
     metaEl.className = "history-card-meta";
     if (meta.seed) metaEl.innerHTML += `<span>Seed ${meta.seed}</span>`;
-    if (meta.steps) metaEl.innerHTML += `<span>${meta.steps} steps</span>`;
+    if (meta.steps) metaEl.innerHTML += `<span>${meta.steps}st</span>`;
     if (meta.width) metaEl.innerHTML += `<span>${meta.width}\u00d7${meta.height}</span>`;
     overlay.appendChild(metaEl);
+    imgWrap.appendChild(overlay);
 
-    const actionsEl = document.createElement("div");
-    actionsEl.className = "history-card-actions";
+    // Always-visible action bar at the bottom
+    const actionBar = document.createElement("div");
+    actionBar.className = "history-card-actionbar";
 
-    const loadBtn = document.createElement("button");
-    loadBtn.className = "history-card-btn history-card-btn--load";
-    loadBtn.type = "button";
-    loadBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.84"/></svg> Load`;
-    loadBtn.addEventListener("click", (e) => {
+    const iterateBtn = document.createElement("button");
+    iterateBtn.className = "history-card-action-btn history-card-action-btn--iterate";
+    iterateBtn.type = "button";
+    iterateBtn.title = "Iterate: load settings + use as source";
+    iterateBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>Iterate`;
+    iterateBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
       loadSettingsFromMeta(meta);
+      // Set image as img2img source from URL
+      await setHistoryImageAsSource(`/api/gallery/${file.name}`, meta);
       card.classList.add("settings-loaded");
       setTimeout(() => card.classList.remove("settings-loaded"), 1800);
       showSettingsLoadedToast();
       $("#tab-canvas").click();
     });
 
+    const loadBtn = document.createElement("button");
+    loadBtn.className = "history-card-action-btn history-card-action-btn--load";
+    loadBtn.type = "button";
+    loadBtn.title = "Load settings";
+    loadBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.84"/></svg>Load`;
+    loadBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      loadSettingsFromMeta(meta);
+      card.classList.add("settings-loaded");
+      setTimeout(() => card.classList.remove("settings-loaded"), 1800);
+      showSettingsLoadedToast();
+    });
+
     const delBtn = document.createElement("button");
-    delBtn.className = "history-card-btn history-card-btn--delete";
+    delBtn.className = "history-card-action-btn history-card-action-btn--delete";
     delBtn.type = "button";
-    delBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg> Delete`;
+    delBtn.title = "Delete";
+    delBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
     delBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
       card.style.opacity = "0.4";
@@ -1409,24 +1573,71 @@ function renderGallery(files, filter) {
       else { card.style.opacity = ""; card.style.pointerEvents = ""; }
     });
 
-    actionsEl.appendChild(loadBtn);
-    actionsEl.appendChild(delBtn);
-    overlay.appendChild(actionsEl);
+    actionBar.appendChild(iterateBtn);
+    actionBar.appendChild(loadBtn);
+    actionBar.appendChild(delBtn);
 
-    card.addEventListener("click", () => {
+    // Clicking the image area previews in Canvas
+    imgWrap.addEventListener("click", () => {
       const output = $("#output");
       const previewImg = document.createElement("img");
       previewImg.src = `/api/gallery/${file.name}`;
       previewImg.alt = "Preview";
       output.innerHTML = "";
       output.appendChild(previewImg);
+      // Track canvas image state (no base64 available from URL — clear it)
+      state.canvasImageBase64 = null;
+      state.canvasImageWidth = meta.width || null;
+      state.canvasImageHeight = meta.height || null;
+      $("#image-actions").style.display = "none";
       $("#tab-canvas").click();
     });
 
-    card.appendChild(img);
-    card.appendChild(overlay);
+    card.appendChild(imgWrap);
+    card.appendChild(actionBar);
     list.appendChild(card);
   }
+}
+
+async function setHistoryImageAsSource(url, meta) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      // Draw to canvas to get base64
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth;
+      c.height = img.naturalHeight;
+      c.getContext("2d").drawImage(img, 0, 0);
+
+      const resVal = $("#resolution").value || "832x1216";
+      const [tw, th] = resVal.split("x").map(Number);
+      const iw = img.naturalWidth;
+      const ih = img.naturalHeight;
+
+      if (iw === tw && ih === th) {
+        // Exact match — use directly
+        state.img2img = c.toDataURL("image/png").split(",")[1];
+        // Make thumbnail
+        const thumb = document.createElement("canvas");
+        thumb.width = 128; thumb.height = 128;
+        thumb.getContext("2d").drawImage(img, 0, 0, 128, 128);
+        state.img2imgThumbDataUrl = thumb.toDataURL("image/jpeg", 0.8);
+        activateImg2ImgMode();
+        const accordion = $("#img2img-accordion");
+        if (accordion && !accordion.open) accordion.open = true;
+        resolve();
+      } else {
+        // Needs crop — openCropOverlay will call activateImg2ImgMode() on confirm
+        const accordion = $("#img2img-accordion");
+        if (accordion && !accordion.open) accordion.open = true;
+        openCropOverlay(img);
+        resolve();
+      }
+    };
+    img.onerror = () => resolve();
+    img.src = url;
+  });
 }
 
 function loadSettingsFromMeta(meta) {
@@ -1491,6 +1702,16 @@ function loadSettingsFromMeta(meta) {
    ERROR
    ═══════════════════════════════════════════════════════════ */
 
+function showStatus(msg) {
+  clearError();
+  const slot = $("#error-slot");
+  const div = document.createElement("div");
+  div.className = "status-msg";
+  div.textContent = msg;
+  slot.appendChild(div);
+  setTimeout(() => { if (slot.contains(div)) slot.removeChild(div); }, 3000);
+}
+
 function showError(msg) {
   clearError();
   const slot = $("#error-slot");
@@ -1502,6 +1723,164 @@ function showError(msg) {
 
 function clearError() {
   $("#error-slot").innerHTML = "";
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CHARACTERS (Spec 4)
+   ═══════════════════════════════════════════════════════════ */
+
+const MAX_CHARACTERS = 6;
+
+function setupCharacters() {
+  const addBtn   = $("#btn-add-character");
+  const slotsEl  = $("#character-slots");
+  const accordion = $("#characters-accordion");
+  const badge    = $("#char-count-badge");
+
+  if (!addBtn || !slotsEl) return;
+
+  addBtn.addEventListener("click", () => {
+    if (characters.length >= MAX_CHARACTERS) return;
+    addCharacterSlot();
+  });
+
+  function updateCharacterUI() {
+    const count = characters.length;
+    // Badge on accordion header
+    if (badge) {
+      badge.textContent = count;
+      badge.style.display = count > 0 ? "inline-flex" : "none";
+    }
+    // Add button disabled when at max
+    addBtn.disabled = count >= MAX_CHARACTERS;
+    // Scene mode label on Prompt tab
+    const sceneLabel = $("#scene-label");
+    if (sceneLabel) sceneLabel.style.display = count > 0 ? "" : "none";
+    // Character count suggestion chip
+    updateCountSuggestionChip(count);
+  }
+
+  function addCharacterSlot() {
+    const idx = characters.length;
+    const charData = { prompt: "", x: 0.5, y: 0.5 };
+    characters.push(charData);
+
+    const card = document.createElement("div");
+    card.className = "char-slot-card";
+    card.dataset.idx = idx;
+
+    // Textarea
+    const ta = document.createElement("textarea");
+    ta.className = "char-slot-textarea field-textarea";
+    ta.rows = 3;
+    ta.placeholder = "girl, blonde hair, blue eyes, waving";
+    ta.spellcheck = false;
+    ta.addEventListener("input", () => { charData.prompt = ta.value; });
+
+    // Position grid (5x5)
+    const gridWrap = document.createElement("div");
+    gridWrap.className = "char-position-grid";
+    gridWrap.setAttribute("aria-label", "Character position");
+
+    for (let row = 0; row < 5; row++) {
+      for (let col = 0; col < 5; col++) {
+        const cell = document.createElement("button");
+        cell.type = "button";
+        cell.className = "char-pos-cell";
+        cell.dataset.row = row;
+        cell.dataset.col = col;
+        if (row === 2 && col === 2) cell.classList.add("selected"); // default center
+        cell.addEventListener("click", () => {
+          gridWrap.querySelectorAll(".char-pos-cell").forEach((c) => c.classList.remove("selected"));
+          cell.classList.add("selected");
+          charData.x = col / 4;
+          charData.y = row / 4;
+        });
+        gridWrap.appendChild(cell);
+      }
+    }
+
+    // Card header row (label + remove button)
+    const cardHeader = document.createElement("div");
+    cardHeader.className = "char-slot-header";
+
+    const cardLabel = document.createElement("span");
+    cardLabel.className = "char-slot-label";
+    cardLabel.textContent = `Character ${idx + 1}`;
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "char-slot-remove";
+    removeBtn.title = "Remove character";
+    removeBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+    removeBtn.addEventListener("click", () => {
+      const cardIdx = parseInt(card.dataset.idx);
+      characters.splice(cardIdx, 1);
+      card.remove();
+      // Re-index remaining cards and re-label
+      slotsEl.querySelectorAll(".char-slot-card").forEach((c, i) => {
+        c.dataset.idx = i;
+        const lbl = c.querySelector(".char-slot-label");
+        if (lbl) lbl.textContent = `Character ${i + 1}`;
+      });
+      updateCharacterUI();
+    });
+
+    cardHeader.appendChild(cardLabel);
+    cardHeader.appendChild(removeBtn);
+
+    // Layout: header, textarea, then row with grid
+    const bodyRow = document.createElement("div");
+    bodyRow.className = "char-slot-body";
+
+    const gridLabel = document.createElement("div");
+    gridLabel.className = "char-grid-label field-label";
+    gridLabel.textContent = "Position";
+
+    bodyRow.appendChild(gridLabel);
+    bodyRow.appendChild(gridWrap);
+
+    card.appendChild(cardHeader);
+    card.appendChild(ta);
+    card.appendChild(bodyRow);
+
+    slotsEl.appendChild(card);
+    updateCharacterUI();
+    ta.focus();
+  }
+
+}
+
+function updateCountSuggestionChip(count) {
+  const wrap = $("#char-count-chip-wrap");
+  const chip = $("#char-count-chip");
+  if (!wrap || !chip) return;
+  if (count === 0) {
+    wrap.style.display = "none";
+    return;
+  }
+  const tagMap = { 1: "1girl", 2: "2girls", 3: "3girls", 4: "4girls", 5: "5girls", 6: "6girls" };
+  const tag = tagMap[count] || `${count}girls`;
+  chip.textContent = `Add to scene: ${tag}`;
+  chip.onclick = () => {
+    const promptEl = $("#prompt");
+    const val = promptEl.value;
+    // Insert tag at beginning of prompt, unless it's already there
+    if (val.trimStart().startsWith(tag)) return;
+    promptEl.value = tag + (val.length > 0 ? ", " : "") + val;
+    promptEl.dispatchEvent(new Event("input"));
+    // Flash
+    chip.classList.add("char-count-chip--inserted");
+    setTimeout(() => chip.classList.remove("char-count-chip--inserted"), 400);
+  };
+  wrap.style.display = "flex";
+}
+
+function collectCharacterPayload() {
+  return characters.map((c) => ({
+    char_caption: c.prompt,
+    centers: [{ x: c.x, y: c.y }],
+  }));
 }
 
 init();
