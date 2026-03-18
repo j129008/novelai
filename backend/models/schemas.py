@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 
 VALID_MODELS = Literal[
     "nai-diffusion-4-5-full",
@@ -53,3 +53,16 @@ class GenerateRequest(BaseModel):
 class GenerateResponse(BaseModel):
     image: str  # base64 encoded png
     seed: int
+
+
+class CharacterUsage(BaseModel):
+    tag: str
+    count: int = Field(ge=1)
+
+
+class CharacterUsageList(BaseModel):
+    characters: list[CharacterUsage]
+
+
+class RecordCharactersRequest(BaseModel):
+    tags: list[Annotated[str, Field(min_length=1)]] = Field(default_factory=list)

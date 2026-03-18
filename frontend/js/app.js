@@ -72,6 +72,18 @@ async function init() {
       value: `${r.width}x${r.height}`,
       label: r.label,
     })));
+
+    // Restore saved resolution from localStorage
+    const savedResolution = localStorage.getItem("nai-resolution");
+    if (savedResolution) {
+      const resolutionEl = $("#resolution");
+      for (const opt of resolutionEl.options) {
+        if (opt.value === savedResolution) {
+          resolutionEl.value = savedResolution;
+          break;
+        }
+      }
+    }
   } catch (e) {
     showError(`Failed to load options: ${e.message}`);
   }
@@ -82,6 +94,14 @@ async function init() {
   bindSlider("noise", "noise-val", 2);
   bindSlider("ref-strength", "ref-strength-val", 2);
   bindSlider("ref-info", "ref-info-val", 2);
+
+  // Persist resolution selection
+  const resolutionEl = $("#resolution");
+  if (resolutionEl) {
+    resolutionEl.addEventListener("change", () => {
+      localStorage.setItem("nai-resolution", resolutionEl.value);
+    });
+  }
 
   // Vibe/style-reference upload (sidebar, unchanged)
   setupFileUpload("vibe-upload", "vibe-preview", "vibe-placeholder", "vibe-clear", "vibe");
@@ -1093,6 +1113,9 @@ async function generate() {
     $("#info-seed").textContent = `Seed: ${data.seed}`;
 
     loadGallery();
+
+    // Fire-and-forget: record character tags from the prompt
+    recordRecentCharacters(prompt);
   } catch (e) {
     clearTimeout(stopTimeout);
     if (e.name === "AbortError") {
@@ -1168,6 +1191,56 @@ function setCanvasImageAsSource() {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   RECENT CHARACTERS
+   ═══════════════════════════════════════════════════════════ */
+
+let _recentCharacters = []; // [{ tag, count }, ...] sorted by count desc
+
+async function recordRecentCharacters(rawPrompt) {
+  // 1. Split on comma and pipe to get tokens
+  const raw = rawPrompt.split(/[,|]/).map((t) => t.trim());
+
+  // 2. Strip weight syntax: {, }, [, ], and numeric prefix patterns like 1.5::
+  const stripped = raw.map((t) =>
+    t
+      .replace(/^\d+(\.\d+)?::/, "")   // numeric prefix like 1.5::
+      .replace(/^-\d+(\.\d+)?::/, "")  // negative numeric prefix like -1::
+      .replace(/::$/, "")               // trailing ::
+      .replace(/[{}\[\]]/g, "")         // braces and brackets
+      .trim()
+  );
+
+  // 3. Filter: keep tokens longer than 3 chars that contain _ or (
+  const candidates = stripped.filter((t) => t.length > 3 && (t.includes("_") || t.includes("(")));
+  if (!candidates.length) return;
+
+  // 4. Check which are real character tags
+  try {
+    const resp = await fetch(`/api/tags/check-characters?tags=${encodeURIComponent(candidates.join(","))}`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const confirmed = data.characters || [];
+    if (!confirmed.length) return;
+
+    // 5. Record confirmed character tags
+    await fetch("/api/recent-characters", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tags: confirmed }),
+    });
+  } catch { /* fire-and-forget, silent */ }
+}
+
+async function loadRecentCharacters() {
+  try {
+    const resp = await fetch("/api/recent-characters");
+    if (!resp.ok) return;
+    const data = await resp.json();
+    _recentCharacters = data.characters || [];
+  } catch { /* silent */ }
+}
+
+/* ═══════════════════════════════════════════════════════════
    TAG BROWSER
    ═══════════════════════════════════════════════════════════ */
 
@@ -1201,12 +1274,11 @@ function setupTagBrowser() {
     canvas.classList.add("tag-browser-open");
     btn.classList.add("btn-action--primary");
     btn.setAttribute("aria-expanded", "true");
-    if (!_tagCategories.length) {
-      loadTagCategories().then(() => { buildRail(); renderGrid(); });
-    } else {
+    const fetchCategories = !_tagCategories.length ? loadTagCategories() : Promise.resolve();
+    Promise.all([fetchCategories, loadRecentCharacters()]).then(() => {
       buildRail();
       renderGrid();
-    }
+    });
   }
 
   function close() {
@@ -1268,6 +1340,42 @@ function setupTagBrowser() {
     const filter = searchInput.value.trim().toLowerCase().replace(/ /g, "_");
     grid.innerHTML = "";
 
+    // ── Recent Characters section ─────────────────────────
+    if (_recentCharacters.length) {
+      const visibleRecent = filter
+        ? _recentCharacters.filter((r) => r.tag.toLowerCase().includes(filter))
+        : _recentCharacters;
+
+      if (visibleRecent.length) {
+        const rcLabel = document.createElement("div");
+        rcLabel.className = "tag-browser-section-label tag-browser-section-label--recent";
+        rcLabel.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Recent Characters`;
+        grid.appendChild(rcLabel);
+
+        const rcWrap = document.createElement("div");
+        rcWrap.className = "tag-browser-chips";
+
+        for (const rc of visibleRecent) {
+          const chip = document.createElement("button");
+          chip.className = "tag-chip tag-chip--recent";
+          chip.type = "button";
+
+          const nameSpan = document.createElement("span");
+          nameSpan.textContent = rc.tag.replace(/_/g, " ");
+
+          const countSpan = document.createElement("span");
+          countSpan.className = "tag-chip-count";
+          countSpan.textContent = `\u00d7${rc.count}`;
+
+          chip.appendChild(nameSpan);
+          chip.appendChild(countSpan);
+          chip.addEventListener("click", () => insertBrowserTag(rc.tag, chip));
+          rcWrap.appendChild(chip);
+        }
+        grid.appendChild(rcWrap);
+      }
+    }
+
     const cats = activeCategory === "all"
       ? _tagCategories
       : _tagCategories.filter((c) => c.id === activeCategory);
@@ -1299,12 +1407,17 @@ function setupTagBrowser() {
       grid.appendChild(wrap);
     }
 
+    // Check if recent characters section already produced visible results
+    const anyRecentVisible = _recentCharacters.length > 0 && (
+      !filter || _recentCharacters.some((r) => r.tag.toLowerCase().includes(filter))
+    );
+
     // When filtering, also search the full 140K tag database
     if (filter && filter.length >= 2) {
       clearTimeout(_searchDebounce);
       const gen = _renderGen;
-      _searchDebounce = setTimeout(() => fetchFullSearch(filter, anyTags, gen), 200);
-    } else if (!anyTags) {
+      _searchDebounce = setTimeout(() => fetchFullSearch(filter, anyTags || anyRecentVisible, gen), 200);
+    } else if (!anyTags && !anyRecentVisible) {
       const empty = document.createElement("p");
       empty.className = "tag-browser-empty";
       empty.textContent = "No tags found";

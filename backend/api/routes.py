@@ -10,7 +10,13 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from models.schemas import GenerateRequest, GenerateResponse
+from models.schemas import (
+    CharacterUsage,
+    CharacterUsageList,
+    GenerateRequest,
+    GenerateResponse,
+    RecordCharactersRequest,
+)
 from api.novelai import generate_image
 
 router = APIRouter(prefix="/api")
@@ -20,6 +26,10 @@ TOKEN = os.getenv("NOVELAI_TOKEN", "")
 # Settings file for persistent config
 _settings_file = Path(__file__).resolve().parent.parent.parent / ".app-settings.json"
 _default_output = Path(__file__).resolve().parent.parent.parent / "output"
+
+# Character usage tracking file
+_characters_file = Path(__file__).resolve().parent.parent.parent / ".recent-characters.json"
+_CHARACTERS_MAX = 50
 
 
 def _load_settings():
@@ -39,6 +49,26 @@ def _get_output_dir() -> Path:
     p = Path(settings.get("output_dir", str(_default_output)))
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def _load_characters() -> list[CharacterUsage]:
+    if _characters_file.exists():
+        try:
+            raw = json.loads(_characters_file.read_text())
+            return [CharacterUsage(**item) for item in raw]
+        except (json.JSONDecodeError, TypeError, ValueError):
+            pass
+    return []
+
+
+def _save_characters(characters: list[CharacterUsage]) -> None:
+    _characters_file.write_text(
+        json.dumps([c.model_dump() for c in characters], indent=2)
+    )
+
+
+def _sorted_characters(characters: list[CharacterUsage]) -> list[CharacterUsage]:
+    return sorted(characters, key=lambda c: c.count, reverse=True)
 
 
 # Ensure default output dir exists
@@ -103,6 +133,16 @@ async def get_options():
 @router.get("/tags/categories")
 async def get_tag_categories():
     return _tag_categories
+
+
+@router.get("/tags/check-characters")
+async def check_characters(tags: str = Query(description="Comma-separated tag names")):
+    candidates = {t.strip() for t in tags.split(",") if t.strip()}
+    character_names = {
+        t["name"] for t in _tags if t["category"] == "character"
+    }
+    confirmed = [t for t in candidates if t in character_names]
+    return {"characters": confirmed}
 
 
 @router.get("/tags")
@@ -279,5 +319,39 @@ async def browse_folder():
 @router.post("/settings/open-folder")
 async def open_output_folder():
     out = _get_output_dir()
-    subprocess.Popen(["open", str(out)])
+    try:
+        subprocess.Popen(["open", str(out)])
+    except Exception:
+        raise HTTPException(status_code=500, detail="Could not open output folder")
     return {"opened": str(out)}
+
+
+@router.get("/recent-characters", response_model=CharacterUsageList)
+async def get_recent_characters():
+    return CharacterUsageList(characters=_load_characters())
+
+
+@router.post("/recent-characters", response_model=CharacterUsageList)
+async def record_characters(req: RecordCharactersRequest):
+    characters = _load_characters()
+    index: dict[str, CharacterUsage] = {c.tag: c for c in characters}
+
+    for tag in req.tags:
+        if tag in index:
+            index[tag] = CharacterUsage(tag=tag, count=index[tag].count + 1)
+        else:
+            index[tag] = CharacterUsage(tag=tag, count=1)
+
+    updated = _sorted_characters(list(index.values()))
+    if len(updated) > _CHARACTERS_MAX:
+        updated = updated[:_CHARACTERS_MAX]
+
+    _save_characters(updated)
+    return CharacterUsageList(characters=updated)
+
+
+@router.delete("/recent-characters/{tag_name}", response_model=CharacterUsageList)
+async def delete_recent_character(tag_name: str):
+    characters = [c for c in _load_characters() if c.tag != tag_name]
+    _save_characters(characters)
+    return CharacterUsageList(characters=characters)
