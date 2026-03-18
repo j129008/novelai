@@ -1899,3 +1899,59 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   padding: 4px 10px;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   CHARACTER MARKERS — persistent canvas overlays
+   ═══════════════════════════════════════════════════════════ */
+
+.char-marker {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-overlay);
+  border: 2px solid var(--border-strong);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  user-select: none;
+  transform: translate(-50%, -50%);
+  transition: width 0.15s, height 0.15s, box-shadow 0.15s;
+  z-index: 5;
+  /* Ensure the marker is always rendered above canvas image */
+  pointer-events: all;
+}
+
+.char-marker:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.char-marker--active {
+  border-color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-dim);
+}
+
+.char-marker--auto {
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.char-marker--dragging {
+  width: 32px;
+  height: 32px;
+  cursor: grabbing;
+  box-shadow: 0 0 12px var(--accent-dim);
+  transition: none;
+}
+
+/* Active sidebar card highlight — mirrors selected marker */
+.char-slot-card--active {
+  border-color: var(--accent);
+  border-left-color: var(--accent);
+}
+
