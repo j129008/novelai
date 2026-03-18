@@ -1716,9 +1716,10 @@ function showSettingsLoadedToast() {
 }
 
 function galleryFileUrl(name) {
+  const encoded = encodeURIComponent(name);
   return _galleryPath
-    ? `/api/gallery/${name}?path=${encodeURIComponent(_galleryPath)}`
-    : `/api/gallery/${name}`;
+    ? `/api/gallery/${encoded}?path=${encodeURIComponent(_galleryPath)}`
+    : `/api/gallery/${encoded}`;
 }
 
 function renderBreadcrumb() {
