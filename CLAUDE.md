@@ -42,10 +42,21 @@ python backend/main.py
 - Use python-dotenv for environment variable management
 - Generated images go to user-configured output directory
 
-## Review Process
+## Team (Sub-Agents)
 
-This project uses two sub-agent reviewers (`.claude/agents/`):
-1. **Steve Jobs** — Reviews UI/UX design decisions
-2. **Linus Torvalds** — Reviews code quality and architecture
+This project uses a team of sub-agents (`.claude/agents/`):
 
-Both must approve before changes are considered complete.
+| Agent | Role | Responsibilities |
+|-------|------|-----------------|
+| **Steve Jobs** | PM | Product vision, feature specs, prioritization, UI/UX final call |
+| **Guido van Rossum** | Backend Engineer | FastAPI endpoints, API integrations, Pythonic server-side logic |
+| **Lea Verou** | Frontend Engineer | UI components, CSS mastery, vanilla HTML/CSS/JS |
+| **James Whittaker** | QA Engineer | Google-level testing rigor, endpoint validation, bug catching |
+| **Linus Torvalds** | Reviewer & Merger | Code review, quality enforcement, merge gatekeeper |
+
+### Workflow
+1. **Steve Jobs** defines what to build (specs & priorities)
+2. **Guido van Rossum** / **Lea Verou** implement the changes
+3. **James Whittaker** tests functionality and catches bugs
+4. **Linus Torvalds** reviews code and merges approved changes
+5. **Steve Jobs** does final product review before shipping
