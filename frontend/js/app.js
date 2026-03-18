@@ -1666,6 +1666,7 @@ function setupTagBrowser() {
    ═══════════════════════════════════════════════════════════ */
 
 let _galleryData = [];
+let _galleryPath = "";
 let _settingsLoadedToast = null;
 
 function setupHistoryTabs() {
@@ -1703,7 +1704,7 @@ function setupHistoryTabs() {
 
   if (searchInput) {
     searchInput.addEventListener("input", () => {
-      renderGallery(_galleryData, searchInput.value.toLowerCase());
+      renderGallery(_galleryData, [], searchInput.value.toLowerCase());
     });
   }
 }
@@ -1714,6 +1715,57 @@ function showSettingsLoadedToast() {
   setTimeout(() => _settingsLoadedToast.classList.remove("visible"), 2400);
 }
 
+function galleryFileUrl(name) {
+  return _galleryPath
+    ? `/api/gallery/${name}?path=${encodeURIComponent(_galleryPath)}`
+    : `/api/gallery/${name}`;
+}
+
+function renderBreadcrumb() {
+  const breadcrumb = $("#gallery-breadcrumb");
+  if (!breadcrumb) return;
+  breadcrumb.innerHTML = "";
+
+  // Root segment
+  const rootBtn = document.createElement("button");
+  rootBtn.type = "button";
+  rootBtn.textContent = "/";
+  if (!_galleryPath) {
+    rootBtn.className = "gallery-breadcrumb-current";
+  } else {
+    rootBtn.className = "gallery-breadcrumb-item";
+    rootBtn.addEventListener("click", () => {
+      _galleryPath = "";
+      loadGallery();
+    });
+  }
+  breadcrumb.appendChild(rootBtn);
+
+  if (!_galleryPath) return;
+
+  const segments = _galleryPath.split("/");
+  segments.forEach((seg, i) => {
+    const sep = document.createElement("span");
+    sep.className = "gallery-breadcrumb-sep";
+    sep.textContent = ">";
+    breadcrumb.appendChild(sep);
+
+    const isLast = i === segments.length - 1;
+    const segEl = document.createElement(isLast ? "span" : "button");
+    if (!isLast) segEl.type = "button";
+    segEl.textContent = seg;
+    segEl.className = isLast ? "gallery-breadcrumb-current" : "gallery-breadcrumb-item";
+    if (!isLast) {
+      const targetPath = segments.slice(0, i + 1).join("/");
+      segEl.addEventListener("click", () => {
+        _galleryPath = targetPath;
+        loadGallery();
+      });
+    }
+    breadcrumb.appendChild(segEl);
+  });
+}
+
 async function loadGallery() {
   const list = $("#gallery-list");
   const empty = $("#gallery-empty");
@@ -1721,21 +1773,33 @@ async function loadGallery() {
   if (!list) return;
 
   try {
-    const resp = await fetch("/api/gallery");
+    const url = "/api/gallery" + (_galleryPath ? "?path=" + encodeURIComponent(_galleryPath) : "");
+    const resp = await fetch(url);
     if (!resp.ok) return;
-    const files = await resp.json();
+    const data = await resp.json();
+
+    // Support both new format {path, directories, files} and legacy array format
+    const files = Array.isArray(data) ? data : (data.files || []);
+    const directories = Array.isArray(data) ? [] : (data.directories || []);
 
     _galleryData = files;
     if (count) {
       count.textContent = files.length || "";
       count.classList.toggle("visible", files.length > 0);
     }
+    renderBreadcrumb();
     const searchVal = ($("#gallery-search")?.value || "").toLowerCase();
-    renderGallery(files, searchVal);
+    renderGallery(files, directories, searchVal);
   } catch { /* ignore */ }
 }
 
-function renderGallery(files, filter) {
+function renderGallery(files, directories, filter) {
+  // Support legacy 2-arg call (files, filter) when no directories available
+  if (typeof directories === "string" || directories === undefined) {
+    filter = directories;
+    directories = [];
+  }
+
   const list = $("#gallery-list");
   const empty = $("#gallery-empty");
   if (!list) return;
@@ -1750,7 +1814,10 @@ function renderGallery(files, filter) {
       })
     : files;
 
-  if (!filtered.length) {
+  // When searching, directories are hidden (not searchable by design)
+  const visibleDirs = filter ? [] : (directories || []);
+
+  if (!filtered.length && !visibleDirs.length) {
     list.style.display = "none";
     empty.style.display = "block";
     empty.textContent = filter ? "No matching images" : "No saved images yet";
@@ -1760,6 +1827,31 @@ function renderGallery(files, filter) {
   list.style.display = "grid";
   empty.style.display = "none";
   list.innerHTML = "";
+
+  // Render folder cards first
+  for (const dirName of visibleDirs) {
+    const card = document.createElement("div");
+    card.className = "gallery-folder-card";
+
+    const icon = document.createElement("div");
+    icon.className = "gallery-folder-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = "\uD83D\uDCC1"; // 📁
+
+    const name = document.createElement("div");
+    name.className = "gallery-folder-name";
+    name.textContent = dirName;
+
+    card.appendChild(icon);
+    card.appendChild(name);
+
+    card.addEventListener("click", () => {
+      _galleryPath = _galleryPath ? _galleryPath + "/" + dirName : dirName;
+      loadGallery();
+    });
+
+    list.appendChild(card);
+  }
 
   for (const file of filtered) {
     const meta = file.meta || {};
@@ -1772,7 +1864,7 @@ function renderGallery(files, filter) {
 
     const img = document.createElement("img");
     img.className = "history-card-img";
-    img.src = `/api/gallery/${file.name}`;
+    img.src = galleryFileUrl(file.name);
     img.alt = file.name;
     img.loading = "lazy";
     imgWrap.appendChild(img);
@@ -1809,7 +1901,7 @@ function renderGallery(files, filter) {
       e.stopPropagation();
       loadSettingsFromMeta(meta);
       // Set image as img2img source from URL
-      await setHistoryImageAsSource(`/api/gallery/${file.name}`, meta);
+      await setHistoryImageAsSource(galleryFileUrl(file.name), meta);
       card.classList.add("settings-loaded");
       setTimeout(() => card.classList.remove("settings-loaded"), 1800);
       showSettingsLoadedToast();
@@ -1839,7 +1931,7 @@ function renderGallery(files, filter) {
       e.stopPropagation();
       card.style.opacity = "0.4";
       card.style.pointerEvents = "none";
-      const r = await fetch(`/api/gallery/${file.name}`, { method: "DELETE" });
+      const r = await fetch(galleryFileUrl(file.name), { method: "DELETE" });
       if (r.ok) loadGallery();
       else { card.style.opacity = ""; card.style.pointerEvents = ""; }
     });
@@ -1933,7 +2025,7 @@ function setupLightbox() {
     const file = _lightboxData[_lightboxIndex];
     if (!file) return;
     loadSettingsFromMeta(file.meta || {});
-    await setHistoryImageAsSource(`/api/gallery/${file.name}`, file.meta || {});
+    await setHistoryImageAsSource(galleryFileUrl(file.name), file.meta || {});
     showSettingsLoadedToast();
     closeLightbox();
     $("#tab-canvas").click();
@@ -2036,7 +2128,7 @@ function renderLightboxFrame() {
     err.textContent = "Failed to load image";
     imgWrap.appendChild(err);
   };
-  img.src = `/api/gallery/${file.name}`;
+  img.src = galleryFileUrl(file.name);
 }
 
 async function setHistoryImageAsSource(url, meta) {

@@ -13,6 +13,8 @@ from pydantic import BaseModel
 from models.schemas import (
     CharacterUsage,
     CharacterUsageList,
+    GalleryFileItem,
+    GalleryListResponse,
     GenerateRequest,
     GenerateResponse,
     RecordCharactersRequest,
@@ -216,6 +218,20 @@ async def generate(req: GenerateRequest):
     )
 
 
+def _resolve_gallery_path(output_dir: Path, subpath: str) -> Path:
+    """Resolve subpath inside output_dir, raising 400 on traversal attempts.
+
+    Rejects paths containing '..' components before resolution as an explicit
+    guard, then re-checks after Path.resolve() to catch symlink-based escapes.
+    """
+    if ".." in Path(subpath).parts:
+        raise HTTPException(status_code=400, detail="Path traversal not allowed")
+    resolved = (output_dir / subpath).resolve()
+    if not resolved.is_relative_to(output_dir.resolve()):
+        raise HTTPException(status_code=400, detail="Path traversal not allowed")
+    return resolved
+
+
 def _read_png_meta(filepath: Path) -> dict:
     # PNG files saved by this app carry generation parameters in the PNG "Comment" chunk,
     # which Pillow exposes as img.info["Comment"].  The value is a JSON object written by
@@ -256,33 +272,45 @@ def _read_png_meta(filepath: Path) -> dict:
     return {}
 
 
-@router.get("/gallery")
-async def list_gallery():
+@router.get("/gallery", response_model=GalleryListResponse)
+async def list_gallery(path: str = Query(default="")):
     out = _get_output_dir()
-    files = sorted(out.glob("*.png"), key=lambda f: f.stat().st_mtime, reverse=True)
-    results = []
-    for f in files:
-        item = {"name": f.name, "size": f.stat().st_size}
-        meta = _read_png_meta(f)
-        if meta:
-            item["meta"] = meta
-        results.append(item)
-    return results
+    current_dir = _resolve_gallery_path(out, path)
+    if not current_dir.is_dir():
+        raise HTTPException(status_code=404, detail="Directory not found")
+
+    directories = sorted(
+        d.name for d in current_dir.iterdir() if d.is_dir()
+    )
+    png_files = sorted(
+        current_dir.glob("*.png"), key=lambda f: f.stat().st_mtime, reverse=True
+    )
+    files = [
+        GalleryFileItem(
+            name=f.name,
+            size=f.stat().st_size,
+            meta=_read_png_meta(f),
+        )
+        for f in png_files
+    ]
+    return GalleryListResponse(path=path, directories=directories, files=files)
 
 
 @router.get("/gallery/{filename}")
-async def get_gallery_image(filename: str):
+async def get_gallery_image(filename: str, path: str = Query(default="")):
     out = _get_output_dir()
-    filepath = (out / filename).resolve()
+    filepath = _resolve_gallery_path(out, path) / filename
+    filepath = filepath.resolve()
     if not filepath.exists() or not filepath.is_relative_to(out.resolve()):
         raise HTTPException(status_code=404, detail="Image not found")
     return FileResponse(filepath, media_type="image/png")
 
 
 @router.delete("/gallery/{filename}")
-async def delete_gallery_image(filename: str):
+async def delete_gallery_image(filename: str, path: str = Query(default="")):
     out = _get_output_dir()
-    filepath = (out / filename).resolve()
+    filepath = _resolve_gallery_path(out, path) / filename
+    filepath = filepath.resolve()
     if not filepath.exists() or not filepath.is_relative_to(out.resolve()):
         raise HTTPException(status_code=404, detail="Image not found")
     filepath.unlink()

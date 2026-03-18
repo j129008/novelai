@@ -267,6 +267,19 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 .history-card-btn--delete:hover { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
 .gallery-empty { font-size: 0.82rem; color: var(--text-tertiary); text-align: center; padding: 24px 0; }
 
+/* Gallery breadcrumb */
+.gallery-breadcrumb { display: flex; align-items: center; gap: 4px; padding: 8px 0; font-size: 0.78rem; color: var(--text-tertiary); flex-wrap: wrap; flex-shrink: 0; }
+.gallery-breadcrumb-item { cursor: pointer; color: var(--text-secondary); transition: color 0.12s; background: none; border: none; font-family: inherit; font-size: inherit; padding: 0; }
+.gallery-breadcrumb-item:hover { color: var(--accent); }
+.gallery-breadcrumb-sep { color: var(--text-tertiary); user-select: none; }
+.gallery-breadcrumb-current { color: var(--text-primary); cursor: default; }
+
+/* Gallery folder cards */
+.gallery-folder-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: var(--bg-float); border: 1px solid var(--border-muted); border-radius: var(--radius-md); cursor: pointer; padding: 16px; min-height: 100px; transition: border-color 0.15s, background 0.15s; }
+.gallery-folder-card:hover { border-color: var(--accent); background: var(--bg-overlay); }
+.gallery-folder-icon { font-size: 1.8rem; line-height: 1; }
+.gallery-folder-name { font-size: 0.78rem; color: var(--text-secondary); text-align: center; word-break: break-all; }
+
 /* Settings loaded toast */
 .settings-loaded-toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(16px); background: var(--accent); color: white; font-size: 0.8rem; font-weight: 600; padding: 10px 20px; border-radius: 20px; box-shadow: 0 4px 20px var(--accent-glow); opacity: 0; transition: opacity 0.2s, transform 0.25s var(--ease-out); pointer-events: none; z-index: 200; white-space: nowrap; }
 .settings-loaded-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }

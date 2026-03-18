@@ -66,3 +66,15 @@ class CharacterUsageList(BaseModel):
 
 class RecordCharactersRequest(BaseModel):
     tags: list[Annotated[str, Field(min_length=1)]] = Field(default_factory=list)
+
+
+class GalleryFileItem(BaseModel):
+    name: str
+    size: int
+    meta: dict = Field(default_factory=dict)
+
+
+class GalleryListResponse(BaseModel):
+    path: str
+    directories: list[str]
+    files: list[GalleryFileItem]
