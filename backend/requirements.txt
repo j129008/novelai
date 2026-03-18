@@ -9,4 +9,4 @@ python-dotenv==1.0.1
 httpx==0.28.1
 
 # Image processing (PNG metadata reading, gallery thumbnails)
-Pillow>=10.0
+Pillow==12.1.0
