@@ -59,14 +59,6 @@ function loadCharactersFromCache() {
   } catch (_) { return []; }
 }
 
-// ── SKETCH CANVAS ────────────────────────────────────────────
-// Populated by setupSketchCanvas(); consumed by generate().
-const _sketch = {
-  hasContent: () => false,
-  toBase64:   () => "",
-  strength:   () => 0.6,
-};
-
 // ── ABORT CONTROLLER ────────────────────────────────────────
 let _generateAbortController = null;
 
@@ -158,7 +150,6 @@ async function init() {
   setupGuide();
   setupSettings();
   setupCharacters();
-  setupSketchCanvas();
   setupLightbox();
 
   // Load recent characters at startup so sidebar section is populated immediately
@@ -1028,249 +1019,6 @@ function setupFileUpload(inputId, previewId, placeholderId, clearId, stateKey) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   SKETCH CANVAS
-   ═══════════════════════════════════════════════════════════ */
-
-const SKETCH_COLORS = [
-  "#e74c3c", "#e67e22", "#f1c40f",
-  "#2ecc71", "#1abc9c", "#3498db",
-  "#9b59b6", "#8b4513", "#ffffff",
-  "#bdc3c7", "#7f8c8d", "#2c3e50",
-];
-
-function setupSketchCanvas() {
-  const canvas      = $("#sketch-canvas");
-  const colorsEl    = $("#sketch-colors");
-  const sizesEl     = $("#sketch-sizes");
-  const eraserBtn   = $("#sketch-eraser");
-  const clearBtn    = $("#sketch-clear");
-  const drawToggle  = $("#sketch-draw-toggle");
-  const badge       = $("#sketch-active-badge");
-  const outputEl    = $("#output");
-
-  if (!canvas || !colorsEl || !outputEl) return;
-
-  const ctx = canvas.getContext("2d");
-
-  // ── State ──────────────────────────────────────────────
-  let currentColor = SKETCH_COLORS[5]; // default: blue
-  let brushSize    = 20;
-  let eraseMode    = false;
-  let drawMode     = false;
-  let drawing      = false;
-  let lastX        = 0;
-  let lastY        = 0;
-
-  // ── Color swatches ─────────────────────────────────────
-  for (const hex of SKETCH_COLORS) {
-    const swatch = document.createElement("button");
-    swatch.type = "button";
-    swatch.className = "sketch-color-swatch" + (hex === currentColor ? " active" : "");
-    swatch.style.background = hex;
-    swatch.title = hex;
-    swatch.addEventListener("click", () => {
-      colorsEl.querySelectorAll(".sketch-color-swatch").forEach((s) => s.classList.remove("active"));
-      swatch.classList.add("active");
-      currentColor = hex;
-      // Switching to a color always exits erase mode
-      if (eraseMode) toggleErase(false);
-    });
-    colorsEl.appendChild(swatch);
-  }
-
-  // ── Size buttons ────────────────────────────────────────
-  sizesEl.querySelectorAll(".sketch-size-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      sizesEl.querySelectorAll(".sketch-size-btn").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      brushSize = parseInt(btn.dataset.size, 10);
-    });
-  });
-
-  // ── Eraser toggle ───────────────────────────────────────
-  function toggleErase(force) {
-    eraseMode = typeof force === "boolean" ? force : !eraseMode;
-    eraserBtn.classList.toggle("active", eraseMode);
-  }
-
-  eraserBtn.addEventListener("click", () => toggleErase());
-
-  // ── Draw mode toggle ─────────────────────────────────────
-  // Activates/deactivates the sketch canvas overlay as an interactive surface.
-  function setDrawMode(active) {
-    drawMode = active;
-    drawToggle.classList.toggle("active", drawMode);
-    outputEl.classList.toggle("sketch-draw-active", drawMode);
-
-    // Enable/disable pointer events on the canvas overlay
-    canvas.style.pointerEvents = drawMode ? "auto" : "none";
-
-    // Suppress character marker interaction while drawing
-    outputEl.querySelectorAll(".char-marker").forEach((m) => {
-      m.style.pointerEvents = drawMode ? "none" : "";
-    });
-  }
-
-  if (drawToggle) {
-    drawToggle.addEventListener("click", () => setDrawMode(!drawMode));
-  }
-
-  // ── Hide/show generated image ──────────────────────────
-  const hideImgBtn = $("#sketch-hide-img");
-  if (hideImgBtn) {
-    hideImgBtn.addEventListener("click", () => {
-      outputEl.classList.toggle("sketch-img-hidden");
-      hideImgBtn.classList.toggle("active", outputEl.classList.contains("sketch-img-hidden"));
-    });
-  }
-
-  // ── Clear ────────────────────────────────────────────────
-  clearBtn.addEventListener("click", () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    _hasStrokes = false;
-    updateBadge();
-  });
-
-  // ── Canvas sizing via ResizeObserver on #output ──────────
-  // canvas.width/height = output resolution for quality
-  // CSS width/height = 100% of #output via CSS (inset: 0)
-  function resizeCanvas() {
-    const displayW = outputEl.clientWidth;
-    const displayH = outputEl.clientHeight;
-    if (!displayW || !displayH) return;
-
-    // Read output resolution for logical canvas resolution
-    const resVal = $("#resolution").value || "832x1216";
-    const [outW, outH] = resVal.split("x").map(Number);
-
-    // Only resize if dimensions actually changed (setting canvas.width clears content!)
-    if (canvas.width === outW && canvas.height === outH) return;
-
-    const hadContent = canvasHasContent();
-
-    canvas.width  = outW;
-    canvas.height = outH;
-    _hasStrokes = false;
-
-    if (hadContent) {
-      showStatus("Sketch cleared — resolution changed");
-      updateBadge();
-    }
-  }
-
-  const resizeObserver = new ResizeObserver(() => {
-    requestAnimationFrame(resizeCanvas);
-  });
-  resizeObserver.observe(outputEl);
-
-  // Re-size logical resolution when resolution select changes
-  const resolutionEl = $("#resolution");
-  if (resolutionEl) {
-    resolutionEl.addEventListener("change", resizeCanvas);
-  }
-
-  // ── Badge helper ─────────────────────────────────────────
-  let _hasStrokes = false;  // fast track: set on stroke, cleared on clear/resize
-
-  function canvasHasContent() {
-    return _hasStrokes;
-  }
-
-  function updateBadge() {
-    if (!badge) return;
-    badge.style.display = canvasHasContent() ? "" : "none";
-  }
-
-  // ── Drawing ──────────────────────────────────────────────
-  function getCanvasPos(e) {
-    const rect = canvas.getBoundingClientRect();
-    // Scale from CSS pixels to canvas pixels (canvas resolution vs display size)
-    const scaleX = canvas.width  / rect.width;
-    const scaleY = canvas.height / rect.height;
-    return [
-      (e.clientX - rect.left) * scaleX,
-      (e.clientY - rect.top)  * scaleY,
-    ];
-  }
-
-  function beginStroke(e) {
-    drawing = true;
-    [lastX, lastY] = getCanvasPos(e);
-    // Paint a single dot at the start position
-    paintDot(lastX, lastY);
-  }
-
-  function continueStroke(e) {
-    if (!drawing) return;
-    const [x, y] = getCanvasPos(e);
-
-    ctx.save();
-    ctx.globalCompositeOperation = eraseMode ? "destination-out" : "source-over";
-    ctx.strokeStyle = eraseMode ? "rgba(0,0,0,1)" : currentColor;
-    ctx.lineWidth   = brushSize;
-    ctx.lineCap     = "round";
-    ctx.lineJoin    = "round";
-
-    ctx.beginPath();
-    ctx.moveTo(lastX, lastY);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    ctx.restore();
-
-    lastX = x;
-    lastY = y;
-  }
-
-  function paintDot(x, y) {
-    ctx.save();
-    ctx.globalCompositeOperation = eraseMode ? "destination-out" : "source-over";
-    ctx.fillStyle = eraseMode ? "rgba(0,0,0,1)" : currentColor;
-    ctx.beginPath();
-    ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  function endStroke() {
-    if (!drawing) return;
-    drawing = false;
-    _hasStrokes = true;
-    updateBadge();
-  }
-
-  canvas.addEventListener("mousedown", (e) => {
-    if (!drawMode) return;
-    e.preventDefault();
-    e.stopPropagation();
-    beginStroke(e);
-  });
-
-  canvas.addEventListener("mousemove", (e) => {
-    if (!drawMode) return;
-    if (e.buttons === 1) continueStroke(e);
-  });
-
-  canvas.addEventListener("mouseup", (e) => {
-    if (!drawMode) return;
-    endStroke();
-  });
-  canvas.addEventListener("mouseleave", endStroke);
-
-  // Prevent native image drag on all images inside #output
-  outputEl.addEventListener("dragstart", (e) => {
-    if (e.target.tagName === "IMG") e.preventDefault();
-  });
-
-  // ── Sketch strength slider ────────────────────────────────
-  bindSlider("sketch-strength", "sketch-strength-val", 2);
-
-  // ── Register in module-level sketch state ─────────────────
-  _sketch.hasContent = canvasHasContent;
-  _sketch.toBase64   = () => canvas.toDataURL("image/png").split(",")[1];
-  _sketch.strength   = () => parseFloat($("#sketch-strength").value);
-}
-
-/* ═══════════════════════════════════════════════════════════
    GENERATE
    ═══════════════════════════════════════════════════════════ */
 
@@ -1341,12 +1089,7 @@ async function generate() {
     use_coords: characters.some((c) => !c.positionAuto),
   };
 
-  // Sketch takes priority over img2img when it has content
-  if (_sketch.hasContent()) {
-    body.sketch_image    = _sketch.toBase64();
-    body.sketch_strength = _sketch.strength();
-    // Don't send img2img alongside sketch — sketch is the reference
-  } else if (state.img2img) {
+  if (state.img2img) {
     body.image = state.img2img;
   }
 

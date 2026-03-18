@@ -8,6 +8,5 @@ python-dotenv==1.0.1
 # HTTP client for NovelAI API calls
 httpx==0.28.1
 
-# Image processing (PNG metadata reading, gallery thumbnails, sketch compositing)
+# Image processing (PNG metadata reading, gallery thumbnails)
 Pillow==12.1.0
-numpy==2.4.0
