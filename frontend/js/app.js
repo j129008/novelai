@@ -1145,8 +1145,9 @@ async function generate() {
 
     loadGallery();
 
-    // Fire-and-forget: record character tags from the prompt
-    recordRecentCharacters(prompt);
+    // Fire-and-forget: record character tags from prompt + all character slots
+    const allPromptText = [prompt, ...characters.map((c) => c.prompt)].join(", ");
+    recordRecentCharacters(allPromptText);
   } catch (e) {
     clearTimeout(stopTimeout);
     if (e.name === "AbortError") {
