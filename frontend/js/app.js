@@ -2119,6 +2119,109 @@ function loadSettingsFromMeta(meta) {
     smea.checked = !!meta.sm;
     smeaDyn.checked = !!meta.sm_dyn;
   }
+
+  // Restore character slots from v4_prompt char_captions
+  if (meta.char_captions && Array.isArray(meta.char_captions) && meta.char_captions.length > 0) {
+    // Clear existing characters
+    const slotsEl = $("#character-slots");
+    if (slotsEl) {
+      characters.length = 0;
+      slotsEl.innerHTML = "";
+
+      // Rebuild from metadata
+      meta.char_captions.forEach((cc) => {
+        const charData = {
+          prompt: cc.char_caption || "",
+          x: (cc.centers && cc.centers[0]) ? cc.centers[0].x : 0.5,
+          y: (cc.centers && cc.centers[0]) ? cc.centers[0].y : 0.5,
+          positionAuto: !meta.use_coords,
+          interactions: [],
+        };
+
+        // Parse interaction directives from the prompt (source#, target#, mutual#)
+        const parts = charData.prompt.split(",").map((s) => s.trim());
+        const cleanParts = [];
+        for (const p of parts) {
+          const match = p.match(/^(source#|target#|mutual#)(.+)$/);
+          if (match) {
+            charData.interactions.push({ directive: match[1], action: match[2] });
+          } else {
+            cleanParts.push(p);
+          }
+        }
+        charData.prompt = cleanParts.join(", ");
+
+        characters.push(charData);
+      });
+
+      // Rebuild UI — trigger setupCharacters' addCharacterSlot for each
+      // Since setupCharacters already ran, we need to manually build the cards
+      // Use the same approach as the cache restore
+      characters.forEach((c, i) => {
+        const card = document.createElement("div");
+        card.className = "char-slot-card";
+        card.dataset.idx = String(i);
+
+        const cardHeader = document.createElement("div");
+        cardHeader.className = "char-slot-header";
+        const cardLabel = document.createElement("span");
+        cardLabel.className = "char-slot-label";
+        cardLabel.textContent = `Character ${i + 1}`;
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "char-slot-remove";
+        removeBtn.title = "Remove character";
+        removeBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+        removeBtn.addEventListener("click", () => {
+          const cardIdx = parseInt(card.dataset.idx);
+          characters.splice(cardIdx, 1);
+          card.remove();
+          slotsEl.querySelectorAll(".char-slot-card").forEach((cc, ii) => {
+            cc.dataset.idx = ii;
+            const lbl = cc.querySelector(".char-slot-label");
+            if (lbl) lbl.textContent = `Character ${ii + 1}`;
+          });
+          if (_activeMarkerIdx >= characters.length) _activeMarkerIdx = -1;
+          renderCharacterMarkers();
+          saveCharactersToCache();
+        });
+        cardHeader.appendChild(cardLabel);
+        cardHeader.appendChild(removeBtn);
+
+        const ta = document.createElement("textarea");
+        ta.className = "char-slot-textarea field-textarea";
+        ta.rows = 3;
+        ta.placeholder = "girl, blonde hair, blue eyes, waving";
+        ta.spellcheck = false;
+        ta.value = c.prompt;
+        ta.addEventListener("input", () => {
+          c.prompt = ta.value;
+          ta.style.height = "auto";
+          ta.style.height = ta.scrollHeight + "px";
+          saveCharactersToCache();
+        });
+        _tagAC.attach(ta);
+
+        card.appendChild(cardHeader);
+        card.appendChild(ta);
+        card.appendChild(buildInteractionsSection(c));
+        slotsEl.appendChild(card);
+      });
+
+      // Open the accordion and update UI
+      const accordion = $("#characters-accordion");
+      if (accordion) accordion.open = true;
+
+      // Update badge and markers
+      const badge = $("#char-count-badge");
+      if (badge) {
+        badge.textContent = characters.length;
+        badge.style.display = characters.length > 0 ? "inline-flex" : "none";
+      }
+      renderCharacterMarkers();
+      saveCharactersToCache();
+    }
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════

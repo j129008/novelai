@@ -230,7 +230,7 @@ def _read_png_meta(filepath: Path) -> dict:
         if "Comment" in img.info:
             import json as _json
             meta = _json.loads(img.info["Comment"])
-            return {
+            result = {
                 "prompt": meta.get("prompt", ""),
                 "uc": meta.get("uc", ""),
                 "seed": meta.get("seed", 0),
@@ -242,6 +242,15 @@ def _read_png_meta(filepath: Path) -> dict:
                 "sm": meta.get("sm", False),
                 "sm_dyn": meta.get("sm_dyn", False),
             }
+            # Extract character data from v4_prompt if present
+            v4 = meta.get("v4_prompt")
+            if v4 and isinstance(v4, dict):
+                caption = v4.get("caption", {})
+                char_captions = caption.get("char_captions", [])
+                if char_captions:
+                    result["char_captions"] = char_captions
+                    result["use_coords"] = v4.get("use_coords", False)
+            return result
     except Exception:
         pass
     return {}
