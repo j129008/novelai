@@ -125,6 +125,10 @@ async function init() {
   setupGuide();
   setupSettings();
   setupCharacters();
+  setupLightbox();
+
+  // Load recent characters at startup so sidebar section is populated immediately
+  loadRecentCharacters().then(renderRecentCharsInSidebar);
 
   $("#btn-set-as-source").addEventListener("click", setCanvasImageAsSource);
 
@@ -1228,6 +1232,10 @@ async function recordRecentCharacters(rawPrompt) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tags: confirmed }),
     });
+
+    // 6. Refresh sidebar recent chars section
+    await loadRecentCharacters();
+    renderRecentCharsInSidebar();
   } catch { /* fire-and-forget, silent */ }
 }
 
@@ -1238,6 +1246,58 @@ async function loadRecentCharacters() {
     const data = await resp.json();
     _recentCharacters = data.characters || [];
   } catch { /* silent */ }
+}
+
+function renderRecentCharsInSidebar() {
+  const section = $("#recent-chars-section");
+  const chipsEl = $("#recent-chars-chips");
+  if (!section || !chipsEl) return;
+
+  if (!_recentCharacters.length) {
+    section.style.display = "none";
+    return;
+  }
+
+  section.style.display = "flex";
+  chipsEl.innerHTML = "";
+
+  for (const rc of _recentCharacters) {
+    const chip = document.createElement("button");
+    chip.className = "tag-chip tag-chip--recent";
+    chip.type = "button";
+
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = rc.tag.replace(/_/g, " ");
+
+    const countSpan = document.createElement("span");
+    countSpan.className = "tag-chip-count";
+    countSpan.textContent = `\u00d7${rc.count}`;
+
+    chip.appendChild(nameSpan);
+    chip.appendChild(countSpan);
+
+    chip.addEventListener("click", () => {
+      // Insert into whichever textarea is active — character slot or prompt
+      const activeEl = document.activeElement;
+      let targetEl = null;
+      if (activeEl && (activeEl.classList.contains("char-slot-textarea") || activeEl === $("#prompt") || activeEl === $("#negative-prompt"))) {
+        targetEl = activeEl;
+      } else {
+        targetEl = $("#prompt");
+      }
+      const tag = rc.tag.replace(/_/g, " ");
+      const val = targetEl.value;
+      const prefix = val.length > 0 && !val.trimEnd().endsWith(",") ? ", " : val.length > 0 ? " " : "";
+      targetEl.value = val + prefix + tag;
+      targetEl.dispatchEvent(new Event("input", { bubbles: true }));
+      targetEl.focus();
+
+      chip.classList.add("tag-chip--inserted");
+      setTimeout(() => chip.classList.remove("tag-chip--inserted"), 300);
+    });
+
+    chipsEl.appendChild(chip);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1275,7 +1335,7 @@ function setupTagBrowser() {
     btn.classList.add("btn-action--primary");
     btn.setAttribute("aria-expanded", "true");
     const fetchCategories = !_tagCategories.length ? loadTagCategories() : Promise.resolve();
-    Promise.all([fetchCategories, loadRecentCharacters()]).then(() => {
+    fetchCategories.then(() => {
       buildRail();
       renderGrid();
     });
@@ -1340,42 +1400,6 @@ function setupTagBrowser() {
     const filter = searchInput.value.trim().toLowerCase().replace(/ /g, "_");
     grid.innerHTML = "";
 
-    // ── Recent Characters section ─────────────────────────
-    if (_recentCharacters.length) {
-      const visibleRecent = filter
-        ? _recentCharacters.filter((r) => r.tag.toLowerCase().includes(filter))
-        : _recentCharacters;
-
-      if (visibleRecent.length) {
-        const rcLabel = document.createElement("div");
-        rcLabel.className = "tag-browser-section-label tag-browser-section-label--recent";
-        rcLabel.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Recent Characters`;
-        grid.appendChild(rcLabel);
-
-        const rcWrap = document.createElement("div");
-        rcWrap.className = "tag-browser-chips";
-
-        for (const rc of visibleRecent) {
-          const chip = document.createElement("button");
-          chip.className = "tag-chip tag-chip--recent";
-          chip.type = "button";
-
-          const nameSpan = document.createElement("span");
-          nameSpan.textContent = rc.tag.replace(/_/g, " ");
-
-          const countSpan = document.createElement("span");
-          countSpan.className = "tag-chip-count";
-          countSpan.textContent = `\u00d7${rc.count}`;
-
-          chip.appendChild(nameSpan);
-          chip.appendChild(countSpan);
-          chip.addEventListener("click", () => insertBrowserTag(rc.tag, chip));
-          rcWrap.appendChild(chip);
-        }
-        grid.appendChild(rcWrap);
-      }
-    }
-
     const cats = activeCategory === "all"
       ? _tagCategories
       : _tagCategories.filter((c) => c.id === activeCategory);
@@ -1407,17 +1431,12 @@ function setupTagBrowser() {
       grid.appendChild(wrap);
     }
 
-    // Check if recent characters section already produced visible results
-    const anyRecentVisible = _recentCharacters.length > 0 && (
-      !filter || _recentCharacters.some((r) => r.tag.toLowerCase().includes(filter))
-    );
-
     // When filtering, also search the full 140K tag database
     if (filter && filter.length >= 2) {
       clearTimeout(_searchDebounce);
       const gen = _renderGen;
-      _searchDebounce = setTimeout(() => fetchFullSearch(filter, anyTags || anyRecentVisible, gen), 200);
-    } else if (!anyTags && !anyRecentVisible) {
+      _searchDebounce = setTimeout(() => fetchFullSearch(filter, anyTags, gen), 200);
+    } else if (!anyTags) {
       const empty = document.createElement("p");
       empty.className = "tag-browser-empty";
       empty.textContent = "No tags found";
@@ -1542,6 +1561,52 @@ function setupTagBrowser() {
       box.style.boxShadow = "0 0 0 3px var(--accent-dim)";
       setTimeout(() => { box.style.borderColor = ""; box.style.boxShadow = ""; }, 300);
     }
+  }
+
+  // ── Surprise Me button ──────────────────────────────────
+  const surpriseBtn = $("#btn-surprise-me");
+  if (surpriseBtn) {
+    surpriseBtn.addEventListener("click", () => {
+      const cats = activeCategory === "all"
+        ? _tagCategories
+        : _tagCategories.filter((c) => c.id === activeCategory);
+
+      // Flatten all tags from relevant categories
+      const allTags = [];
+      for (const cat of cats) {
+        for (const tag of cat.tags) allTags.push(tag);
+      }
+      if (!allTags.length) return;
+
+      const pick = allTags[Math.floor(Math.random() * allTags.length)];
+
+      // Find chip in grid if visible, otherwise insert without visual feedback
+      const chips = grid.querySelectorAll(".tag-chip");
+      let targetChip = null;
+      for (const c of chips) {
+        if (c.textContent.trim().replace(/ /g, "_") === pick || c.textContent.trim() === pick.replace(/_/g, " ")) {
+          targetChip = c;
+          break;
+        }
+      }
+
+      if (targetChip) {
+        targetChip.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        insertBrowserTag(pick, targetChip);
+      } else {
+        // Insert directly without chip visual feedback
+        const promptEl = _insertTarget === "negative" ? $("#negative-prompt") : $("#prompt");
+        const display = pick.replace(/_/g, " ");
+        const val = promptEl.value;
+        const prefix = val.length > 0 && !val.trimEnd().endsWith(",") ? ", " : val.length > 0 ? " " : "";
+        promptEl.value = val + prefix + display;
+        promptEl.dispatchEvent(new Event("input"));
+
+        // Flash the button as feedback
+        surpriseBtn.classList.add("btn-action--confirm");
+        setTimeout(() => surpriseBtn.classList.remove("btn-action--confirm"), 300);
+      }
+    });
   }
 
   searchInput.addEventListener("input", renderGrid);
@@ -1734,26 +1799,194 @@ function renderGallery(files, filter) {
     actionBar.appendChild(loadBtn);
     actionBar.appendChild(delBtn);
 
-    // Clicking the image area previews in Canvas
+    // Clicking the image area opens the lightbox
     imgWrap.addEventListener("click", () => {
-      const output = $("#output");
-      const previewImg = document.createElement("img");
-      previewImg.src = `/api/gallery/${file.name}`;
-      previewImg.alt = "Preview";
-      output.innerHTML = "";
-      output.appendChild(previewImg);
-      // Track canvas image state (no base64 available from URL — clear it)
-      state.canvasImageBase64 = null;
-      state.canvasImageWidth = meta.width || null;
-      state.canvasImageHeight = meta.height || null;
-      $("#image-actions").style.display = "none";
-      $("#tab-canvas").click();
+      openLightbox(filtered, filtered.indexOf(file));
     });
 
     card.appendChild(imgWrap);
     card.appendChild(actionBar);
     list.appendChild(card);
   }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LIGHTBOX
+   ═══════════════════════════════════════════════════════════ */
+
+let _lightboxOverlay = null;
+let _lightboxData = [];
+let _lightboxIndex = 0;
+let _lightboxKeyHandler = null;
+
+function setupLightbox() {
+  const overlay = document.createElement("div");
+  overlay.id = "lightbox-overlay";
+  overlay.className = "lightbox-overlay";
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-label", "Image viewer");
+  overlay.style.display = "none";
+
+  overlay.innerHTML = `
+    <div class="lightbox-topbar">
+      <span class="lightbox-seed-badge" id="lb-seed"></span>
+      <span class="lightbox-counter" id="lb-counter"></span>
+      <button class="lightbox-close" id="lb-close" type="button" aria-label="Close lightbox">&times;</button>
+    </div>
+    <div class="lightbox-stage">
+      <button class="lightbox-arrow" id="lb-prev" type="button" aria-label="Previous image">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="lightbox-img-wrap" id="lb-img-wrap"></div>
+      <button class="lightbox-arrow" id="lb-next" type="button" aria-label="Next image">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+    <div class="lightbox-footer">
+      <p class="lightbox-prompt" id="lb-prompt"></p>
+      <div class="lightbox-actions">
+        <button class="btn-action" id="lb-load" type="button">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.84"/></svg>
+          Load
+        </button>
+        <button class="btn-action btn-action--iterate" id="lb-iterate" type="button">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+          Iterate
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  _lightboxOverlay = overlay;
+
+  // Close on backdrop click (outside the inner content)
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeLightbox();
+  });
+
+  overlay.querySelector("#lb-close").addEventListener("click", closeLightbox);
+
+  overlay.querySelector("#lb-prev").addEventListener("click", () => navigateLightbox(-1));
+  overlay.querySelector("#lb-next").addEventListener("click", () => navigateLightbox(1));
+
+  overlay.querySelector("#lb-load").addEventListener("click", () => {
+    const file = _lightboxData[_lightboxIndex];
+    if (!file) return;
+    loadSettingsFromMeta(file.meta || {});
+    showSettingsLoadedToast();
+    closeLightbox();
+  });
+
+  overlay.querySelector("#lb-iterate").addEventListener("click", async () => {
+    const file = _lightboxData[_lightboxIndex];
+    if (!file) return;
+    loadSettingsFromMeta(file.meta || {});
+    await setHistoryImageAsSource(`/api/gallery/${file.name}`, file.meta || {});
+    showSettingsLoadedToast();
+    closeLightbox();
+    $("#tab-canvas").click();
+  });
+}
+
+function openLightbox(data, index) {
+  if (!_lightboxOverlay) return;
+  _lightboxData = data;
+  _lightboxIndex = index;
+  _lightboxOverlay.style.display = "flex";
+  renderLightboxFrame();
+
+  // Focus trap — focus the close button
+  const closeBtn = _lightboxOverlay.querySelector("#lb-close");
+  if (closeBtn) closeBtn.focus();
+
+  // Keyboard navigation
+  _lightboxKeyHandler = (e) => {
+    if (e.key === "Escape") { closeLightbox(); return; }
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); navigateLightbox(1); }
+    if (e.key === "ArrowLeft"  || e.key === "ArrowUp")   { e.preventDefault(); navigateLightbox(-1); }
+  };
+  document.addEventListener("keydown", _lightboxKeyHandler);
+}
+
+function closeLightbox() {
+  if (!_lightboxOverlay) return;
+  _lightboxOverlay.style.display = "none";
+  if (_lightboxKeyHandler) {
+    document.removeEventListener("keydown", _lightboxKeyHandler);
+    _lightboxKeyHandler = null;
+  }
+}
+
+function navigateLightbox(delta) {
+  const total = _lightboxData.length;
+  if (!total) return;
+  // Wrap around
+  _lightboxIndex = (_lightboxIndex + delta + total) % total;
+  renderLightboxFrame();
+}
+
+function renderLightboxFrame() {
+  const overlay = _lightboxOverlay;
+  if (!overlay) return;
+
+  const file = _lightboxData[_lightboxIndex];
+  if (!file) return;
+  const meta = file.meta || {};
+  const total = _lightboxData.length;
+
+  // Counter
+  const counterEl = overlay.querySelector("#lb-counter");
+  if (counterEl) counterEl.textContent = `${_lightboxIndex + 1} of ${total}`;
+
+  // Seed badge
+  const seedEl = overlay.querySelector("#lb-seed");
+  if (seedEl) {
+    if (meta.seed) {
+      seedEl.textContent = `Seed: ${Number(meta.seed)}`;
+      seedEl.style.display = "";
+    } else {
+      seedEl.style.display = "none";
+    }
+  }
+
+  // Prompt
+  const promptEl = overlay.querySelector("#lb-prompt");
+  if (promptEl) promptEl.textContent = meta.prompt || "";
+
+  // Arrow disabled state
+  const prevBtn = overlay.querySelector("#lb-prev");
+  const nextBtn = overlay.querySelector("#lb-next");
+  // Always enable both (wrap-around)
+  if (prevBtn) prevBtn.disabled = total <= 1;
+  if (nextBtn) nextBtn.disabled = total <= 1;
+
+  // Image — show loading spinner while loading
+  const imgWrap = overlay.querySelector("#lb-img-wrap");
+  if (!imgWrap) return;
+  imgWrap.innerHTML = "";
+
+  const spinner = document.createElement("div");
+  spinner.className = "lightbox-img-loading";
+  imgWrap.appendChild(spinner);
+
+  const img = document.createElement("img");
+  img.className = "lightbox-img";
+  img.alt = meta.prompt || file.name;
+
+  img.onload = () => {
+    imgWrap.innerHTML = "";
+    imgWrap.appendChild(img);
+  };
+  img.onerror = () => {
+    imgWrap.innerHTML = "";
+    const err = document.createElement("p");
+    err.style.cssText = "color:var(--text-tertiary);font-size:0.83rem";
+    err.textContent = "Failed to load image";
+    imgWrap.appendChild(err);
+  };
+  img.src = `/api/gallery/${file.name}`;
 }
 
 async function setHistoryImageAsSource(url, meta) {
