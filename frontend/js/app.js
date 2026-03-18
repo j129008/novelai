@@ -32,7 +32,7 @@ const state = {
 };
 
 // ── CHARACTER SLOTS ──────────────────────────────────────────
-const characters = [];  // array of { prompt, x, y } — managed by setupCharacters()
+const characters = [];  // array of { prompt, x, y, interactions } — managed by setupCharacters()
 
 // ── ABORT CONTROLLER ────────────────────────────────────────
 let _generateAbortController = null;
@@ -710,50 +710,78 @@ function setupAutoSavePrompt() {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   TAG AUTOCOMPLETE
+   TAG AUTOCOMPLETE — shared singleton dropdown
+   Single dropdown element (position: fixed) shared by all
+   textareas. getBoundingClientRect() positions it correctly
+   under any textarea regardless of scroll context or
+   overflow:hidden ancestors.
    ═══════════════════════════════════════════════════════════ */
 
-function setupTagAutocomplete() {
-  const prompt = $("#prompt");
-  const negative = $("#negative-prompt");
+const _tagAC = (() => {
   const dropdown = $("#tag-dropdown");
-  if (!prompt || !dropdown) return;
-
   let selectedIdx = -1;
+  let activeEl = null;   // the textarea/input currently driving autocomplete
   let debounceTimer = null;
-  let activeTextarea = prompt;
 
-  prompt.addEventListener("focus", () => { activeTextarea = prompt; });
-  negative.addEventListener("focus", () => { activeTextarea = negative; });
+  // ── Positioning ─────────────────────────────────────────
+  function repositionDropdown() {
+    if (!activeEl) return;
+    const rect = activeEl.getBoundingClientRect();
+    const viewH = window.innerHeight;
+    const ddH = Math.min(220, dropdown.scrollHeight || 220);
+    const spaceBelow = viewH - rect.bottom;
+    const showAbove = spaceBelow < ddH + 8 && rect.top > ddH + 8;
 
-  function getWordAtCursor(textarea) {
-    const val = textarea.value;
-    const cursor = textarea.selectionStart;
+    dropdown.style.width = rect.width + "px";
+    dropdown.style.left  = rect.left + "px";
+    if (showAbove) {
+      dropdown.style.top    = "";
+      dropdown.style.bottom = (viewH - rect.top + 4) + "px";
+    } else {
+      dropdown.style.bottom = "";
+      dropdown.style.top    = (rect.bottom + 2) + "px";
+    }
+  }
+
+  // ── Helpers ──────────────────────────────────────────────
+  function escapeHtml(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function formatCount(n) {
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
+    if (n >= 1000)    return (n / 1000).toFixed(0) + "k";
+    return String(n);
+  }
+
+  function getWordAtCursor(el) {
+    const val = el.value;
+    const cursor = el.selectionStart;
     let start = val.lastIndexOf(",", cursor - 1) + 1;
     while (start < cursor && val[start] === " ") start++;
     const word = val.slice(start, cursor).trim();
     return { word, start, end: cursor };
   }
 
-  async function fetchTags(query) {
-    if (query.length < 2) { hideDropdown(); return; }
+  // ── Dropdown render ──────────────────────────────────────
+  async function fetchAndShow(query) {
+    if (query.length < 2) { hide(); return; }
     try {
       const resp = await fetch(`/api/tags?q=${encodeURIComponent(query)}`);
       if (!resp.ok) return;
       const tags = await resp.json();
-      showDropdown(tags, query);
+      show(tags, query);
     } catch { /* ignore */ }
   }
 
-  function showDropdown(tags, query) {
-    if (!tags.length) { hideDropdown(); return; }
+  function show(tags, query) {
+    if (!tags.length) { hide(); return; }
     selectedIdx = -1;
     const q = query.toLowerCase();
     dropdown.innerHTML = "";
-    tags.forEach((tag, i) => {
+    tags.forEach((tag) => {
       const item = document.createElement("div");
       item.className = "tag-item";
-      item.dataset.index = i;
 
       const nameSpan = document.createElement("span");
       nameSpan.className = "tag-item-name";
@@ -782,49 +810,44 @@ function setupTagAutocomplete() {
 
       item.addEventListener("mousedown", (e) => {
         e.preventDefault();
-        insertTag(tag.name);
+        insert(tag.name);
       });
 
       dropdown.appendChild(item);
     });
     dropdown.classList.add("visible");
+    repositionDropdown();
   }
 
-  function hideDropdown() {
+  function hide() {
     dropdown.classList.remove("visible");
     selectedIdx = -1;
   }
 
-  function insertTag(tagName) {
-    const textarea = activeTextarea;
-    const { start, end } = getWordAtCursor(textarea);
-    const val = textarea.value;
+  // ── Tag insertion ────────────────────────────────────────
+  function insert(tagName) {
+    if (!activeEl) return;
+    const { start, end } = getWordAtCursor(activeEl);
+    const val = activeEl.value;
     const before = val.slice(0, start);
-    const after = val.slice(end);
-    const tag = tagName.replace(/_/g, " ");
+    const after  = val.slice(end);
+    const tag    = tagName.replace(/_/g, " ");
     const needsComma = before.length > 0 && !before.trimEnd().endsWith(",");
-    const insert = (needsComma ? ", " : "") + tag + ", ";
-    textarea.value = before + insert + after;
-    const newPos = before.length + insert.length;
-    textarea.selectionStart = textarea.selectionEnd = newPos;
-    textarea.focus();
-    hideDropdown();
+    const insertStr = (needsComma ? ", " : "") + tag + ", ";
+    activeEl.value = before + insertStr + after;
+    const newPos = before.length + insertStr.length;
+    activeEl.selectionStart = activeEl.selectionEnd = newPos;
+    activeEl.focus();
+    activeEl.dispatchEvent(new Event("input", { bubbles: true }));
+    hide();
   }
 
-  function formatCount(n) {
-    if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
-    if (n >= 1000) return (n / 1000).toFixed(0) + "k";
-    return String(n);
-  }
-
-  function escapeHtml(s) {
-    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-
+  // ── Event handlers for a single element ─────────────────
   function handleInput(e) {
     clearTimeout(debounceTimer);
+    activeEl = e.target;
     const { word } = getWordAtCursor(e.target);
-    debounceTimer = setTimeout(() => fetchTags(word), 150);
+    debounceTimer = setTimeout(() => fetchAndShow(word), 150);
   }
 
   function handleKeydown(e) {
@@ -835,33 +858,53 @@ function setupTagAutocomplete() {
     if (e.key === "ArrowDown") {
       e.preventDefault();
       selectedIdx = Math.min(selectedIdx + 1, items.length - 1);
-      updateSelection(items);
+      items.forEach((el, i) => el.classList.toggle("selected", i === selectedIdx));
+      if (selectedIdx >= 0) items[selectedIdx].scrollIntoView({ block: "nearest" });
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       selectedIdx = Math.max(selectedIdx - 1, 0);
-      updateSelection(items);
+      items.forEach((el, i) => el.classList.toggle("selected", i === selectedIdx));
+      if (selectedIdx >= 0) items[selectedIdx].scrollIntoView({ block: "nearest" });
     } else if (e.key === "Tab" || e.key === "Enter") {
       if (selectedIdx >= 0) {
         e.preventDefault();
         const name = items[selectedIdx].querySelector(".tag-item-name").textContent;
-        insertTag(name.replace(/ /g, "_"));
+        insert(name.replace(/ /g, "_"));
       }
     } else if (e.key === "Escape") {
-      hideDropdown();
+      hide();
     }
   }
 
-  function updateSelection(items) {
-    items.forEach((el, i) => el.classList.toggle("selected", i === selectedIdx));
-    if (selectedIdx >= 0) items[selectedIdx].scrollIntoView({ block: "nearest" });
+  function handleBlur() {
+    setTimeout(hide, 150);
   }
 
-  prompt.addEventListener("input", handleInput);
-  negative.addEventListener("input", handleInput);
-  prompt.addEventListener("keydown", handleKeydown);
-  negative.addEventListener("keydown", handleKeydown);
-  prompt.addEventListener("blur", () => setTimeout(hideDropdown, 150));
-  negative.addEventListener("blur", () => setTimeout(hideDropdown, 150));
+  function handleFocus(e) {
+    activeEl = e.target;
+  }
+
+  // ── Public: attach autocomplete to any input/textarea ───
+  function attach(el) {
+    el.addEventListener("focus",   handleFocus);
+    el.addEventListener("input",   handleInput);
+    el.addEventListener("keydown", handleKeydown);
+    el.addEventListener("blur",    handleBlur);
+  }
+
+  // Reposition on scroll/resize so dropdown follows the field
+  window.addEventListener("scroll",  () => { if (dropdown.classList.contains("visible")) repositionDropdown(); }, { passive: true });
+  window.addEventListener("resize",  () => { if (dropdown.classList.contains("visible")) repositionDropdown(); }, { passive: true });
+
+  return { attach, hide };
+})();
+
+function setupTagAutocomplete() {
+  const prompt   = $("#prompt");
+  const negative = $("#negative-prompt");
+  if (!prompt) return;
+  _tagAC.attach(prompt);
+  if (negative) _tagAC.attach(negative);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -992,6 +1035,7 @@ async function generate() {
     strength: parseFloat($("#strength").value),
     noise: parseFloat($("#noise").value),
     char_captions: collectCharacterPayload(),
+    use_coords: characters.some((c) => !c.positionAuto),
   };
 
   if (state.img2img) {
@@ -1520,9 +1564,9 @@ function renderGallery(files, filter) {
 
     const metaEl = document.createElement("div");
     metaEl.className = "history-card-meta";
-    if (meta.seed) metaEl.innerHTML += `<span>Seed ${meta.seed}</span>`;
-    if (meta.steps) metaEl.innerHTML += `<span>${meta.steps}st</span>`;
-    if (meta.width) metaEl.innerHTML += `<span>${meta.width}\u00d7${meta.height}</span>`;
+    if (meta.seed) { const s = document.createElement("span"); s.textContent = `Seed ${meta.seed}`; metaEl.appendChild(s); }
+    if (meta.steps) { const s = document.createElement("span"); s.textContent = `${meta.steps}st`; metaEl.appendChild(s); }
+    if (meta.width) { const s = document.createElement("span"); s.textContent = `${meta.width}\u00d7${meta.height}`; metaEl.appendChild(s); }
     overlay.appendChild(metaEl);
     imgWrap.appendChild(overlay);
 
@@ -1726,14 +1770,12 @@ function clearError() {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   CHARACTERS (Spec 4)
+   CHARACTERS
    ═══════════════════════════════════════════════════════════ */
 
 const MAX_CHARACTERS = 6;
 
 function setupCharacters() {
-  // There are two "Add Character" buttons: one in the empty state, one inline.
-  // Both trigger the same action.
   const addBtnEmpty  = $("#btn-add-character");
   const addBtnInline = $("#btn-add-character-inline");
   const slotsEl      = $("#character-slots");
@@ -1745,9 +1787,8 @@ function setupCharacters() {
 
   function handleAddClick() {
     if (characters.length >= MAX_CHARACTERS) return;
-    // Auto-open accordion when first character is added
     if (accordion && !accordion.open) accordion.open = true;
-    addCharacterSlot();
+    addCharacterSlot(slotsEl, updateCharacterUI);
   }
 
   if (addBtnEmpty)  addBtnEmpty.addEventListener("click", handleAddClick);
@@ -1757,157 +1798,353 @@ function setupCharacters() {
     const count = characters.length;
     const isEmpty = count === 0;
 
-    // Badge on accordion header
     if (badge) {
       badge.textContent = count;
       badge.style.display = count > 0 ? "inline-flex" : "none";
     }
 
-    // Empty state visibility
     if (emptyState) emptyState.style.display = isEmpty ? "flex" : "none";
 
-    // Inline "Add Character" button (shown only when slots exist)
     if (addBtnInline) {
       addBtnInline.style.display = isEmpty ? "none" : "";
       addBtnInline.disabled = count >= MAX_CHARACTERS;
     }
 
-    // Scene mode label on Prompt tab
     const sceneLabel = $("#scene-label");
     if (sceneLabel) sceneLabel.style.display = count > 0 ? "" : "none";
 
-    // Character count suggestion chip
     updateCountSuggestionChip(count);
   }
+}
 
-  function addCharacterSlot() {
-    const idx = characters.length;
-    const charData = { prompt: "", x: 0.5, y: 0.5 };
-    characters.push(charData);
+function addCharacterSlot(slotsEl, updateCharacterUI) {
+  const idx = characters.length;
+  const charData = { prompt: "", x: 0.5, y: 0.5, positionAuto: true, interactions: [] };
+  characters.push(charData);
 
-    const card = document.createElement("div");
-    card.className = "char-slot-card";
-    card.dataset.idx = idx;
+  const card = document.createElement("div");
+  card.className = "char-slot-card";
+  card.dataset.idx = idx;
 
-    // Textarea with auto-grow
-    const ta = document.createElement("textarea");
-    ta.className = "char-slot-textarea field-textarea";
-    ta.rows = 2;
-    ta.placeholder = "girl, blonde hair, blue eyes, waving";
-    ta.spellcheck = false;
-    ta.addEventListener("input", () => {
-      charData.prompt = ta.value;
-      // Auto-grow: reset height then expand to scrollHeight
-      ta.style.height = "auto";
-      ta.style.height = ta.scrollHeight + "px";
+  // ── Card header ──────────────────────────────────────────
+  const cardHeader = document.createElement("div");
+  cardHeader.className = "char-slot-header";
+
+  const cardLabel = document.createElement("span");
+  cardLabel.className = "char-slot-label";
+  cardLabel.textContent = `Character ${idx + 1}`;
+
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "char-slot-remove";
+  removeBtn.title = "Remove character";
+  removeBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+  removeBtn.addEventListener("click", () => {
+    const cardIdx = parseInt(card.dataset.idx);
+    characters.splice(cardIdx, 1);
+    card.remove();
+    slotsEl.querySelectorAll(".char-slot-card").forEach((c, i) => {
+      c.dataset.idx = i;
+      const lbl = c.querySelector(".char-slot-label");
+      if (lbl) lbl.textContent = `Character ${i + 1}`;
     });
-
-    // Position grid (5x5) with context labels
-    // Outer wrapper provides the "picture frame" context
-    const gridSection = document.createElement("div");
-    gridSection.className = "char-position-section";
-
-    const gridHeader = document.createElement("div");
-    gridHeader.className = "char-grid-header";
-
-    const gridLabel = document.createElement("div");
-    gridLabel.className = "char-grid-label field-label";
-    gridLabel.textContent = "Position in frame";
-
-    gridHeader.appendChild(gridLabel);
-    gridSection.appendChild(gridHeader);
-
-    // Axis row: L arrow + grid frame + R arrow
-    const gridAxisRow = document.createElement("div");
-    gridAxisRow.className = "char-grid-axis-row";
-
-    const axisL = document.createElement("span");
-    axisL.className = "char-grid-axis-label";
-    axisL.setAttribute("aria-label", "Left");
-    axisL.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 2 2 5 6 8"/></svg>`;
-
-    const gridFrame = document.createElement("div");
-    gridFrame.className = "char-grid-frame";
-
-    const gridWrap = document.createElement("div");
-    gridWrap.className = "char-position-grid";
-    gridWrap.setAttribute("aria-label", "Character position — click a cell to set position in frame");
-    gridWrap.setAttribute("role", "group");
-
-    const COLS = 5;
-    const ROWS = 7; // taller than wide → portrait 5:7 ≈ 3:4
-    const defaultRow = Math.floor(ROWS / 2);
-    const defaultCol = Math.floor(COLS / 2);
-
-    for (let row = 0; row < ROWS; row++) {
-      for (let col = 0; col < COLS; col++) {
-        const cell = document.createElement("button");
-        cell.type = "button";
-        cell.className = "char-pos-cell";
-        cell.dataset.row = row;
-        cell.dataset.col = col;
-        if (row === defaultRow && col === defaultCol) cell.classList.add("selected");
-        cell.setAttribute("aria-label", `Position column ${col + 1} of ${COLS}, row ${row + 1} of ${ROWS}`);
-        cell.addEventListener("click", () => {
-          gridWrap.querySelectorAll(".char-pos-cell").forEach((c) => c.classList.remove("selected"));
-          cell.classList.add("selected");
-          charData.x = col / (COLS - 1);
-          charData.y = row / (ROWS - 1);
-        });
-        gridWrap.appendChild(cell);
-      }
-    }
-
-    gridFrame.appendChild(gridWrap);
-
-    const axisR = document.createElement("span");
-    axisR.className = "char-grid-axis-label";
-    axisR.setAttribute("aria-label", "Right");
-    axisR.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 2 8 5 4 8"/></svg>`;
-
-    gridAxisRow.appendChild(axisL);
-    gridAxisRow.appendChild(gridFrame);
-    gridAxisRow.appendChild(axisR);
-    gridSection.appendChild(gridAxisRow);
-
-    // Card header row (label + remove button)
-    const cardHeader = document.createElement("div");
-    cardHeader.className = "char-slot-header";
-
-    const cardLabel = document.createElement("span");
-    cardLabel.className = "char-slot-label";
-    cardLabel.textContent = `Character ${idx + 1}`;
-
-    const removeBtn = document.createElement("button");
-    removeBtn.type = "button";
-    removeBtn.className = "char-slot-remove";
-    removeBtn.title = "Remove character";
-    removeBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
-    removeBtn.addEventListener("click", () => {
-      const cardIdx = parseInt(card.dataset.idx);
-      characters.splice(cardIdx, 1);
-      card.remove();
-      // Re-index remaining cards and re-label
-      slotsEl.querySelectorAll(".char-slot-card").forEach((c, i) => {
-        c.dataset.idx = i;
-        const lbl = c.querySelector(".char-slot-label");
-        if (lbl) lbl.textContent = `Character ${i + 1}`;
-      });
-      updateCharacterUI();
-    });
-
-    cardHeader.appendChild(cardLabel);
-    cardHeader.appendChild(removeBtn);
-
-    card.appendChild(cardHeader);
-    card.appendChild(ta);
-    card.appendChild(gridSection);
-
-    slotsEl.appendChild(card);
     updateCharacterUI();
-    ta.focus();
+  });
+
+  cardHeader.appendChild(cardLabel);
+  cardHeader.appendChild(removeBtn);
+
+  // ── Textarea with auto-grow ──────────────────────────────
+  const ta = document.createElement("textarea");
+  ta.className = "char-slot-textarea field-textarea";
+  ta.rows = 2;
+  ta.placeholder = "girl, blonde hair, blue eyes, waving";
+  ta.spellcheck = false;
+  ta.addEventListener("input", () => {
+    charData.prompt = ta.value;
+    ta.style.height = "auto";
+    ta.style.height = ta.scrollHeight + "px";
+  });
+  // Attach shared tag autocomplete
+  _tagAC.attach(ta);
+
+  // ── Position grid section ────────────────────────────────
+  const gridSection = document.createElement("div");
+  gridSection.className = "char-position-section";
+
+  const gridHeader = document.createElement("div");
+  gridHeader.className = "char-grid-header";
+
+  const gridLabel = document.createElement("div");
+  gridLabel.className = "char-grid-label field-label";
+  gridLabel.textContent = "Position in frame";
+
+  // Actions container: Auto pill + Pick button
+  const gridActions = document.createElement("div");
+  gridActions.className = "char-grid-actions";
+
+  // Feature 1: Auto pill — ON by default
+  const autoPill = document.createElement("button");
+  autoPill.type = "button";
+  autoPill.className = "char-auto-pill active";
+  autoPill.textContent = "Auto";
+  autoPill.title = "AI decides position automatically";
+
+  // Feature 2: Pick on canvas button
+  const pickBtn = document.createElement("button");
+  pickBtn.type = "button";
+  pickBtn.className = "char-pick-btn";
+  pickBtn.title = "Click to place on canvas";
+  pickBtn.innerHTML = `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>Pick`;
+
+  gridActions.appendChild(autoPill);
+  gridActions.appendChild(pickBtn);
+  gridHeader.appendChild(gridLabel);
+  gridHeader.appendChild(gridActions);
+  gridSection.appendChild(gridHeader);
+
+  // Axis row: L arrow + grid frame + R arrow
+  const gridAxisRow = document.createElement("div");
+  gridAxisRow.className = "char-grid-axis-row";
+
+  const axisL = document.createElement("span");
+  axisL.className = "char-grid-axis-label";
+  axisL.setAttribute("aria-label", "Left");
+  axisL.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 2 2 5 6 8"/></svg>`;
+
+  const gridFrame = document.createElement("div");
+  gridFrame.className = "char-grid-frame";
+
+  const gridWrap = document.createElement("div");
+  gridWrap.className = "char-position-grid";
+  gridWrap.setAttribute("aria-label", "Character position — click a cell to set position in frame");
+  gridWrap.setAttribute("role", "group");
+
+  const COLS = 5;
+  const ROWS = 7;
+
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "char-pos-cell";
+      cell.dataset.row = row;
+      cell.dataset.col = col;
+      // Feature 1: No default selected cell — Auto is active
+      cell.setAttribute("aria-label", `Position column ${col + 1} of ${COLS}, row ${row + 1} of ${ROWS}`);
+      cell.addEventListener("click", () => {
+        gridWrap.querySelectorAll(".char-pos-cell").forEach((c) => c.classList.remove("selected"));
+        cell.classList.add("selected");
+        charData.x = col / (COLS - 1);
+        charData.y = row / (ROWS - 1);
+        charData.positionAuto = false;
+        // Turn off Auto pill
+        autoPill.classList.remove("active");
+      });
+      gridWrap.appendChild(cell);
+    }
   }
 
+  // Auto pill click: clear selection, re-enable Auto
+  autoPill.addEventListener("click", () => {
+    gridWrap.querySelectorAll(".char-pos-cell").forEach((c) => c.classList.remove("selected"));
+    charData.positionAuto = true;
+    charData.x = 0.5;
+    charData.y = 0.5;
+    autoPill.classList.add("active");
+  });
+
+  // Feature 2: Pick on canvas
+  pickBtn.addEventListener("click", () => {
+    openCanvasPositionPicker(parseInt(card.dataset.idx), charData, (nx, ny) => {
+      charData.x = nx;
+      charData.y = ny;
+      charData.positionAuto = false;
+      autoPill.classList.remove("active");
+      // Snap to nearest grid cell
+      const nearestCol = Math.round(nx * (COLS - 1));
+      const nearestRow = Math.round(ny * (ROWS - 1));
+      gridWrap.querySelectorAll(".char-pos-cell").forEach((c) => {
+        const match = parseInt(c.dataset.col) === nearestCol && parseInt(c.dataset.row) === nearestRow;
+        c.classList.toggle("selected", match);
+      });
+    });
+  });
+
+  gridFrame.appendChild(gridWrap);
+
+  const axisR = document.createElement("span");
+  axisR.className = "char-grid-axis-label";
+  axisR.setAttribute("aria-label", "Right");
+  axisR.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 2 8 5 4 8"/></svg>`;
+
+  gridAxisRow.appendChild(axisL);
+  gridAxisRow.appendChild(gridFrame);
+  gridAxisRow.appendChild(axisR);
+  gridSection.appendChild(gridAxisRow);
+
+  // ── Feature 4: Interactions section ─────────────────────
+  const interactionsSection = buildInteractionsSection(charData);
+
+  // ── Assemble card ────────────────────────────────────────
+  card.appendChild(cardHeader);
+  card.appendChild(ta);
+  card.appendChild(gridSection);
+  card.appendChild(interactionsSection);
+
+  slotsEl.appendChild(card);
+  updateCharacterUI();
+  ta.focus();
+}
+
+// ── Feature 2: Canvas position picker ───────────────────────
+
+function openCanvasPositionPicker(charIdx, charData, onPick) {
+  const outputEl = $("#output");
+  if (!outputEl) return;
+
+  // Remove any existing overlay
+  const existing = outputEl.querySelector(".char-canvas-overlay");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.className = "char-canvas-overlay";
+
+  const hint = document.createElement("div");
+  hint.className = "char-canvas-overlay-hint";
+  hint.textContent = `Click to place Character ${charIdx + 1}`;
+  overlay.appendChild(hint);
+
+  // Show all existing character positions as numbered markers
+  characters.forEach((c, i) => {
+    if (c.positionAuto) return; // skip auto-positioned
+    const marker = document.createElement("div");
+    marker.className = "char-canvas-marker" + (i === charIdx ? " active" : "");
+    marker.textContent = i + 1;
+    marker.style.left = (c.x * 100) + "%";
+    marker.style.top  = (c.y * 100) + "%";
+    overlay.appendChild(marker);
+  });
+
+  // Click handler
+  overlay.addEventListener("click", (e) => {
+    if (e.target === hint) return;
+    const rect = overlay.getBoundingClientRect();
+    const nx = (e.clientX - rect.left) / rect.width;
+    const ny = (e.clientY - rect.top)  / rect.height;
+    onPick(Math.max(0, Math.min(1, nx)), Math.max(0, Math.min(1, ny)));
+    overlay.remove();
+  });
+
+  // Escape dismisses
+  const escHandler = (e) => {
+    if (e.key === "Escape") {
+      overlay.remove();
+      document.removeEventListener("keydown", escHandler);
+    }
+  };
+  document.addEventListener("keydown", escHandler);
+  overlay.addEventListener("click", () => document.removeEventListener("keydown", escHandler));
+
+  outputEl.appendChild(overlay);
+}
+
+// ── Feature 4: Build interactions section ───────────────────
+
+function buildInteractionsSection(charData) {
+  const details = document.createElement("details");
+  details.className = "char-interactions-details";
+
+  const summary = document.createElement("summary");
+  summary.className = "char-interactions-summary";
+  summary.innerHTML = `<svg class="char-interactions-chevron" width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>Interactions`;
+  details.appendChild(summary);
+
+  const body = document.createElement("div");
+  body.className = "char-interactions-body";
+
+  // Add row
+  const addRow = document.createElement("div");
+  addRow.className = "char-interactions-add-row";
+
+  const directiveSelect = document.createElement("select");
+  directiveSelect.className = "char-interactions-directive";
+  directiveSelect.setAttribute("aria-label", "Interaction directive type");
+  [["source#", "source#"], ["target#", "target#"], ["mutual#", "mutual#"]].forEach(([val, label]) => {
+    const opt = document.createElement("option");
+    opt.value = val;
+    opt.textContent = label;
+    directiveSelect.appendChild(opt);
+  });
+
+  const actionInput = document.createElement("input");
+  actionInput.type = "text";
+  actionInput.className = "char-interactions-action";
+  actionInput.placeholder = "hug";
+  actionInput.spellcheck = false;
+  actionInput.setAttribute("autocomplete", "off");
+  // Attach shared tag autocomplete to the action input
+  _tagAC.attach(actionInput);
+
+  const addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = "char-interactions-add-btn";
+  addBtn.setAttribute("aria-label", "Add interaction");
+  addBtn.textContent = "+";
+
+  addRow.appendChild(directiveSelect);
+  addRow.appendChild(actionInput);
+  addRow.appendChild(addBtn);
+  body.appendChild(addRow);
+
+  // Chips container
+  const chipsEl = document.createElement("div");
+  chipsEl.className = "char-interactions-chips";
+  body.appendChild(chipsEl);
+
+  function addInteraction() {
+    const action = actionInput.value.trim().replace(/,/g, "").replace(/ /g, "_");
+    if (!action) return;
+    const directive = directiveSelect.value;
+    const interaction = { directive, action };
+    charData.interactions.push(interaction);
+
+    // Render chip
+    const chip = document.createElement("span");
+    chip.className = "char-interaction-chip";
+
+    const label = document.createElement("span");
+    label.textContent = directive + action.replace(/_/g, " ");
+    chip.appendChild(label);
+
+    const removeX = document.createElement("button");
+    removeX.type = "button";
+    removeX.className = "char-interaction-chip-remove";
+    removeX.setAttribute("aria-label", `Remove ${directive}${action}`);
+    removeX.textContent = "\u00d7";
+    removeX.addEventListener("click", () => {
+      const iIdx = charData.interactions.indexOf(interaction);
+      if (iIdx >= 0) charData.interactions.splice(iIdx, 1);
+      chip.remove();
+    });
+    chip.appendChild(removeX);
+    chipsEl.appendChild(chip);
+
+    actionInput.value = "";
+    actionInput.focus();
+  }
+
+  addBtn.addEventListener("click", addInteraction);
+  actionInput.addEventListener("keydown", (e) => {
+    // Only add on Enter when autocomplete dropdown is not navigating
+    if (e.key === "Enter" && !$("#tag-dropdown").classList.contains("visible")) {
+      e.preventDefault();
+      addInteraction();
+    }
+  });
+
+  details.appendChild(body);
+  return details;
 }
 
 function updateCountSuggestionChip(count) {
@@ -1936,10 +2173,19 @@ function updateCountSuggestionChip(count) {
 }
 
 function collectCharacterPayload() {
-  return characters.map((c) => ({
-    char_caption: c.prompt,
-    centers: [{ x: c.x, y: c.y }],
-  }));
+  return characters.map((c) => {
+    let caption = c.prompt;
+    if (c.interactions && c.interactions.length > 0) {
+      const interactionStr = c.interactions.map((i) => i.directive + i.action).join(", ");
+      const needsComma = caption.length > 0 && !caption.trimEnd().endsWith(",");
+      caption = caption + (needsComma ? ", " : caption.length > 0 ? " " : "") + interactionStr;
+    }
+    const entry = { char_caption: caption };
+    if (!c.positionAuto) {
+      entry.centers = [{ x: c.x, y: c.y }];
+    }
+    return entry;
+  });
 }
 
 init();
