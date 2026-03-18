@@ -11,8 +11,10 @@ the ``parameters`` dict beyond the legacy fields that earlier models used:
 ``v4_prompt``
     Wraps the positive prompt in a caption structure that supports per-character prompts
     and spatial coordinates.  ``base_caption`` carries the main prompt text.
-    ``char_captions`` is always an empty list here because per-character prompting is not
-    exposed in this app's UI.  ``use_order`` is ``True`` so tag order affects emphasis.
+    ``char_captions`` carries per-character prompts when the Multi-Character Composer UI
+    supplies them; it is an empty list for single-character or pipe-syntax requests.
+    ``use_coords`` is ``True`` only when any character has non-default coordinates.
+    ``use_order`` is ``True`` so tag order affects emphasis.
 
 ``v4_negative_prompt``
     Same structure for the negative prompt.  ``use_order`` is ``False`` here, matching
@@ -30,6 +32,8 @@ import io
 import random
 import zipfile
 from typing import Optional
+
+from models.schemas import CharCaption
 
 API_URL = "https://image.novelai.net/ai/generate-image"
 
@@ -62,6 +66,7 @@ async def generate_image(
     reference_image: Optional[str] = None,
     reference_information_extracted: float = 1.0,
     reference_strength: float = 0.6,
+    char_captions: list[CharCaption] = [],
 ) -> tuple[bytes, int]:
     if seed == 0:
         seed = random.randint(1, 0xFFFFFFFF)
@@ -90,12 +95,20 @@ async def generate_image(
 
     # V4+ models require v4_prompt and v4_negative_prompt caption structures
     if model in V4_MODELS:
+        _default_center = {"x": 0.5, "y": 0.5}
+        _use_coords = any(
+            caption.centers != [_default_center]
+            for caption in char_captions
+        )
         params["v4_prompt"] = {
             "caption": {
                 "base_caption": prompt,
-                "char_captions": [],
+                "char_captions": [
+                    {"char_caption": c.char_caption, "centers": c.centers}
+                    for c in char_captions
+                ],
             },
-            "use_coords": False,
+            "use_coords": _use_coords,
             "use_order": True,
             "legacy_uc": False,
         }

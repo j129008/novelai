@@ -15,6 +15,11 @@ VALID_SAMPLERS = Literal[
 ]
 
 
+class CharCaption(BaseModel):
+    char_caption: str  # The prompt for this character
+    centers: list[dict] = [{"x": 0.5, "y": 0.5}]  # [{x: float, y: float}] normalized 0-1 coordinates
+
+
 class GenerateRequest(BaseModel):
     prompt: str = Field(min_length=1)
     negative_prompt: str = ""
@@ -35,6 +40,8 @@ class GenerateRequest(BaseModel):
     reference_image: Optional[str] = None  # base64
     reference_information_extracted: float = Field(default=1.0, ge=0, le=1)
     reference_strength: float = Field(default=0.6, ge=0, le=1)
+    # multi-character composer
+    char_captions: list[CharCaption] = []  # per-character prompts with positions
 
 
 class GenerateResponse(BaseModel):
