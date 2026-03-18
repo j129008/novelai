@@ -2400,11 +2400,14 @@ function renderCharacterMarkers() {
         onDragEnd();
         document.removeEventListener("mousemove", onMove);
         document.removeEventListener("mouseup",   onUp);
-        // Select this character on click (no drag)
+        // Select this character on click (no drag) — update classes in place
+        // (do NOT call renderCharacterMarkers here — it destroys the element
+        //  and breaks dblclick detection on the second click)
         if (!dragMoved) {
           _activeMarkerIdx = i;
-          renderCharacterMarkers();
-          // Highlight the corresponding sidebar card
+          outputEl.querySelectorAll(".char-marker").forEach((m, mi) => {
+            m.classList.toggle("char-marker--active", mi === i);
+          });
           const slotsEl = $("#character-slots");
           if (slotsEl) {
             slotsEl.querySelectorAll(".char-slot-card").forEach((c, ci) => {
@@ -2435,7 +2438,9 @@ function renderCharacterMarkers() {
       onDragEnd();
       if (!dragMoved) {
         _activeMarkerIdx = i;
-        renderCharacterMarkers();
+        outputEl.querySelectorAll(".char-marker").forEach((m, mi) => {
+          m.classList.toggle("char-marker--active", mi === i);
+        });
         const slotsEl = $("#character-slots");
         if (slotsEl) {
           slotsEl.querySelectorAll(".char-slot-card").forEach((c, ci) => {
