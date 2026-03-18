@@ -408,11 +408,15 @@
 
         <div class="controls-footer">
           <div class="auto-toggles">
-            <label class="auto-toggle" title="Automatically use output as img2img source for next generation">
-              <input type="checkbox" id="auto-iterate"> Auto Iterate
+            <label class="toggle-switch" title="Automatically use output as img2img source for next generation">
+              <input type="checkbox" id="auto-iterate">
+              <span class="toggle-track" aria-hidden="true"><span class="toggle-knob"></span></span>
+              <span class="toggle-label">Auto Iterate</span>
             </label>
-            <label class="auto-toggle" title="Automatically start next generation after completion">
-              <input type="checkbox" id="auto-generate"> Auto Generate
+            <label class="toggle-switch" title="Automatically start next generation after completion">
+              <input type="checkbox" id="auto-generate">
+              <span class="toggle-track" aria-hidden="true"><span class="toggle-knob"></span></span>
+              <span class="toggle-label">Auto Generate</span>
             </label>
           </div>
           <button id="generate-btn" class="btn-generate" type="button">

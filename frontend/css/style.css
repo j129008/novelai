@@ -982,21 +982,19 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   border-top: 1px solid var(--border-subtle);
 }
 
-.auto-toggles {
-  display: flex;
-  gap: 14px;
-  margin-bottom: 8px;
-}
-.auto-toggle {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.75rem;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  user-select: none;
-}
-.auto-toggle input { cursor: pointer; accent-color: var(--accent); }
+/* ── Auto-toggle pill switches ─────────────────────────────── */
+.auto-toggles { display: flex; gap: 12px; margin-bottom: 10px; }
+.toggle-switch { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
+.toggle-switch input[type="checkbox"] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.toggle-track { position: relative; display: inline-block; width: 30px; height: 17px; border-radius: 999px; background: var(--bg-deep); border: 1px solid var(--border-strong); flex-shrink: 0; transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease; }
+.toggle-knob { position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: var(--text-tertiary); transition: transform 0.15s var(--ease-out), background 0.15s ease; }
+.toggle-switch input:checked + .toggle-track { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+.toggle-switch input:checked + .toggle-track .toggle-knob { transform: translateX(13px); background: #fff; }
+.toggle-switch input:focus-visible + .toggle-track { outline: none; box-shadow: 0 0 0 3px var(--accent-dim); }
+.toggle-switch:hover .toggle-track { border-color: var(--border-strong); background: var(--bg-overlay); }
+.toggle-switch:hover input:checked + .toggle-track { background: var(--accent-bright); border-color: var(--accent-bright); }
+.toggle-label { font-size: 0.75rem; font-weight: 500; color: var(--text-tertiary); transition: color 0.15s ease; }
+.toggle-switch:has(input:checked) .toggle-label { color: var(--text-secondary); }
 
 /* ═══════════════════════════════════════════════════════════
    SPEC 3B — Stop Button
