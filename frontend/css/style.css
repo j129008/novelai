@@ -982,6 +982,18 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   border-top: 1px solid var(--border-subtle);
 }
 
+.auto-iterate-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  margin-bottom: 8px;
+  user-select: none;
+}
+.auto-iterate-toggle input { cursor: pointer; accent-color: var(--accent); }
+
 /* ═══════════════════════════════════════════════════════════
    SPEC 3B — Stop Button
    ═══════════════════════════════════════════════════════════ */

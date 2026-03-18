@@ -1150,6 +1150,11 @@ async function generate() {
     // Fire-and-forget: record character tags from prompt + all character slots
     const allPromptText = [prompt, ...characters.map((c) => c.prompt)].join(", ");
     recordRecentCharacters(allPromptText);
+
+    // Auto Iterate: set output as img2img source for next generation
+    if ($("#auto-iterate") && $("#auto-iterate").checked) {
+      iterateOnResult();
+    }
   } catch (e) {
     clearTimeout(stopTimeout);
     if (e.name === "AbortError") {
