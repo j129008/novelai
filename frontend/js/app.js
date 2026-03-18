@@ -2248,9 +2248,6 @@ function renderCharacterMarkers() {
 
   if (!characters.length) return;
 
-  // Don't render markers over the placeholder — only when a real image exists
-  if (!outputEl.querySelector("img")) return;
-
   characters.forEach((charData, i) => {
     const marker = document.createElement("div");
     marker.className = "char-marker";
