@@ -1910,7 +1910,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   border-radius: 50%;
   background: var(--bg-overlay);
   border: 2px solid var(--border-strong);
-  color: white;
+  color: var(--text-primary);
   font-size: 0.72rem;
   font-weight: 700;
   display: flex;

@@ -2248,6 +2248,9 @@ function renderCharacterMarkers() {
 
   if (!characters.length) return;
 
+  // Don't render markers over the placeholder — only when a real image exists
+  if (!outputEl.querySelector("img")) return;
+
   characters.forEach((charData, i) => {
     const marker = document.createElement("div");
     marker.className = "char-marker";
@@ -2258,6 +2261,7 @@ function renderCharacterMarkers() {
     marker.style.top  = (charData.y * 100) + "%";
     marker.setAttribute("role", "button");
     marker.setAttribute("aria-label", `Character ${i + 1} position. Double-click to toggle auto.`);
+    marker.title = "Drag to set position. Double-click to reset to Auto.";
     marker.tabIndex = 0;
 
     // ── Drag state ──────────────────────────────────────────
@@ -2272,7 +2276,6 @@ function renderCharacterMarkers() {
       startX = clientX;
       startY = clientY;
       marker.classList.add("char-marker--dragging");
-      marker.classList.remove("char-marker--auto");
     }
 
     function onDragMove(clientX, clientY) {
@@ -2296,6 +2299,7 @@ function renderCharacterMarkers() {
       marker.classList.remove("char-marker--dragging");
       if (dragMoved) {
         charData.positionAuto = false;
+        marker.classList.remove("char-marker--auto");
       }
     }
 
@@ -2345,6 +2349,12 @@ function renderCharacterMarkers() {
       if (!dragMoved) {
         _activeMarkerIdx = i;
         renderCharacterMarkers();
+        const slotsEl = $("#character-slots");
+        if (slotsEl) {
+          slotsEl.querySelectorAll(".char-slot-card").forEach((c, ci) => {
+            c.classList.toggle("char-slot-card--active", ci === i);
+          });
+        }
       }
     }, { passive: false });
 
@@ -2359,11 +2369,16 @@ function renderCharacterMarkers() {
       renderCharacterMarkers();
     });
 
-    // Keyboard: Enter/Space to select, Delete to go auto
+    // Keyboard: Enter/Space to select, Delete to toggle auto
     marker.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         _activeMarkerIdx = i;
+        renderCharacterMarkers();
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        charData.positionAuto = !charData.positionAuto;
+        if (charData.positionAuto) { charData.x = 0.5; charData.y = 0.5; }
         renderCharacterMarkers();
       }
     });
