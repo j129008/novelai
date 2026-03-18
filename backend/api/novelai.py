@@ -33,7 +33,7 @@ import random
 import zipfile
 from typing import Optional
 
-from models.schemas import CharCaption
+from models.schemas import CharCaption, CharCenter
 
 API_URL = "https://image.novelai.net/ai/generate-image"
 
@@ -97,7 +97,6 @@ async def generate_image(
 
     # V4+ models require v4_prompt and v4_negative_prompt caption structures
     if model in V4_MODELS:
-        from models.schemas import CharCenter
         _default_center = CharCenter()
         _use_coords = any(
             caption.centers != [_default_center]
