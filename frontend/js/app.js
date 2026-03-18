@@ -1836,6 +1836,8 @@ function setupCharacters() {
 
     const COLS = 5;
     const ROWS = 7; // taller than wide → portrait 5:7 ≈ 3:4
+    const defaultRow = Math.floor(ROWS / 2);
+    const defaultCol = Math.floor(COLS / 2);
 
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < COLS; col++) {
@@ -1844,8 +1846,6 @@ function setupCharacters() {
         cell.className = "char-pos-cell";
         cell.dataset.row = row;
         cell.dataset.col = col;
-        const defaultRow = Math.floor(ROWS / 2);
-        const defaultCol = Math.floor(COLS / 2);
         if (row === defaultRow && col === defaultCol) cell.classList.add("selected");
         cell.setAttribute("aria-label", `Position column ${col + 1} of ${COLS}, row ${row + 1} of ${ROWS}`);
         cell.addEventListener("click", () => {
