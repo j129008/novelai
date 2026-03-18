@@ -1905,13 +1905,13 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 
 .char-marker {
   position: absolute;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: var(--bg-overlay);
-  border: 2px solid var(--border-strong);
-  color: var(--text-primary);
-  font-size: 0.72rem;
+  background: var(--accent);
+  border: 2.5px solid rgba(255,255,255,0.9);
+  color: #fff;
+  font-size: 0.78rem;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -1919,10 +1919,10 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   cursor: grab;
   user-select: none;
   transform: translate(-50%, -50%);
-  transition: width 0.15s, height 0.15s, box-shadow 0.15s;
+  transition: width 0.15s, height 0.15s, box-shadow 0.15s, opacity 0.15s, background 0.15s;
   z-index: 5;
-  /* Ensure the marker is always rendered above canvas image */
   pointer-events: all;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
 
 .char-marker:focus {
@@ -1937,13 +1937,24 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 }
 
 .char-marker--auto {
-  border-style: dashed;
-  opacity: 0.6;
+  background: var(--bg-overlay);
+  border: 2.5px dashed var(--text-tertiary);
+  opacity: 0.5;
+  box-shadow: none;
+}
+.char-marker--auto::after {
+  content: "A";
+  position: absolute;
+  font-size: 0.5rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  bottom: -14px;
+  letter-spacing: 0.5px;
 }
 
 .char-marker--dragging {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   cursor: grabbing;
   box-shadow: 0 0 12px var(--accent-dim);
   transition: none;
