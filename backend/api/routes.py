@@ -175,6 +175,13 @@ async def generate(req: GenerateRequest):
 
 
 def _read_png_meta(filepath: Path) -> dict:
+    # PNG files saved by this app carry generation parameters in the PNG "Comment" chunk,
+    # which Pillow exposes as img.info["Comment"].  The value is a JSON object written by
+    # the NovelAI API directly into the generated image — we do not write it ourselves.
+    # Fields extracted here match the keys that NovelAI embeds: prompt, uc (negative
+    # prompt), seed, steps, scale, sampler, width, height, sm, and sm_dyn.  If the chunk
+    # is absent (e.g., images created by other tools), the function returns an empty dict
+    # and the gallery entry is listed without metadata.
     try:
         from PIL import Image
         img = Image.open(filepath)

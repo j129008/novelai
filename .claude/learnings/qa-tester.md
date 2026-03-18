@@ -7,3 +7,7 @@ Read this file before starting any QA session.
 
 <!-- Entries are added automatically by retro. Format:
 - [YYYY-MM-DD] <rule> (source: <reviewer>) -->
+- [2026-03-18] When testing documentation, always cross-check requirements.txt comment text against actual listed packages — comments can claim a package is listed when it isn't. (source: James Whittaker)
+- [2026-03-18] When testing documentation prose that counts items ("Two ways"), verify the count matches the actual bullet points that follow. (source: James Whittaker)
+- [2026-03-18] When docs use shell examples (base64, curl flags), verify portability across macOS vs Linux — macOS-specific flags like `base64 -i` are not portable. (source: James Whittaker)
+- [2026-03-18] Always check every endpoint in the API reference has an "Error Conditions" section if it can 500 on non-primary platforms; compare against sibling endpoints for consistency. (source: James Whittaker)
