@@ -66,8 +66,10 @@ async def generate_image(
     reference_image: Optional[str] = None,
     reference_information_extracted: float = 1.0,
     reference_strength: float = 0.6,
-    char_captions: list[CharCaption] = [],
+    char_captions: Optional[list[CharCaption]] = None,
 ) -> tuple[bytes, int]:
+    if char_captions is None:
+        char_captions = []
     if seed == 0:
         seed = random.randint(1, 0xFFFFFFFF)
 
@@ -95,7 +97,8 @@ async def generate_image(
 
     # V4+ models require v4_prompt and v4_negative_prompt caption structures
     if model in V4_MODELS:
-        _default_center = {"x": 0.5, "y": 0.5}
+        from models.schemas import CharCenter
+        _default_center = CharCenter()
         _use_coords = any(
             caption.centers != [_default_center]
             for caption in char_captions
@@ -104,7 +107,7 @@ async def generate_image(
             "caption": {
                 "base_caption": prompt,
                 "char_captions": [
-                    {"char_caption": c.char_caption, "centers": c.centers}
+                    {"char_caption": c.char_caption, "centers": [{"x": p.x, "y": p.y} for p in c.centers]}
                     for c in char_captions
                 ],
             },

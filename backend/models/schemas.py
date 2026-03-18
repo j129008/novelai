@@ -15,9 +15,14 @@ VALID_SAMPLERS = Literal[
 ]
 
 
+class CharCenter(BaseModel):
+    x: float = Field(default=0.5, ge=0.0, le=1.0)
+    y: float = Field(default=0.5, ge=0.0, le=1.0)
+
+
 class CharCaption(BaseModel):
-    char_caption: str  # The prompt for this character
-    centers: list[dict] = [{"x": 0.5, "y": 0.5}]  # [{x: float, y: float}] normalized 0-1 coordinates
+    char_caption: str
+    centers: list[CharCenter] = Field(default_factory=lambda: [CharCenter()])
 
 
 class GenerateRequest(BaseModel):
@@ -41,7 +46,7 @@ class GenerateRequest(BaseModel):
     reference_information_extracted: float = Field(default=1.0, ge=0, le=1)
     reference_strength: float = Field(default=0.6, ge=0, le=1)
     # multi-character composer
-    char_captions: list[CharCaption] = []  # per-character prompts with positions
+    char_captions: list[CharCaption] = Field(default_factory=list)  # per-character prompts with positions
 
 
 class GenerateResponse(BaseModel):

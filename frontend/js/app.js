@@ -1849,8 +1849,6 @@ function setupCharacters() {
     ta.focus();
   }
 
-  // Expose updateCharacterUI for external callers
-  window._updateCharacterUI = updateCharacterUI;
 }
 
 function updateCountSuggestionChip(count) {

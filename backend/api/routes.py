@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from models.schemas import CharCaption, GenerateRequest, GenerateResponse
+from models.schemas import GenerateRequest, GenerateResponse
 from api.novelai import generate_image
 
 router = APIRouter(prefix="/api")
