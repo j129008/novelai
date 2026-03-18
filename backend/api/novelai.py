@@ -27,11 +27,15 @@ The NovelAI API response is a ZIP archive containing a single PNG file.  The see
 for generation is tracked locally and returned alongside the image bytes so callers can
 embed it in the saved filename and in the response to the browser.
 """
+import base64
 import httpx
 import io
+import numpy as np
 import random
 import zipfile
 from typing import Optional
+
+from PIL import Image
 
 from models.schemas import CharCaption, CharCenter
 
@@ -45,6 +49,38 @@ V4_MODELS = {
     "nai-diffusion-4-5-curated",
     "nai-diffusion-4-5-full",
 }
+
+def composite_sketch_on_noise(sketch_b64: str, width: int, height: int) -> str:
+    """Composite an RGBA sketch onto a noise background, return base64 RGB PNG.
+
+    Transparent pixels in the sketch are replaced with Gaussian noise so the
+    model receives a fully-opaque colour image rather than a blank canvas.
+    Painted pixels (alpha > 0) are passed through as-is, preserving the
+    colour hints the user drew.
+    """
+    sketch_bytes = base64.b64decode(sketch_b64)
+    sketch = Image.open(io.BytesIO(sketch_bytes)).convert("RGBA")
+
+    if sketch.size != (width, height):
+        sketch = sketch.resize((width, height), Image.LANCZOS)
+
+    sketch_array = np.array(sketch)  # (H, W, 4): R, G, B, A
+    alpha = sketch_array[:, :, 3]   # (H, W)
+
+    noise = np.clip(
+        np.random.normal(128, 40, (height, width, 3)), 0, 255
+    ).astype(np.uint8)
+
+    # Where alpha > 0 use sketch RGB; elsewhere use noise.
+    mask = alpha > 0                              # (H, W) bool
+    composite = noise.copy()
+    composite[mask] = sketch_array[:, :, :3][mask]
+
+    out_image = Image.fromarray(composite, mode="RGB")
+    buf = io.BytesIO()
+    out_image.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode()
+
 
 async def generate_image(
     token: str,

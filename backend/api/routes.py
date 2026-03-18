@@ -17,7 +17,7 @@ from models.schemas import (
     GenerateResponse,
     RecordCharactersRequest,
 )
-from api.novelai import generate_image
+from api.novelai import composite_sketch_on_noise, generate_image
 
 router = APIRouter(prefix="/api")
 
@@ -176,6 +176,16 @@ async def search_tags(q: str = Query(min_length=1), limit: int = Query(default=1
 async def generate(req: GenerateRequest):
     if not TOKEN:
         raise HTTPException(status_code=503, detail="NOVELAI_TOKEN not configured")
+
+    if req.sketch_image:
+        # Sketch mode: composite sketch onto noise, then use as img2img input.
+        # sketch_image takes priority over any normal img2img image.
+        try:
+            composite_b64 = composite_sketch_on_noise(req.sketch_image, req.width, req.height)
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Invalid sketch_image: {e}")
+        req.image = composite_b64
+        req.strength = req.sketch_strength
 
     try:
         image_data, seed = await generate_image(

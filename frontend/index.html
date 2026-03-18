@@ -320,7 +320,45 @@
           </div>
         </details>
 
-        <!-- 3. Compact row: Canvas Size + Seed -->
+        <!-- 3. Sketch accordion -->
+        <details class="accordion" id="sketch-accordion">
+          <summary class="accordion-header">
+            <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
+            Sketch
+            <span id="sketch-active-badge" class="accordion-badge" style="display:none">Active</span>
+          </summary>
+          <div class="accordion-body">
+            <div class="sketch-toolbar">
+              <div class="sketch-colors" id="sketch-colors"></div>
+              <div class="sketch-tools">
+                <button id="sketch-eraser" class="sketch-tool-btn" type="button" title="Eraser (toggle)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20H7L3 16l10-10 7 7-3 3"/><path d="M6.0001 17.9999l3-3"/></svg>
+                </button>
+                <button id="sketch-clear" class="sketch-tool-btn sketch-tool-btn--danger" type="button" title="Clear canvas">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="sketch-sizes" id="sketch-sizes">
+              <button class="sketch-size-btn" data-size="8" type="button">S</button>
+              <button class="sketch-size-btn active" data-size="20" type="button">M</button>
+              <button class="sketch-size-btn" data-size="40" type="button">L</button>
+            </div>
+            <div class="sketch-canvas-wrap" id="sketch-canvas-wrap">
+              <canvas id="sketch-canvas"></canvas>
+            </div>
+            <div class="control-group control-group--tight">
+              <div class="slider-header">
+                <label class="field-label" for="sketch-strength">Sketch Influence</label>
+                <span class="slider-value" id="sketch-strength-val">0.35</span>
+              </div>
+              <input type="range" id="sketch-strength" class="field-range" min="0.1" max="0.7" step="0.05" value="0.35">
+              <div class="slider-endpoints"><span>Loose</span><span>Tight</span></div>
+            </div>
+          </div>
+        </details>
+
+        <!-- 4. Compact row: Canvas Size + Seed -->
         <div class="control-group control-group--compact-row">
           <div class="compact-col">
             <label class="field-label" for="resolution">Canvas</label>
@@ -337,7 +375,7 @@
           </div>
         </div>
 
-        <!-- 4. Quality slider -->
+        <!-- 5. Quality slider -->
         <div class="control-group">
           <div class="slider-header">
             <label class="field-label" for="steps">Quality</label>
@@ -347,10 +385,10 @@
           <div class="slider-endpoints"><span>Draft</span><span>Best</span></div>
         </div>
 
-        <!-- 5. Divider -->
+        <!-- 6. Divider -->
         <div class="divider"></div>
 
-        <!-- 6. Style Reference accordion -->
+        <!-- 7. Style Reference accordion -->
         <details class="accordion">
           <summary class="accordion-header">
             <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
@@ -379,7 +417,7 @@
           </div>
         </details>
 
-        <!-- 7. Advanced accordion (renamed from Fine-tuning) -->
+        <!-- 8. Advanced accordion (renamed from Fine-tuning) -->
         <details class="accordion">
           <summary class="accordion-header">
             <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
