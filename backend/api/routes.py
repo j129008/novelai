@@ -283,7 +283,8 @@ async def list_gallery(path: str = Query(default="")):
         d.name for d in current_dir.iterdir() if d.is_dir()
     )
     png_files = sorted(
-        current_dir.glob("*.png"), key=lambda f: f.stat().st_mtime, reverse=True
+        (f for f in current_dir.glob("*.png") if not f.name.startswith("._")),
+        key=lambda f: f.stat().st_mtime, reverse=True,
     )
     files = [
         GalleryFileItem(
