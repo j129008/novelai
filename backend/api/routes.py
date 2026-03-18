@@ -5,7 +5,6 @@ import os
 import subprocess
 import time
 from pathlib import Path
-from urllib.parse import unquote
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -134,6 +133,16 @@ async def get_options():
 @router.get("/tags/categories")
 async def get_tag_categories():
     return _tag_categories
+
+
+@router.get("/tags/check-characters")
+async def check_characters(tags: str = Query(description="Comma-separated tag names")):
+    candidates = {t.strip() for t in tags.split(",") if t.strip()}
+    character_names = {
+        t["name"] for t in _tags if t["category"] == "character"
+    }
+    confirmed = [t for t in candidates if t in character_names]
+    return {"characters": confirmed}
 
 
 @router.get("/tags")
@@ -343,17 +352,6 @@ async def record_characters(req: RecordCharactersRequest):
 
 @router.delete("/recent-characters/{tag_name}", response_model=CharacterUsageList)
 async def delete_recent_character(tag_name: str):
-    tag = unquote(tag_name)
-    characters = [c for c in _load_characters() if c.tag != tag]
+    characters = [c for c in _load_characters() if c.tag != tag_name]
     _save_characters(characters)
     return CharacterUsageList(characters=characters)
-
-
-@router.get("/tags/check-characters")
-async def check_characters(tags: str = Query(description="Comma-separated tag names")):
-    candidates = {t.strip() for t in tags.split(",") if t.strip()}
-    character_names = {
-        t["name"] for t in _tags if t["category"] == "character"
-    }
-    confirmed = [t for t in candidates if t in character_names]
-    return {"characters": confirmed}

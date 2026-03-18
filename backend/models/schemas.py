@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 
 VALID_MODELS = Literal[
     "nai-diffusion-4-5-full",
@@ -65,4 +65,4 @@ class CharacterUsageList(BaseModel):
 
 
 class RecordCharactersRequest(BaseModel):
-    tags: list[str] = Field(default_factory=list)
+    tags: list[Annotated[str, Field(min_length=1)]] = Field(default_factory=list)
