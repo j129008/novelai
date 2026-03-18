@@ -2115,9 +2115,9 @@ function loadSettingsFromMeta(meta) {
     const hd = $("#hd-enhancement");
     const smea = $("#smea");
     const smeaDyn = $("#smea-dyn");
-    hd.checked = meta.sm || meta.sm_dyn;
-    smea.checked = !!meta.sm;
-    smeaDyn.checked = !!meta.sm_dyn;
+    if (hd) hd.checked = meta.sm || meta.sm_dyn;
+    if (smea) smea.checked = !!meta.sm;
+    if (smeaDyn) smeaDyn.checked = !!meta.sm_dyn;
   }
 
   // Restore characters only when metadata contains char_captions
