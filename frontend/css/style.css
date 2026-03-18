@@ -2089,3 +2089,14 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   cursor: crosshair;
 }
 
+/* Dim generated image during draw mode so sketch strokes are visible */
+.output-area.sketch-draw-active > img {
+  opacity: 0.25;
+  transition: opacity 0.2s;
+}
+
+/* Fully hide image when user toggles it off */
+.output-area.sketch-img-hidden > img {
+  display: none;
+}
+
