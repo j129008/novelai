@@ -231,7 +231,6 @@
             </div>
             <textarea id="prompt" class="field-textarea field-textarea--prompt" rows="6" placeholder="Describe your vision… e.g. a girl standing in a field of sunflowers at golden hour" spellcheck="false"></textarea>
             <textarea id="negative-prompt" class="field-textarea field-textarea--negative" rows="6" placeholder="What to exclude…" spellcheck="false" style="display:none">nsfw, lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page, @_@, mismatched pupils, glowing eyes, bad anatomy</textarea>
-            <div id="tag-dropdown" class="tag-dropdown"></div>
           </div>
         </div>
 
@@ -496,6 +495,8 @@
 
     </main>
   </div>
+  <!-- Shared tag autocomplete dropdown — positioned via JS using getBoundingClientRect() -->
+  <div id="tag-dropdown" class="tag-dropdown"></div>
   <script src="js/app.js?v=99"></script>
 </body>
 </html>
