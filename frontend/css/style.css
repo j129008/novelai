@@ -889,6 +889,35 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   transform: scale(1.05);
 }
 
+/* Recent Characters chips — subtle accent tint to distinguish from regular chips */
+.tag-chip.tag-chip--recent {
+  background: rgba(124,92,252,0.08);
+  border-color: rgba(124,92,252,0.25);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.tag-chip.tag-chip--recent:hover {
+  background: var(--accent-dim);
+  border-color: rgba(124,92,252,0.4);
+  color: var(--text-primary);
+}
+
+/* Count badge inside recent character chips */
+.tag-chip-count {
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Recent Characters section label with icon */
+.tag-browser-section-label--recent {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary);
+}
+
 .tag-browser-empty {
   font-size: 0.82rem;
   color: var(--text-tertiary);

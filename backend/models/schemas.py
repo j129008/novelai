@@ -53,3 +53,16 @@ class GenerateRequest(BaseModel):
 class GenerateResponse(BaseModel):
     image: str  # base64 encoded png
     seed: int
+
+
+class CharacterUsage(BaseModel):
+    tag: str
+    count: int = Field(ge=1)
+
+
+class CharacterUsageList(BaseModel):
+    characters: list[CharacterUsage]
+
+
+class RecordCharactersRequest(BaseModel):
+    tags: list[str] = Field(default_factory=list)
