@@ -1035,6 +1035,7 @@ async function generate() {
     strength: parseFloat($("#strength").value),
     noise: parseFloat($("#noise").value),
     char_captions: collectCharacterPayload(),
+    use_coords: characters.some((c) => !c.positionAuto),
   };
 
   if (state.img2img) {
@@ -1563,9 +1564,9 @@ function renderGallery(files, filter) {
 
     const metaEl = document.createElement("div");
     metaEl.className = "history-card-meta";
-    if (meta.seed) metaEl.innerHTML += `<span>Seed ${meta.seed}</span>`;
-    if (meta.steps) metaEl.innerHTML += `<span>${meta.steps}st</span>`;
-    if (meta.width) metaEl.innerHTML += `<span>${meta.width}\u00d7${meta.height}</span>`;
+    if (meta.seed) { const s = document.createElement("span"); s.textContent = `Seed ${meta.seed}`; metaEl.appendChild(s); }
+    if (meta.steps) { const s = document.createElement("span"); s.textContent = `${meta.steps}st`; metaEl.appendChild(s); }
+    if (meta.width) { const s = document.createElement("span"); s.textContent = `${meta.width}\u00d7${meta.height}`; metaEl.appendChild(s); }
     overlay.appendChild(metaEl);
     imgWrap.appendChild(overlay);
 
@@ -2179,10 +2180,11 @@ function collectCharacterPayload() {
       const needsComma = caption.length > 0 && !caption.trimEnd().endsWith(",");
       caption = caption + (needsComma ? ", " : caption.length > 0 ? " " : "") + interactionStr;
     }
-    return {
-      char_caption: caption,
-      centers: [{ x: c.x, y: c.y }],
-    };
+    const entry = { char_caption: caption };
+    if (!c.positionAuto) {
+      entry.centers = [{ x: c.x, y: c.y }];
+    }
+    return entry;
   });
 }
 
