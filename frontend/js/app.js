@@ -1160,6 +1160,11 @@ async function generate() {
     if ($("#auto-iterate") && $("#auto-iterate").checked) {
       iterateOnResult();
     }
+
+    // Auto Generate: start next generation after a short delay
+    if ($("#auto-generate") && $("#auto-generate").checked) {
+      setTimeout(() => generate(), 500);
+    }
   } catch (e) {
     clearTimeout(stopTimeout);
     if (e.name === "AbortError") {
