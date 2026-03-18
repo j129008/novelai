@@ -1,5 +1,12 @@
+# Web framework and server
 fastapi==0.115.6
 uvicorn==0.34.0
+
+# Environment variable loading (.env file support)
 python-dotenv==1.0.1
+
+# HTTP client for NovelAI API calls
 httpx==0.28.1
-scipy
+
+# Image processing (PNG metadata reading, gallery thumbnails)
+Pillow==12.1.0

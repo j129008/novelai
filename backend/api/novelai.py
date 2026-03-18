@@ -1,3 +1,30 @@
+"""
+NovelAI API client.
+
+Responsible for constructing the generate-image payload and returning raw PNG bytes.
+
+V4+ payload structure
+---------------------
+V4 and V4.5 models (those in V4_MODELS) require two additional top-level fields inside
+the ``parameters`` dict beyond the legacy fields that earlier models used:
+
+``v4_prompt``
+    Wraps the positive prompt in a caption structure that supports per-character prompts
+    and spatial coordinates.  ``base_caption`` carries the main prompt text.
+    ``char_captions`` is always an empty list here because per-character prompting is not
+    exposed in this app's UI.  ``use_order`` is ``True`` so tag order affects emphasis.
+
+``v4_negative_prompt``
+    Same structure for the negative prompt.  ``use_order`` is ``False`` here, matching
+    NovelAI's own web app behavior for undesired content.
+
+The legacy ``uc`` key is also kept alongside ``negative_prompt`` for API compatibility;
+older model versions and some server-side paths still read ``uc``.
+
+The NovelAI API response is a ZIP archive containing a single PNG file.  The seed used
+for generation is tracked locally and returned alongside the image bytes so callers can
+embed it in the saved filename and in the response to the browser.
+"""
 import httpx
 import io
 import random
