@@ -2396,6 +2396,29 @@ function setupCharacters() {
   }
 }
 
+function swapCharacterSlots(slotsEl, fromIdx, toIdx) {
+  if (toIdx < 0 || toIdx >= characters.length) return;
+  // Swap in array
+  [characters[fromIdx], characters[toIdx]] = [characters[toIdx], characters[fromIdx]];
+  // Swap in DOM
+  const cards = [...slotsEl.querySelectorAll(".char-slot-card")];
+  const fromCard = cards[fromIdx];
+  const toCard = cards[toIdx];
+  if (fromIdx < toIdx) {
+    slotsEl.insertBefore(toCard, fromCard);
+  } else {
+    slotsEl.insertBefore(fromCard, toCard);
+  }
+  // Re-index
+  slotsEl.querySelectorAll(".char-slot-card").forEach((c, i) => {
+    c.dataset.idx = i;
+    const lbl = c.querySelector(".char-slot-label");
+    if (lbl) lbl.textContent = `Character ${i + 1}`;
+  });
+  renderCharacterMarkers();
+  saveCharactersToCache();
+}
+
 function addCharacterSlot(slotsEl, updateCharacterUI) {
   const idx = characters.length;
   const charData = { prompt: "", x: 0.5, y: 0.5, positionAuto: true, interactions: [] };
@@ -2433,7 +2456,29 @@ function addCharacterSlot(slotsEl, updateCharacterUI) {
     saveCharactersToCache();
   });
 
+  const moveUpBtn = document.createElement("button");
+  moveUpBtn.type = "button";
+  moveUpBtn.className = "char-slot-move";
+  moveUpBtn.title = "Move up";
+  moveUpBtn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>`;
+  moveUpBtn.addEventListener("click", () => {
+    const i = parseInt(card.dataset.idx);
+    swapCharacterSlots(slotsEl, i, i - 1);
+  });
+
+  const moveDownBtn = document.createElement("button");
+  moveDownBtn.type = "button";
+  moveDownBtn.className = "char-slot-move";
+  moveDownBtn.title = "Move down";
+  moveDownBtn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+  moveDownBtn.addEventListener("click", () => {
+    const i = parseInt(card.dataset.idx);
+    swapCharacterSlots(slotsEl, i, i + 1);
+  });
+
   cardHeader.appendChild(cardLabel);
+  cardHeader.appendChild(moveUpBtn);
+  cardHeader.appendChild(moveDownBtn);
   cardHeader.appendChild(removeBtn);
 
   // ── Textarea with auto-grow ──────────────────────────────
