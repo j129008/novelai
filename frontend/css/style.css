@@ -275,6 +275,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 @media (max-width: 860px) {
   .workspace { grid-template-columns: 1fr; overflow: visible; }
   .controls { height: auto; position: static; max-height: none; border-right: none; border-bottom: 1px solid var(--border-subtle); overflow: hidden; }
+  .controls-prompt { flex-shrink: 0; }
   .controls-scroll { max-height: 55vh; }
   .canvas { min-height: 60vh; padding: 14px 16px 20px; }
   .output-area { min-height: 50vw; }
@@ -918,11 +919,17 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
    SPEC 3A — Sticky Generate Button
    ═══════════════════════════════════════════════════════════ */
 
+.controls-prompt {
+  flex-shrink: 0;
+  padding: 20px 18px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
 .controls-scroll {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 20px 18px 14px;
+  padding: 14px 18px 14px;
   display: flex;
   flex-direction: column;
   gap: 14px;
