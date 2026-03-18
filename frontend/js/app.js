@@ -1142,14 +1142,16 @@ function setupSketchCanvas() {
     const resVal = $("#resolution").value || "832x1216";
     const [outW, outH] = resVal.split("x").map(Number);
 
-    // Preserve painted content flag before resize destroys it
+    // Only resize if dimensions actually changed (setting canvas.width clears content!)
+    if (canvas.width === outW && canvas.height === outH) return;
+
     const hadContent = canvasHasContent();
 
     canvas.width  = outW;
     canvas.height = outH;
 
     if (hadContent) {
-      showStatus("Sketch cleared — output area resized");
+      showStatus("Sketch cleared — resolution changed");
       updateBadge();
     }
   }
