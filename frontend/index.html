@@ -234,10 +234,6 @@
           <textarea id="negative-prompt" class="field-textarea field-textarea--negative" rows="6" placeholder="What to exclude…" spellcheck="false" style="display:none">nsfw, lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page, @_@, mismatched pupils, glowing eyes, bad anatomy</textarea>
           <div id="tag-dropdown" class="tag-dropdown"></div>
         </div>
-        <div id="char-count-chip-wrap" class="char-count-chip-wrap" style="display:none">
-          <button id="char-count-chip" class="char-count-chip" type="button"></button>
-        </div>
-
         <div class="control-group">
           <label class="field-label" for="resolution">Canvas Size</label>
           <select id="resolution" class="field-select"></select>
@@ -367,8 +363,25 @@
           </summary>
           <div class="accordion-body">
             <p class="accordion-hint">Describe each character separately. The Prompt field is your scene/background.</p>
+            <!-- Empty state: shown when no character slots exist -->
+            <div id="char-empty-state" class="char-empty-state">
+              <svg class="char-empty-icon" width="44" height="44" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+                <circle cx="15" cy="13" r="5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M5 36c0-5.523 4.477-10 10-10s10 4.477 10 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <circle cx="31" cy="13" r="5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M21 36c0-5.523 4.477-10 10-10s10 4.477 10 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              <p class="char-empty-text">Add characters to control individual appearances and positions</p>
+              <button id="btn-add-character" class="btn-action btn-action--primary char-empty-add-btn" type="button">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Character
+              </button>
+            </div>
             <div id="character-slots" class="character-slots"></div>
-            <button id="btn-add-character" class="btn-action btn-action--primary" type="button" style="width:100%; justify-content:center;">
+            <div id="char-count-chip-wrap" class="char-count-chip-wrap" style="display:none">
+              <button id="char-count-chip" class="char-count-chip" type="button"></button>
+            </div>
+            <button id="btn-add-character-inline" class="btn-action btn-action--primary" type="button" style="width:100%; justify-content:center; display:none">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Add Character
             </button>

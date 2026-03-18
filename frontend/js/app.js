@@ -1732,30 +1732,50 @@ function clearError() {
 const MAX_CHARACTERS = 6;
 
 function setupCharacters() {
-  const addBtn   = $("#btn-add-character");
-  const slotsEl  = $("#character-slots");
-  const accordion = $("#characters-accordion");
-  const badge    = $("#char-count-badge");
+  // There are two "Add Character" buttons: one in the empty state, one inline.
+  // Both trigger the same action.
+  const addBtnEmpty  = $("#btn-add-character");
+  const addBtnInline = $("#btn-add-character-inline");
+  const slotsEl      = $("#character-slots");
+  const accordion    = $("#characters-accordion");
+  const badge        = $("#char-count-badge");
+  const emptyState   = $("#char-empty-state");
 
-  if (!addBtn || !slotsEl) return;
+  if (!slotsEl) return;
 
-  addBtn.addEventListener("click", () => {
+  function handleAddClick() {
     if (characters.length >= MAX_CHARACTERS) return;
+    // Auto-open accordion when first character is added
+    if (accordion && !accordion.open) accordion.open = true;
     addCharacterSlot();
-  });
+  }
+
+  if (addBtnEmpty)  addBtnEmpty.addEventListener("click", handleAddClick);
+  if (addBtnInline) addBtnInline.addEventListener("click", handleAddClick);
 
   function updateCharacterUI() {
     const count = characters.length;
+    const isEmpty = count === 0;
+
     // Badge on accordion header
     if (badge) {
       badge.textContent = count;
       badge.style.display = count > 0 ? "inline-flex" : "none";
     }
-    // Add button disabled when at max
-    addBtn.disabled = count >= MAX_CHARACTERS;
+
+    // Empty state visibility
+    if (emptyState) emptyState.style.display = isEmpty ? "flex" : "none";
+
+    // Inline "Add Character" button (shown only when slots exist)
+    if (addBtnInline) {
+      addBtnInline.style.display = isEmpty ? "none" : "";
+      addBtnInline.disabled = count >= MAX_CHARACTERS;
+    }
+
     // Scene mode label on Prompt tab
     const sceneLabel = $("#scene-label");
     if (sceneLabel) sceneLabel.style.display = count > 0 ? "" : "none";
+
     // Character count suggestion chip
     updateCountSuggestionChip(count);
   }
@@ -1769,36 +1789,86 @@ function setupCharacters() {
     card.className = "char-slot-card";
     card.dataset.idx = idx;
 
-    // Textarea
+    // Textarea with auto-grow
     const ta = document.createElement("textarea");
     ta.className = "char-slot-textarea field-textarea";
-    ta.rows = 3;
+    ta.rows = 2;
     ta.placeholder = "girl, blonde hair, blue eyes, waving";
     ta.spellcheck = false;
-    ta.addEventListener("input", () => { charData.prompt = ta.value; });
+    ta.addEventListener("input", () => {
+      charData.prompt = ta.value;
+      // Auto-grow: reset height then expand to scrollHeight
+      ta.style.height = "auto";
+      ta.style.height = ta.scrollHeight + "px";
+    });
 
-    // Position grid (5x5)
+    // Position grid (5x5) with context labels
+    // Outer wrapper provides the "picture frame" context
+    const gridSection = document.createElement("div");
+    gridSection.className = "char-position-section";
+
+    const gridHeader = document.createElement("div");
+    gridHeader.className = "char-grid-header";
+
+    const gridLabel = document.createElement("div");
+    gridLabel.className = "char-grid-label field-label";
+    gridLabel.textContent = "Position in frame";
+
+    gridHeader.appendChild(gridLabel);
+    gridSection.appendChild(gridHeader);
+
+    // Axis row: L arrow + grid frame + R arrow
+    const gridAxisRow = document.createElement("div");
+    gridAxisRow.className = "char-grid-axis-row";
+
+    const axisL = document.createElement("span");
+    axisL.className = "char-grid-axis-label";
+    axisL.setAttribute("aria-label", "Left");
+    axisL.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 2 2 5 6 8"/></svg>`;
+
+    const gridFrame = document.createElement("div");
+    gridFrame.className = "char-grid-frame";
+
     const gridWrap = document.createElement("div");
     gridWrap.className = "char-position-grid";
-    gridWrap.setAttribute("aria-label", "Character position");
+    gridWrap.setAttribute("aria-label", "Character position — click a cell to set position in frame");
+    gridWrap.setAttribute("role", "group");
 
-    for (let row = 0; row < 5; row++) {
-      for (let col = 0; col < 5; col++) {
+    const COLS = 5;
+    const ROWS = 7; // taller than wide → portrait 5:7 ≈ 3:4
+    const defaultRow = Math.floor(ROWS / 2);
+    const defaultCol = Math.floor(COLS / 2);
+
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS; col++) {
         const cell = document.createElement("button");
         cell.type = "button";
         cell.className = "char-pos-cell";
         cell.dataset.row = row;
         cell.dataset.col = col;
-        if (row === 2 && col === 2) cell.classList.add("selected"); // default center
+        if (row === defaultRow && col === defaultCol) cell.classList.add("selected");
+        cell.setAttribute("aria-label", `Position column ${col + 1} of ${COLS}, row ${row + 1} of ${ROWS}`);
         cell.addEventListener("click", () => {
           gridWrap.querySelectorAll(".char-pos-cell").forEach((c) => c.classList.remove("selected"));
           cell.classList.add("selected");
-          charData.x = col / 4;
-          charData.y = row / 4;
+          charData.x = col / (COLS - 1);
+          charData.y = row / (ROWS - 1);
         });
         gridWrap.appendChild(cell);
       }
     }
+
+    gridFrame.appendChild(gridWrap);
+
+    const axisR = document.createElement("span");
+    axisR.className = "char-grid-axis-label";
+    axisR.setAttribute("aria-label", "Right");
+    axisR.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 2 8 5 4 8"/></svg>`;
+
+    gridAxisRow.appendChild(axisL);
+    gridAxisRow.appendChild(gridFrame);
+    gridAxisRow.appendChild(axisR);
+    gridSection.appendChild(gridAxisRow);
 
     // Card header row (label + remove button)
     const cardHeader = document.createElement("div");
@@ -1829,20 +1899,9 @@ function setupCharacters() {
     cardHeader.appendChild(cardLabel);
     cardHeader.appendChild(removeBtn);
 
-    // Layout: header, textarea, then row with grid
-    const bodyRow = document.createElement("div");
-    bodyRow.className = "char-slot-body";
-
-    const gridLabel = document.createElement("div");
-    gridLabel.className = "char-grid-label field-label";
-    gridLabel.textContent = "Position";
-
-    bodyRow.appendChild(gridLabel);
-    bodyRow.appendChild(gridWrap);
-
     card.appendChild(cardHeader);
     card.appendChild(ta);
-    card.appendChild(bodyRow);
+    card.appendChild(gridSection);
 
     slotsEl.appendChild(card);
     updateCharacterUI();
