@@ -1237,16 +1237,27 @@ function setupSketchCanvas() {
   }
 
   canvas.addEventListener("mousedown", (e) => {
+    if (!drawMode) return;
     e.preventDefault();
+    e.stopPropagation();
     beginStroke(e);
   });
 
   canvas.addEventListener("mousemove", (e) => {
+    if (!drawMode) return;
     if (e.buttons === 1) continueStroke(e);
   });
 
-  canvas.addEventListener("mouseup",    endStroke);
+  canvas.addEventListener("mouseup", (e) => {
+    if (!drawMode) return;
+    endStroke();
+  });
   canvas.addEventListener("mouseleave", endStroke);
+
+  // Prevent native image drag on all images inside #output
+  outputEl.addEventListener("dragstart", (e) => {
+    if (e.target.tagName === "IMG") e.preventDefault();
+  });
 
   // ── Sketch strength slider ────────────────────────────────
   bindSlider("sketch-strength", "sketch-strength-val", 2);
