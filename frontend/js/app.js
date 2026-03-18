@@ -1127,6 +1127,7 @@ function setupSketchCanvas() {
   // ── Clear ────────────────────────────────────────────────
   clearBtn.addEventListener("click", () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    _hasStrokes = false;
     updateBadge();
   });
 
@@ -1149,6 +1150,7 @@ function setupSketchCanvas() {
 
     canvas.width  = outW;
     canvas.height = outH;
+    _hasStrokes = false;
 
     if (hadContent) {
       showStatus("Sketch cleared — resolution changed");
@@ -1168,13 +1170,10 @@ function setupSketchCanvas() {
   }
 
   // ── Badge helper ─────────────────────────────────────────
+  let _hasStrokes = false;  // fast track: set on stroke, cleared on clear/resize
+
   function canvasHasContent() {
-    if (!canvas.width || !canvas.height) return false;
-    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    for (let i = 3; i < data.length; i += 4) {
-      if (data[i] > 0) return true;
-    }
-    return false;
+    return _hasStrokes;
   }
 
   function updateBadge() {
@@ -1235,6 +1234,7 @@ function setupSketchCanvas() {
   function endStroke() {
     if (!drawing) return;
     drawing = false;
+    _hasStrokes = true;
     updateBadge();
   }
 

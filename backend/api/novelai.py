@@ -67,9 +67,8 @@ def composite_sketch_on_noise(sketch_b64: str, width: int, height: int) -> str:
     sketch_array = np.array(sketch)  # (H, W, 4): R, G, B, A
     alpha = sketch_array[:, :, 3]   # (H, W)
 
-    noise = np.clip(
-        np.random.normal(128, 40, (height, width, 3)), 0, 255
-    ).astype(np.uint8)
+    # Use uniform random noise (0-255) instead of Gaussian to avoid gray bias
+    noise = np.random.randint(0, 256, (height, width, 3), dtype=np.uint8)
 
     # Where alpha > 0 use sketch RGB; elsewhere use noise.
     mask = alpha > 0                              # (H, W) bool

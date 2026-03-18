@@ -47,7 +47,7 @@ class GenerateRequest(BaseModel):
     reference_strength: float = Field(default=0.6, ge=0, le=1)
     # color sketch guide
     sketch_image: Optional[str] = None  # base64 RGBA PNG sketch
-    sketch_strength: float = Field(default=0.6, ge=0, le=1)
+    sketch_strength: float = Field(default=0.85, ge=0, le=1)
     # multi-character composer
     char_captions: list[CharCaption] = Field(default_factory=list)  # per-character prompts with positions
     use_coords: Optional[bool] = None  # explicit coordinate control; None = auto-detect from centers
