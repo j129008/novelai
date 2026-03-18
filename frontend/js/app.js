@@ -2158,6 +2158,11 @@ function setupCharacters() {
 
   if (!slotsEl) return;
 
+  // Show/hide markers when accordion opens/closes
+  if (accordion) {
+    accordion.addEventListener("toggle", () => renderCharacterMarkers());
+  }
+
   function handleAddClick() {
     if (characters.length >= MAX_CHARACTERS) return;
     if (accordion && !accordion.open) accordion.open = true;
@@ -2336,6 +2341,10 @@ function renderCharacterMarkers() {
   outputEl.querySelectorAll(".char-marker").forEach((m) => m.remove());
 
   if (!characters.length) return;
+
+  // Only show markers when Characters accordion is open
+  const accordion = $("#characters-accordion");
+  if (accordion && !accordion.open) return;
 
   characters.forEach((charData, i) => {
     const marker = document.createElement("div");
