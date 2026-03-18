@@ -52,11 +52,13 @@ This project uses a team of sub-agents (`.claude/agents/`):
 | **Guido van Rossum** | Backend Engineer | FastAPI endpoints, API integrations, Pythonic server-side logic |
 | **Lea Verou** | Frontend Engineer | UI components, CSS mastery, vanilla HTML/CSS/JS |
 | **James Whittaker** | QA Engineer | Google-level testing rigor, endpoint validation, bug catching |
+| **Donald Knuth** | Tech Writer | Documentation, API references, user guides, literate programming |
 | **Linus Torvalds** | Reviewer & Merger | Code review, quality enforcement, merge gatekeeper |
 
 ### Workflow
 1. **Steve Jobs** defines what to build (specs & priorities)
 2. **Guido van Rossum** / **Lea Verou** implement the changes
 3. **James Whittaker** tests functionality and catches bugs
-4. **Linus Torvalds** reviews code and merges approved changes
-5. **Steve Jobs** does final product review before shipping
+4. **Donald Knuth** writes/updates documentation
+5. **Linus Torvalds** reviews code and merges approved changes
+6. **Steve Jobs** does final product review before shipping
