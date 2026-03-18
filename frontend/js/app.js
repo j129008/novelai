@@ -1115,6 +1115,15 @@ function setupSketchCanvas() {
     drawToggle.addEventListener("click", () => setDrawMode(!drawMode));
   }
 
+  // ── Hide/show generated image ──────────────────────────
+  const hideImgBtn = $("#sketch-hide-img");
+  if (hideImgBtn) {
+    hideImgBtn.addEventListener("click", () => {
+      outputEl.classList.toggle("sketch-img-hidden");
+      hideImgBtn.classList.toggle("active", outputEl.classList.contains("sketch-img-hidden"));
+    });
+  }
+
   // ── Clear ────────────────────────────────────────────────
   clearBtn.addEventListener("click", () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
