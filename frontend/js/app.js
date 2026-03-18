@@ -64,7 +64,7 @@ function loadCharactersFromCache() {
 const _sketch = {
   hasContent: () => false,
   toBase64:   () => "",
-  strength:   () => 0.35,
+  strength:   () => 0.6,
 };
 
 // ── ABORT CONTROLLER ────────────────────────────────────────
@@ -1039,16 +1039,16 @@ const SKETCH_COLORS = [
 ];
 
 function setupSketchCanvas() {
-  const canvas    = $("#sketch-canvas");
-  const colorsEl  = $("#sketch-colors");
-  const sizesEl   = $("#sketch-sizes");
-  const eraserBtn = $("#sketch-eraser");
-  const clearBtn  = $("#sketch-clear");
-  const badge     = $("#sketch-active-badge");
-  const wrap      = $("#sketch-canvas-wrap");
-  const accordion = $("#sketch-accordion");
+  const canvas      = $("#sketch-canvas");
+  const colorsEl    = $("#sketch-colors");
+  const sizesEl     = $("#sketch-sizes");
+  const eraserBtn   = $("#sketch-eraser");
+  const clearBtn    = $("#sketch-clear");
+  const drawToggle  = $("#sketch-draw-toggle");
+  const badge       = $("#sketch-active-badge");
+  const outputEl    = $("#output");
 
-  if (!canvas || !colorsEl) return;
+  if (!canvas || !colorsEl || !outputEl) return;
 
   const ctx = canvas.getContext("2d");
 
@@ -1056,6 +1056,7 @@ function setupSketchCanvas() {
   let currentColor = SKETCH_COLORS[5]; // default: blue
   let brushSize    = 20;
   let eraseMode    = false;
+  let drawMode     = false;
   let drawing      = false;
   let lastX        = 0;
   let lastY        = 0;
@@ -1094,46 +1095,62 @@ function setupSketchCanvas() {
 
   eraserBtn.addEventListener("click", () => toggleErase());
 
+  // ── Draw mode toggle ─────────────────────────────────────
+  // Activates/deactivates the sketch canvas overlay as an interactive surface.
+  function setDrawMode(active) {
+    drawMode = active;
+    drawToggle.classList.toggle("active", drawMode);
+    outputEl.classList.toggle("sketch-draw-active", drawMode);
+
+    // Enable/disable pointer events on the canvas overlay
+    canvas.style.pointerEvents = drawMode ? "auto" : "none";
+
+    // Suppress character marker interaction while drawing
+    outputEl.querySelectorAll(".char-marker").forEach((m) => {
+      m.style.pointerEvents = drawMode ? "none" : "";
+    });
+  }
+
+  if (drawToggle) {
+    drawToggle.addEventListener("click", () => setDrawMode(!drawMode));
+  }
+
   // ── Clear ────────────────────────────────────────────────
   clearBtn.addEventListener("click", () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     updateBadge();
   });
 
-  // ── Canvas sizing ───────────────────────────────────────
+  // ── Canvas sizing via ResizeObserver on #output ──────────
+  // canvas.width/height = output resolution for quality
+  // CSS width/height = 100% of #output via CSS (inset: 0)
   function resizeCanvas() {
+    const displayW = outputEl.clientWidth;
+    const displayH = outputEl.clientHeight;
+    if (!displayW || !displayH) return;
+
+    // Read output resolution for logical canvas resolution
     const resVal = $("#resolution").value || "832x1216";
     const [outW, outH] = resVal.split("x").map(Number);
-    const displayW = wrap.clientWidth || wrap.offsetWidth;
-    if (!displayW) return;
-    const displayH = Math.round(displayW * (outH / outW));
 
-    // Preserve painted content across resize
-    const hasContent = canvasHasContent();
+    // Preserve painted content flag before resize destroys it
+    const hadContent = canvasHasContent();
 
-    canvas.width  = displayW;
-    canvas.height = displayH;
-    // canvas.style.width is already 100% via CSS, height auto-follows
+    canvas.width  = outW;
+    canvas.height = outH;
 
-    // If the canvas had content it's now lost (inherent to resize).
-    // The spec says: show toast and clear.
-    if (hasContent) {
-      showStatus("Canvas cleared — resolution changed");
+    if (hadContent) {
+      showStatus("Sketch cleared — output area resized");
       updateBadge();
     }
   }
 
-  // Initial size after layout
-  requestAnimationFrame(resizeCanvas);
+  const resizeObserver = new ResizeObserver(() => {
+    requestAnimationFrame(resizeCanvas);
+  });
+  resizeObserver.observe(outputEl);
 
-  // Observe accordion open to resize correctly (body is display:none before first open)
-  if (accordion) {
-    accordion.addEventListener("toggle", () => {
-      if (accordion.open) requestAnimationFrame(resizeCanvas);
-    });
-  }
-
-  // Re-size when resolution changes
+  // Re-size logical resolution when resolution select changes
   const resolutionEl = $("#resolution");
   if (resolutionEl) {
     resolutionEl.addEventListener("change", resizeCanvas);
@@ -1157,7 +1174,7 @@ function setupSketchCanvas() {
   // ── Drawing ──────────────────────────────────────────────
   function getCanvasPos(e) {
     const rect = canvas.getBoundingClientRect();
-    // Scale from CSS pixels to canvas pixels
+    // Scale from CSS pixels to canvas pixels (canvas resolution vs display size)
     const scaleX = canvas.width  / rect.width;
     const scaleY = canvas.height / rect.height;
     return [
