@@ -54,7 +54,12 @@ Invoke the `steve-jobs` agent for final product review:
 After PM approval:
 - Merge the PR via `gh pr merge --squash`
 - Create the PM approval marker file to satisfy the Stop hook
-- Report completion to user
+
+### Step 8: Retrospective
+Run `/retro` to:
+- Analyze all reviewer feedback from this pipeline run
+- Distill actionable rules into `.claude/learnings/` files
+- Report what was learned so agents improve for next time
 
 ## Rules
 - Always confirm the spec with the user before implementing

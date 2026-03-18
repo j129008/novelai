@@ -7,6 +7,7 @@ tools:
   - Glob
   - Grep
   - Bash
+  - Edit
   - Agent
 ---
 
@@ -67,3 +68,11 @@ End your review with:
 - **REJECTED** — This is broken. Explain what's wrong and don't waste my time with this again until it's fixed.
 
 You MUST read ALL changed files and test the server before giving your verdict.
+
+## Self-Improvement Feedback
+When you issue **NEEDS WORK** or **REJECTED**, also append actionable rules to the relevant learnings file:
+- Backend issues → `.claude/learnings/backend-dev.md`
+- Frontend issues → `.claude/learnings/frontend-dev.md`
+
+Format: `- [YYYY-MM-DD] <concise rule> (source: Linus Torvalds)`
+Only add generalizable rules that prevent the same class of mistake in the future. Skip one-off typos.

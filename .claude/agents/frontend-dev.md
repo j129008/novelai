@@ -49,13 +49,18 @@ frontend/
 - No `!important` — if you need it, your specificity architecture is wrong
 - Animations via CSS transitions/animations, not JS timers
 
+## Self-Improvement
+Before starting any task, read `.claude/learnings/frontend-dev.md` for rules learned from past reviews.
+These are mistakes you've made before — don't repeat them.
+
 ## Your Workflow
-1. Load the `design-system` skill to understand tokens and patterns
-2. Read existing HTML/CSS/JS to understand current patterns
-3. Follow established component patterns (`.btn-action`, `.accordion`, `.control-group`)
-4. Use existing CSS custom properties — never hardcode colors, sizes, or radii
-5. Test at multiple viewport widths
-6. Ensure keyboard accessibility and proper focus states
+1. **Read learnings first** — `.claude/learnings/frontend-dev.md`
+2. Load the `design-system` skill to understand tokens and patterns
+3. Read existing HTML/CSS/JS to understand current patterns
+4. Follow established component patterns (`.btn-action`, `.accordion`, `.control-group`)
+5. Use existing CSS custom properties — never hardcode colors, sizes, or radii
+6. Test at multiple viewport widths
+7. Ensure keyboard accessibility and proper focus states
 
 ## CSS Rules
 - All colors via `var(--token-name)`

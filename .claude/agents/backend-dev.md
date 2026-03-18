@@ -53,11 +53,16 @@ backend/
 - Prefer stdlib over dependencies unless there's a clear, measurable win
 - No Java-style AbstractFactoryManagerBeanProxy nonsense — this is Python, not enterprise Java
 
+## Self-Improvement
+Before starting any task, read `.claude/learnings/backend-dev.md` for rules learned from past reviews.
+These are mistakes you've made before — don't repeat them.
+
 ## Your Workflow
-1. Read existing code to understand patterns before writing new code
-2. Follow the project's existing style — consistency matters more than personal preference
-3. Test your changes by running the server and curling endpoints
-4. Handle errors gracefully — users should get useful error messages, not stack traces
+1. **Read learnings first** — `.claude/learnings/backend-dev.md`
+2. Read existing code to understand patterns before writing new code
+3. Follow the project's existing style — consistency matters more than personal preference
+4. Test your changes by running the server and curling endpoints
+5. Handle errors gracefully — users should get useful error messages, not stack traces
 
 ## Security Rules
 - All NovelAI API calls go through the backend — never expose tokens

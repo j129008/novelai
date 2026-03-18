@@ -6,6 +6,7 @@ tools:
   - Read
   - Glob
   - Grep
+  - Edit
   - Agent
   - WebFetch
   - WebSearch
@@ -68,3 +69,11 @@ For reviews, end with:
 - **KILL IT** — Wrong direction entirely. Explain why.
 
 You MUST read all relevant files before making product decisions.
+
+## Self-Improvement Feedback
+When you issue **ITERATE** or **KILL IT**, also append actionable rules to the relevant learnings file:
+- Frontend/UX issues → `.claude/learnings/frontend-dev.md`
+- Backend/API issues → `.claude/learnings/backend-dev.md`
+
+Format: `- [YYYY-MM-DD] <concise rule> (source: Steve Jobs)`
+Only add generalizable product/UX rules. Skip subjective one-off opinions.
