@@ -1111,6 +1111,8 @@ async function generate() {
     img.alt = "Generated image";
     output.innerHTML = "";
     output.appendChild(img);
+    // Re-render character markers (cleared by innerHTML reset above)
+    renderCharacterMarkers();
 
     const actions = $("#image-actions");
     actions.style.display = "flex";
@@ -2194,7 +2196,10 @@ function addCharacterSlot(slotsEl, updateCharacterUI) {
       const lbl = c.querySelector(".char-slot-label");
       if (lbl) lbl.textContent = `Character ${i + 1}`;
     });
+    // Reset active marker if it was the removed one or is now out of range
+    if (_activeMarkerIdx >= characters.length) _activeMarkerIdx = -1;
     updateCharacterUI();
+    renderCharacterMarkers();
   });
 
   cardHeader.appendChild(cardLabel);
@@ -2214,185 +2219,172 @@ function addCharacterSlot(slotsEl, updateCharacterUI) {
   // Attach shared tag autocomplete
   _tagAC.attach(ta);
 
-  // ── Position grid section ────────────────────────────────
-  const gridSection = document.createElement("div");
-  gridSection.className = "char-position-section";
-
-  const gridHeader = document.createElement("div");
-  gridHeader.className = "char-grid-header";
-
-  const gridLabel = document.createElement("div");
-  gridLabel.className = "char-grid-label field-label";
-  gridLabel.textContent = "Position in frame";
-
-  // Actions container: Auto pill + Pick button
-  const gridActions = document.createElement("div");
-  gridActions.className = "char-grid-actions";
-
-  // Feature 1: Auto pill — ON by default
-  const autoPill = document.createElement("button");
-  autoPill.type = "button";
-  autoPill.className = "char-auto-pill active";
-  autoPill.textContent = "Auto";
-  autoPill.title = "AI decides position automatically";
-
-  // Feature 2: Pick on canvas button
-  const pickBtn = document.createElement("button");
-  pickBtn.type = "button";
-  pickBtn.className = "char-pick-btn";
-  pickBtn.title = "Click to place on canvas";
-  pickBtn.innerHTML = `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>Pick`;
-
-  gridActions.appendChild(autoPill);
-  gridActions.appendChild(pickBtn);
-  gridHeader.appendChild(gridLabel);
-  gridHeader.appendChild(gridActions);
-  gridSection.appendChild(gridHeader);
-
-  // Axis row: L arrow + grid frame + R arrow
-  const gridAxisRow = document.createElement("div");
-  gridAxisRow.className = "char-grid-axis-row";
-
-  const axisL = document.createElement("span");
-  axisL.className = "char-grid-axis-label";
-  axisL.setAttribute("aria-label", "Left");
-  axisL.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 2 2 5 6 8"/></svg>`;
-
-  const gridFrame = document.createElement("div");
-  gridFrame.className = "char-grid-frame";
-
-  const gridWrap = document.createElement("div");
-  gridWrap.className = "char-position-grid";
-  gridWrap.setAttribute("aria-label", "Character position — click a cell to set position in frame");
-  gridWrap.setAttribute("role", "group");
-
-  const COLS = 5;
-  const ROWS = 7;
-
-  for (let row = 0; row < ROWS; row++) {
-    for (let col = 0; col < COLS; col++) {
-      const cell = document.createElement("button");
-      cell.type = "button";
-      cell.className = "char-pos-cell";
-      cell.dataset.row = row;
-      cell.dataset.col = col;
-      // Feature 1: No default selected cell — Auto is active
-      cell.setAttribute("aria-label", `Position column ${col + 1} of ${COLS}, row ${row + 1} of ${ROWS}`);
-      cell.addEventListener("click", () => {
-        gridWrap.querySelectorAll(".char-pos-cell").forEach((c) => c.classList.remove("selected"));
-        cell.classList.add("selected");
-        charData.x = col / (COLS - 1);
-        charData.y = row / (ROWS - 1);
-        charData.positionAuto = false;
-        // Turn off Auto pill
-        autoPill.classList.remove("active");
-      });
-      gridWrap.appendChild(cell);
-    }
-  }
-
-  // Auto pill click: clear selection, re-enable Auto
-  autoPill.addEventListener("click", () => {
-    gridWrap.querySelectorAll(".char-pos-cell").forEach((c) => c.classList.remove("selected"));
-    charData.positionAuto = true;
-    charData.x = 0.5;
-    charData.y = 0.5;
-    autoPill.classList.add("active");
-  });
-
-  // Feature 2: Pick on canvas
-  pickBtn.addEventListener("click", () => {
-    openCanvasPositionPicker(parseInt(card.dataset.idx), charData, (nx, ny) => {
-      charData.x = nx;
-      charData.y = ny;
-      charData.positionAuto = false;
-      autoPill.classList.remove("active");
-      // Snap to nearest grid cell
-      const nearestCol = Math.round(nx * (COLS - 1));
-      const nearestRow = Math.round(ny * (ROWS - 1));
-      gridWrap.querySelectorAll(".char-pos-cell").forEach((c) => {
-        const match = parseInt(c.dataset.col) === nearestCol && parseInt(c.dataset.row) === nearestRow;
-        c.classList.toggle("selected", match);
-      });
-    });
-  });
-
-  gridFrame.appendChild(gridWrap);
-
-  const axisR = document.createElement("span");
-  axisR.className = "char-grid-axis-label";
-  axisR.setAttribute("aria-label", "Right");
-  axisR.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 2 8 5 4 8"/></svg>`;
-
-  gridAxisRow.appendChild(axisL);
-  gridAxisRow.appendChild(gridFrame);
-  gridAxisRow.appendChild(axisR);
-  gridSection.appendChild(gridAxisRow);
-
   // ── Feature 4: Interactions section ─────────────────────
   const interactionsSection = buildInteractionsSection(charData);
 
   // ── Assemble card ────────────────────────────────────────
   card.appendChild(cardHeader);
   card.appendChild(ta);
-  card.appendChild(gridSection);
   card.appendChild(interactionsSection);
 
   slotsEl.appendChild(card);
   updateCharacterUI();
+  renderCharacterMarkers();
   ta.focus();
 }
 
-// ── Feature 2: Canvas position picker ───────────────────────
+// ── Canvas character markers ─────────────────────────────────
+// Persistent draggable markers overlaid directly on #output.
+// renderCharacterMarkers() is called whenever characters change.
 
-function openCanvasPositionPicker(charIdx, charData, onPick) {
+let _activeMarkerIdx = -1; // which marker is currently "selected" (highlighted)
+
+function renderCharacterMarkers() {
   const outputEl = $("#output");
   if (!outputEl) return;
 
-  // Remove any existing overlay
-  const existing = outputEl.querySelector(".char-canvas-overlay");
-  if (existing) existing.remove();
+  // Remove existing markers
+  outputEl.querySelectorAll(".char-marker").forEach((m) => m.remove());
 
-  const overlay = document.createElement("div");
-  overlay.className = "char-canvas-overlay";
+  if (!characters.length) return;
 
-  const hint = document.createElement("div");
-  hint.className = "char-canvas-overlay-hint";
-  hint.textContent = `Click to place Character ${charIdx + 1}`;
-  overlay.appendChild(hint);
+  // Don't render markers over the placeholder — only when a real image exists
+  if (!outputEl.querySelector("img")) return;
 
-  // Show all existing character positions as numbered markers
-  characters.forEach((c, i) => {
-    if (c.positionAuto) return; // skip auto-positioned
+  characters.forEach((charData, i) => {
     const marker = document.createElement("div");
-    marker.className = "char-canvas-marker" + (i === charIdx ? " active" : "");
-    marker.textContent = i + 1;
-    marker.style.left = (c.x * 100) + "%";
-    marker.style.top  = (c.y * 100) + "%";
-    overlay.appendChild(marker);
-  });
+    marker.className = "char-marker";
+    if (charData.positionAuto) marker.classList.add("char-marker--auto");
+    if (i === _activeMarkerIdx) marker.classList.add("char-marker--active");
+    marker.textContent = String(i + 1);
+    marker.style.left = (charData.x * 100) + "%";
+    marker.style.top  = (charData.y * 100) + "%";
+    marker.setAttribute("role", "button");
+    marker.setAttribute("aria-label", `Character ${i + 1} position. Double-click to toggle auto.`);
+    marker.title = "Drag to set position. Double-click to reset to Auto.";
+    marker.tabIndex = 0;
 
-  // Click handler
-  overlay.addEventListener("click", (e) => {
-    if (e.target === hint) return;
-    const rect = overlay.getBoundingClientRect();
-    const nx = (e.clientX - rect.left) / rect.width;
-    const ny = (e.clientY - rect.top)  / rect.height;
-    onPick(Math.max(0, Math.min(1, nx)), Math.max(0, Math.min(1, ny)));
-    overlay.remove();
-  });
+    // ── Drag state ──────────────────────────────────────────
+    let isDragging = false;
+    let dragMoved = false;
+    let startX = 0;
+    let startY = 0;
 
-  // Escape dismisses
-  const escHandler = (e) => {
-    if (e.key === "Escape") {
-      overlay.remove();
-      document.removeEventListener("keydown", escHandler);
+    function onDragStart(clientX, clientY) {
+      isDragging = true;
+      dragMoved = false;
+      startX = clientX;
+      startY = clientY;
+      marker.classList.add("char-marker--dragging");
     }
-  };
-  document.addEventListener("keydown", escHandler);
-  overlay.addEventListener("click", () => document.removeEventListener("keydown", escHandler));
 
-  outputEl.appendChild(overlay);
+    function onDragMove(clientX, clientY) {
+      if (!isDragging) return;
+      const dx = Math.abs(clientX - startX);
+      const dy = Math.abs(clientY - startY);
+      if (dx > 3 || dy > 3) dragMoved = true;
+
+      const rect = outputEl.getBoundingClientRect();
+      const nx = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      const ny = Math.max(0, Math.min(1, (clientY - rect.top)  / rect.height));
+      charData.x = nx;
+      charData.y = ny;
+      marker.style.left = (nx * 100) + "%";
+      marker.style.top  = (ny * 100) + "%";
+    }
+
+    function onDragEnd() {
+      if (!isDragging) return;
+      isDragging = false;
+      marker.classList.remove("char-marker--dragging");
+      if (dragMoved) {
+        charData.positionAuto = false;
+        marker.classList.remove("char-marker--auto");
+      }
+    }
+
+    // Mouse events
+    marker.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      onDragStart(e.clientX, e.clientY);
+
+      const onMove = (ev) => onDragMove(ev.clientX, ev.clientY);
+      const onUp   = () => {
+        onDragEnd();
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup",   onUp);
+        // Select this character on click (no drag)
+        if (!dragMoved) {
+          _activeMarkerIdx = i;
+          renderCharacterMarkers();
+          // Highlight the corresponding sidebar card
+          const slotsEl = $("#character-slots");
+          if (slotsEl) {
+            slotsEl.querySelectorAll(".char-slot-card").forEach((c, ci) => {
+              c.classList.toggle("char-slot-card--active", ci === i);
+            });
+          }
+        }
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup",   onUp);
+    });
+
+    // Touch events
+    marker.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      const t = e.touches[0];
+      onDragStart(t.clientX, t.clientY);
+    }, { passive: false });
+
+    marker.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      const t = e.touches[0];
+      onDragMove(t.clientX, t.clientY);
+    }, { passive: false });
+
+    marker.addEventListener("touchend", (e) => {
+      e.preventDefault();
+      onDragEnd();
+      if (!dragMoved) {
+        _activeMarkerIdx = i;
+        renderCharacterMarkers();
+        const slotsEl = $("#character-slots");
+        if (slotsEl) {
+          slotsEl.querySelectorAll(".char-slot-card").forEach((c, ci) => {
+            c.classList.toggle("char-slot-card--active", ci === i);
+          });
+        }
+      }
+    }, { passive: false });
+
+    // Double-click to toggle auto mode
+    marker.addEventListener("dblclick", (e) => {
+      e.preventDefault();
+      charData.positionAuto = !charData.positionAuto;
+      if (charData.positionAuto) {
+        charData.x = 0.5;
+        charData.y = 0.5;
+      }
+      renderCharacterMarkers();
+    });
+
+    // Keyboard: Enter/Space to select, Delete to toggle auto
+    marker.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        _activeMarkerIdx = i;
+        renderCharacterMarkers();
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        charData.positionAuto = !charData.positionAuto;
+        if (charData.positionAuto) { charData.x = 0.5; charData.y = 0.5; }
+        renderCharacterMarkers();
+      }
+    });
+
+    outputEl.appendChild(marker);
+  });
 }
 
 // ── Feature 4: Build interactions section ───────────────────
