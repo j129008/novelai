@@ -2202,7 +2202,23 @@ function loadSettingsFromMeta(meta) {
           renderCharacterMarkers();
           saveCharactersToCache();
         });
+        const moveUpBtn2 = document.createElement("button");
+        moveUpBtn2.type = "button";
+        moveUpBtn2.className = "char-slot-move";
+        moveUpBtn2.title = "Move up";
+        moveUpBtn2.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>`;
+        moveUpBtn2.addEventListener("click", () => swapCharacterSlots(slotsEl, parseInt(card.dataset.idx), parseInt(card.dataset.idx) - 1));
+
+        const moveDownBtn2 = document.createElement("button");
+        moveDownBtn2.type = "button";
+        moveDownBtn2.className = "char-slot-move";
+        moveDownBtn2.title = "Move down";
+        moveDownBtn2.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+        moveDownBtn2.addEventListener("click", () => swapCharacterSlots(slotsEl, parseInt(card.dataset.idx), parseInt(card.dataset.idx) + 1));
+
         cardHeader.appendChild(cardLabel);
+        cardHeader.appendChild(moveUpBtn2);
+        cardHeader.appendChild(moveDownBtn2);
         cardHeader.appendChild(removeBtn);
 
         const ta = document.createElement("textarea");
@@ -2368,7 +2384,23 @@ function setupCharacters() {
         renderCharacterMarkers();
         saveCharactersToCache();
       });
+      const moveUpBtn = document.createElement("button");
+      moveUpBtn.type = "button";
+      moveUpBtn.className = "char-slot-move";
+      moveUpBtn.title = "Move up";
+      moveUpBtn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>`;
+      moveUpBtn.addEventListener("click", () => swapCharacterSlots(slotsEl, parseInt(card.dataset.idx), parseInt(card.dataset.idx) - 1));
+
+      const moveDownBtn = document.createElement("button");
+      moveDownBtn.type = "button";
+      moveDownBtn.className = "char-slot-move";
+      moveDownBtn.title = "Move down";
+      moveDownBtn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+      moveDownBtn.addEventListener("click", () => swapCharacterSlots(slotsEl, parseInt(card.dataset.idx), parseInt(card.dataset.idx) + 1));
+
       cardHeader.appendChild(cardLabel);
+      cardHeader.appendChild(moveUpBtn);
+      cardHeader.appendChild(moveDownBtn);
       cardHeader.appendChild(removeBtn);
 
       const ta = document.createElement("textarea");
