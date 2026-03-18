@@ -1812,6 +1812,7 @@ function renderGallery(files, filter) {
       card.classList.add("settings-loaded");
       setTimeout(() => card.classList.remove("settings-loaded"), 1800);
       showSettingsLoadedToast();
+      $("#tab-canvas").click();
     });
 
     const delBtn = document.createElement("button");
@@ -1910,6 +1911,7 @@ function setupLightbox() {
     loadSettingsFromMeta(file.meta || {});
     showSettingsLoadedToast();
     closeLightbox();
+    $("#tab-canvas").click();
   });
 
   overlay.querySelector("#lb-iterate").addEventListener("click", async () => {
