@@ -32,7 +32,32 @@ const state = {
 };
 
 // ── CHARACTER SLOTS ──────────────────────────────────────────
-const characters = [];  // array of { prompt, x, y, interactions } — managed by setupCharacters()
+const characters = [];  // array of { prompt, x, y, positionAuto, interactions } — managed by setupCharacters()
+
+function saveCharactersToCache() {
+  try {
+    const data = characters.map((c) => ({
+      prompt: c.prompt, x: c.x, y: c.y,
+      positionAuto: c.positionAuto,
+      interactions: c.interactions || [],
+    }));
+    localStorage.setItem("nai-characters", JSON.stringify(data));
+  } catch (_) { /* quota exceeded — ignore */ }
+}
+
+function loadCharactersFromCache() {
+  try {
+    const raw = localStorage.getItem("nai-characters");
+    if (!raw) return [];
+    return JSON.parse(raw).map((c) => ({
+      prompt: c.prompt || "",
+      x: typeof c.x === "number" ? c.x : 0.5,
+      y: typeof c.y === "number" ? c.y : 0.5,
+      positionAuto: c.positionAuto !== false,
+      interactions: Array.isArray(c.interactions) ? c.interactions : [],
+    }));
+  } catch (_) { return []; }
+}
 
 // ── ABORT CONTROLLER ────────────────────────────────────────
 let _generateAbortController = null;
@@ -2163,6 +2188,68 @@ function setupCharacters() {
 
     updateCountSuggestionChip(count);
   }
+
+  // Restore cached characters on page load
+  const cached = loadCharactersFromCache();
+  if (cached.length > 0) {
+    // Pre-populate characters array from cache, then create UI slots
+    cached.forEach((c) => {
+      characters.push(c);
+      // Build the DOM card for this character
+      const card = document.createElement("div");
+      card.className = "char-slot-card";
+      card.dataset.idx = String(characters.length - 1);
+
+      const cardHeader = document.createElement("div");
+      cardHeader.className = "char-slot-header";
+      const cardLabel = document.createElement("span");
+      cardLabel.className = "char-slot-label";
+      cardLabel.textContent = `Character ${characters.length}`;
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "char-slot-remove";
+      removeBtn.title = "Remove character";
+      removeBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+      removeBtn.addEventListener("click", () => {
+        const cardIdx = parseInt(card.dataset.idx);
+        characters.splice(cardIdx, 1);
+        card.remove();
+        slotsEl.querySelectorAll(".char-slot-card").forEach((cc, ii) => {
+          cc.dataset.idx = ii;
+          const lbl = cc.querySelector(".char-slot-label");
+          if (lbl) lbl.textContent = `Character ${ii + 1}`;
+        });
+        if (_activeMarkerIdx >= characters.length) _activeMarkerIdx = -1;
+        updateCharacterUI();
+        renderCharacterMarkers();
+        saveCharactersToCache();
+      });
+      cardHeader.appendChild(cardLabel);
+      cardHeader.appendChild(removeBtn);
+
+      const ta = document.createElement("textarea");
+      ta.className = "char-slot-textarea field-textarea";
+      ta.rows = 3;
+      ta.placeholder = "girl, blonde hair, blue eyes, waving";
+      ta.spellcheck = false;
+      ta.value = c.prompt;
+      ta.addEventListener("input", () => {
+        c.prompt = ta.value;
+        ta.style.height = "auto";
+        ta.style.height = ta.scrollHeight + "px";
+        saveCharactersToCache();
+      });
+      _tagAC.attach(ta);
+
+      card.appendChild(cardHeader);
+      card.appendChild(ta);
+      card.appendChild(buildInteractionsSection(c));
+      slotsEl.appendChild(card);
+    });
+    if (accordion) accordion.open = true;
+    updateCharacterUI();
+    renderCharacterMarkers();
+  }
 }
 
 function addCharacterSlot(slotsEl, updateCharacterUI) {
@@ -2196,10 +2283,10 @@ function addCharacterSlot(slotsEl, updateCharacterUI) {
       const lbl = c.querySelector(".char-slot-label");
       if (lbl) lbl.textContent = `Character ${i + 1}`;
     });
-    // Reset active marker if it was the removed one or is now out of range
     if (_activeMarkerIdx >= characters.length) _activeMarkerIdx = -1;
     updateCharacterUI();
     renderCharacterMarkers();
+    saveCharactersToCache();
   });
 
   cardHeader.appendChild(cardLabel);
@@ -2215,6 +2302,7 @@ function addCharacterSlot(slotsEl, updateCharacterUI) {
     charData.prompt = ta.value;
     ta.style.height = "auto";
     ta.style.height = ta.scrollHeight + "px";
+    saveCharactersToCache();
   });
   // Attach shared tag autocomplete
   _tagAC.attach(ta);
@@ -2230,6 +2318,7 @@ function addCharacterSlot(slotsEl, updateCharacterUI) {
   slotsEl.appendChild(card);
   updateCharacterUI();
   renderCharacterMarkers();
+  saveCharactersToCache();
   ta.focus();
 }
 
@@ -2297,6 +2386,7 @@ function renderCharacterMarkers() {
       if (dragMoved) {
         charData.positionAuto = false;
         marker.classList.remove("char-marker--auto");
+        saveCharactersToCache();
       }
     }
 
@@ -2364,6 +2454,7 @@ function renderCharacterMarkers() {
         charData.y = 0.5;
       }
       renderCharacterMarkers();
+      saveCharactersToCache();
     });
 
     // Keyboard: Enter/Space to select, Delete to toggle auto
@@ -2443,6 +2534,7 @@ function buildInteractionsSection(charData) {
     const directive = directiveSelect.value;
     const interaction = { directive, action };
     charData.interactions.push(interaction);
+    saveCharactersToCache();
 
     // Render chip
     const chip = document.createElement("span");
@@ -2461,6 +2553,7 @@ function buildInteractionsSection(charData) {
       const iIdx = charData.interactions.indexOf(interaction);
       if (iIdx >= 0) charData.interactions.splice(iIdx, 1);
       chip.remove();
+      saveCharactersToCache();
     });
     chip.appendChild(removeX);
     chipsEl.appendChild(chip);
