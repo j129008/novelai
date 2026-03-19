@@ -199,16 +199,39 @@ async function init() {
     });
   });
 
+  // Generation Settings popover toggle
+  const gearBtn = $("#gen-settings-btn");
+  const genPopover = $("#gen-settings-popover");
+  if (gearBtn && genPopover) {
+    gearBtn.addEventListener("click", () => {
+      const open = genPopover.style.display !== "none";
+      genPopover.style.display = open ? "none" : "flex";
+      gearBtn.classList.toggle("active", !open);
+    });
+    // Close on outside click
+    document.addEventListener("click", (e) => {
+      if (genPopover.style.display === "none") return;
+      if (!genPopover.contains(e.target) && !gearBtn.contains(e.target)) {
+        genPopover.style.display = "none";
+        gearBtn.classList.remove("active");
+      }
+    });
+  }
+
   // Also keep Cmd/Ctrl+Enter as global shortcut
   document.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
       generate();
     }
-    // Escape closes the crop overlay
+    // Escape closes the crop overlay and gen-settings popover
     if (e.key === "Escape") {
       const co = $("#crop-overlay");
       if (co && co.style.display !== "none") closeCropOverlay();
+      if (genPopover && genPopover.style.display !== "none") {
+        genPopover.style.display = "none";
+        if (gearBtn) gearBtn.classList.remove("active");
+      }
     }
   });
 }
