@@ -92,8 +92,8 @@ async def generate_text(
             "max_tokens": max_length,
             "temperature": temperature,
             "top_p": 0.975,
-            "frequency_penalty": 0.2,
-            "presence_penalty": 0.1,
+            "frequency_penalty": 0.6,
+            "presence_penalty": 0.4,
         }
         api_url = TEXT_API_URL_OPENAI
     else:
