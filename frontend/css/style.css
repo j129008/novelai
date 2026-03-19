@@ -284,6 +284,30 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 .settings-loaded-toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(16px); background: var(--accent); color: white; font-size: 0.8rem; font-weight: 600; padding: 10px 20px; border-radius: 20px; box-shadow: 0 4px 20px var(--accent-glow); opacity: 0; transition: opacity 0.2s, transform 0.25s var(--ease-out); pointer-events: none; z-index: 200; white-space: nowrap; }
 .settings-loaded-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+.paste-action-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg-float);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  z-index: 300;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  animation: fadeIn 0.15s ease;
+}
+.paste-action-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 14px;
+}
+.paste-action-btns {
+  display: flex;
+  gap: 8px;
+}
+
 /* Responsive */
 @media (max-width: 860px) {
   .workspace { grid-template-columns: 1fr; overflow: visible; }

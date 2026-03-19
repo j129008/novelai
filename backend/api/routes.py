@@ -1,5 +1,6 @@
 import base64
 import csv
+import io
 import json
 import os
 import re
@@ -222,6 +223,43 @@ async def generate(req: GenerateRequest):
         image=base64.b64encode(image_data).decode(),
         seed=seed,
     )
+
+
+class ImageMetaRequest(BaseModel):
+    image: str  # base64
+
+@router.post("/read-image-meta")
+async def read_image_meta(req: ImageMetaRequest):
+    """Read PNG metadata from an uploaded base64 image."""
+    try:
+        from PIL import Image as PILImage
+        img_bytes = base64.b64decode(req.image)
+        img = PILImage.open(io.BytesIO(img_bytes))
+        if "Comment" in img.info:
+            meta = json.loads(img.info["Comment"])
+            result = {
+                "prompt": meta.get("prompt", ""),
+                "uc": meta.get("uc", ""),
+                "seed": meta.get("seed", 0),
+                "steps": meta.get("steps", 23),
+                "scale": meta.get("scale", 5.0),
+                "sampler": meta.get("sampler", "k_euler_ancestral"),
+                "width": meta.get("width", 832),
+                "height": meta.get("height", 1216),
+                "sm": meta.get("sm", False),
+                "sm_dyn": meta.get("sm_dyn", False),
+            }
+            v4 = meta.get("v4_prompt")
+            if v4 and isinstance(v4, dict):
+                caption = v4.get("caption", {})
+                char_captions = caption.get("char_captions", [])
+                if char_captions:
+                    result["char_captions"] = char_captions
+                    result["use_coords"] = v4.get("use_coords", False)
+            return result
+        return {}
+    except Exception:
+        raise HTTPException(status_code=422, detail="Could not read image metadata")
 
 
 def _resolve_gallery_path(output_dir: Path, subpath: str) -> Path:

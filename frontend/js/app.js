@@ -303,16 +303,87 @@ document.addEventListener("paste", (e) => {
     if (item.type.startsWith("image/")) {
       e.preventDefault();
       const file = item.getAsFile();
-      if (file) {
-        loadImageFile(file);
-        const accordion = $("#img2img-accordion");
-        if (accordion && !accordion.open) accordion.open = true;
-        showStatus("Image pasted as img2img source");
-      }
+      if (!file) break;
+      showPasteActionPopup(file);
       break;
     }
   }
 });
+
+function showPasteActionPopup(file) {
+  // Remove any existing popup
+  const existing = document.querySelector(".paste-action-popup");
+  if (existing) existing.remove();
+
+  const popup = document.createElement("div");
+  popup.className = "paste-action-popup";
+
+  const title = document.createElement("div");
+  title.className = "paste-action-title";
+  title.textContent = "Pasted image — what to do?";
+  popup.appendChild(title);
+
+  const btnRow = document.createElement("div");
+  btnRow.className = "paste-action-btns";
+
+  const btnI2I = document.createElement("button");
+  btnI2I.type = "button";
+  btnI2I.className = "btn-action btn-action--primary";
+  btnI2I.textContent = "Use as img2img";
+  btnI2I.addEventListener("click", () => {
+    popup.remove();
+    loadImageFile(file);
+    const accordion = $("#img2img-accordion");
+    if (accordion && !accordion.open) accordion.open = true;
+    showStatus("Image set as img2img source");
+  });
+
+  const btnSettings = document.createElement("button");
+  btnSettings.type = "button";
+  btnSettings.className = "btn-action";
+  btnSettings.textContent = "Load Settings";
+  btnSettings.addEventListener("click", async () => {
+    popup.remove();
+    // Send image to backend to extract PNG metadata
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const base64 = ev.target.result.split(",")[1];
+      try {
+        const resp = await fetch("/api/read-image-meta", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: base64 }),
+        });
+        if (!resp.ok) throw new Error("No metadata");
+        const meta = await resp.json();
+        if (meta && meta.prompt) {
+          loadSettingsFromMeta(meta);
+          showStatus("Settings loaded from image");
+        } else {
+          showError("No generation metadata found in this image");
+        }
+      } catch {
+        showError("Could not read metadata from this image");
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+
+  const btnCancel = document.createElement("button");
+  btnCancel.type = "button";
+  btnCancel.className = "btn-action";
+  btnCancel.textContent = "Cancel";
+  btnCancel.addEventListener("click", () => popup.remove());
+
+  btnRow.appendChild(btnI2I);
+  btnRow.appendChild(btnSettings);
+  btnRow.appendChild(btnCancel);
+  popup.appendChild(btnRow);
+  document.body.appendChild(popup);
+
+  // Auto-dismiss after 8 seconds
+  setTimeout(() => { if (popup.parentNode) popup.remove(); }, 8000);
+}
 
 function loadImageFile(file) {
   const reader = new FileReader();
