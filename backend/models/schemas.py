@@ -80,3 +80,29 @@ class GalleryListResponse(BaseModel):
     files: list[GalleryFileItem]
 
 
+class StoryCreateRequest(BaseModel):
+    title: str = "Untitled Story"
+    content: str = ""
+
+
+class StoryUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+
+
+class StoryRecord(BaseModel):
+    id: str
+    title: str
+    content: str
+    created_at: str  # ISO 8601
+    updated_at: str
+
+
+class StoryListItem(BaseModel):
+    id: str
+    title: str
+    word_count: int
+    created_at: str
+    updated_at: str
+
+

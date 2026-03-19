@@ -529,8 +529,24 @@
         </div>
 
         <div id="panel-story" class="story-panel" style="display:none">
-          <div id="story-editor-content" class="story-editor-content" contenteditable="true" spellcheck="true" data-placeholder="Start writing your story…"></div>
-          <span id="story-word-count" class="story-word-count"></span>
+          <!-- Writing mode -->
+          <div id="story-writing-mode">
+            <div class="story-header">
+              <input type="text" id="story-title" class="story-title-input" value="Untitled Story" placeholder="Story title…">
+              <button id="story-btn-bookshelf" class="btn-action" type="button">Bookshelf</button>
+              <button id="story-btn-new" class="btn-action btn-action--primary" type="button">+ New</button>
+            </div>
+            <div id="story-editor-content" class="story-editor-content" contenteditable="true" spellcheck="true" data-placeholder="Start writing your story…"></div>
+            <span id="story-word-count" class="story-word-count"></span>
+          </div>
+          <!-- Bookshelf mode -->
+          <div id="story-bookshelf-mode" style="display:none">
+            <div class="story-header">
+              <span class="bookshelf-title">Bookshelf</span>
+              <button id="bookshelf-btn-new" class="btn-action btn-action--primary" type="button">+ New Story</button>
+            </div>
+            <div id="bookshelf-list" class="bookshelf-list"></div>
+          </div>
         </div>
 
       </section>

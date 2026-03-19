@@ -1883,19 +1883,69 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
    STORY EDITOR
    ═══════════════════════════════════════════════════════════ */
 
+/* #panel-story is the flex container; no overflow here — children manage their own scroll */
 #panel-story {
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-muted) transparent;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
-#panel-story::-webkit-scrollbar { width: 4px; }
-#panel-story::-webkit-scrollbar-thumb { background: var(--border-muted); border-radius: 4px; }
 
 .story-panel {
-  padding: 24px;
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+/* Writing mode: flex column, editor scrolls */
+#story-writing-mode {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Bookshelf mode: flex column, list scrolls */
+#story-bookshelf-mode {
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Shared story header bar ── */
+.story-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-raised);
+  flex-shrink: 0;
+}
+
+/* Editable title in writing mode */
+.story-title-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 4px 0;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+.story-title-input:focus { border-bottom-color: var(--accent); }
+
+/* Bookshelf header title text */
+.bookshelf-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex: 1;
 }
 
 /* Word count floats at bottom-right of story panel */
@@ -1906,6 +1956,72 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   color: var(--text-tertiary);
   padding: 8px 16px;
   opacity: 0.6;
+  flex-shrink: 0;
+}
+
+/* ── Bookshelf list ── */
+.bookshelf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-muted) transparent;
+}
+.bookshelf-list::-webkit-scrollbar { width: 4px; }
+.bookshelf-list::-webkit-scrollbar-thumb { background: var(--border-muted); border-radius: 4px; }
+
+/* ── Bookshelf card ── */
+.bookshelf-card {
+  background: var(--bg-float);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+.bookshelf-card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.bookshelf-card:active { transform: translateY(0); }
+
+.bookshelf-card-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.bookshelf-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.bookshelf-card-delete {
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  min-height: 0;
+  line-height: 1.4;
+}
+.bookshelf-card-delete--confirm {
+  color: var(--danger);
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+
+/* ── Bookshelf empty state ── */
+.bookshelf-empty {
+  text-align: center;
+  color: var(--text-tertiary);
+  padding: 40px;
+  font-size: 0.9rem;
 }
 
 /* ── contentEditable story editor (Notion-style) ── */
@@ -1914,15 +2030,20 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   max-width: 720px;
   margin: 0 auto;
   width: 100%;
-  min-height: 300px;
+  min-height: 0;
   flex: 1;
   font-size: 1.05rem;
   line-height: 1.85;
   color: var(--text-primary);
   outline: none;
-  padding: 0 16px 80px;
+  padding: 24px 16px 80px;
   caret-color: var(--accent-bright);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-muted) transparent;
 }
+.story-editor-content::-webkit-scrollbar { width: 4px; }
+.story-editor-content::-webkit-scrollbar-thumb { background: var(--border-muted); border-radius: 4px; }
 
 .story-editor-content:empty::before {
   content: attr(data-placeholder);
