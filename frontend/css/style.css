@@ -310,6 +310,8 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 .img2img-source-actions { display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .btn-action--danger { border-color: var(--danger-border); color: var(--danger); }
 .btn-action--danger:hover { background: var(--danger-bg); border-color: var(--danger); }
+.btn-action--danger-subtle { border-color: var(--border-muted); color: var(--text-tertiary); font-size: 1rem; padding: 4px 8px; min-width: 0; }
+.btn-action--danger-subtle:hover { border-color: var(--danger); color: var(--danger); }
 .btn-action--iterate { background: var(--accent-dim); border-color: rgba(124,92,252,0.3); color: var(--accent-bright); }
 .btn-action--iterate:hover { background: rgba(124,92,252,0.28); border-color: var(--accent); color: white; }
 .img2img-sidebar-active { margin-left: auto; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: var(--accent-dim); border: 1px solid rgba(124,92,252,0.4); color: var(--accent-bright); padding: 1px 7px; border-radius: 10px; }
