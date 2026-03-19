@@ -2141,15 +2141,59 @@ function navigateLightbox(delta) {
 let _storySaveTimer = null;
 // Saved selection range so toolbar buttons don't lose cursor position
 let _storySavedRange = null;
+// ID of the currently open story
+let _activeStoryId = null;
+
+/* ── Story API helpers ── */
+async function storyApiList() {
+  const res = await fetch("/api/stories");
+  if (!res.ok) throw new Error("Failed to list stories");
+  return res.json();
+}
+
+async function storyApiGet(id) {
+  const res = await fetch(`/api/stories/${id}`);
+  if (!res.ok) throw new Error("Story not found");
+  return res.json();
+}
+
+async function storyApiCreate(title, content) {
+  const res = await fetch("/api/stories", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, content }),
+  });
+  if (!res.ok) throw new Error("Failed to create story");
+  return res.json();
+}
+
+async function storyApiUpdate(id, data) {
+  const res = await fetch(`/api/stories/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to update story");
+  return res.json();
+}
+
+async function storyApiDelete(id) {
+  const res = await fetch(`/api/stories/${id}`, { method: "DELETE" });
+  if (!res.ok && res.status !== 204) throw new Error("Failed to delete story");
+}
 
 function storySaveContent() {
   clearTimeout(_storySaveTimer);
-  _storySaveTimer = setTimeout(() => {
+  _storySaveTimer = setTimeout(async () => {
+    if (!_activeStoryId) return;
     const editor = $("#story-editor-content");
+    const titleInput = $("#story-title");
     if (!editor) return;
+    const title = titleInput ? (titleInput.value.trim() || "Untitled Story") : "Untitled Story";
+    const content = editor.innerHTML;
     try {
-      localStorage.setItem("nai-story-v2", editor.innerHTML);
-    } catch (_) { /* quota */ }
+      await storyApiUpdate(_activeStoryId, { title, content });
+    } catch (_) { /* ignore transient failures */ }
   }, 500);
 }
 
@@ -2272,16 +2316,21 @@ function insertImageAtCursor(base64, prompt, seed) {
     }
 */
 
-function setupStoryEditor() {
-  const editor = $("#story-editor-content");
-  if (!editor) return;
+/* ── Relative time formatting ── */
+function relativeTime(isoStr) {
+  const diff = Date.now() - new Date(isoStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return "Yesterday";
+  if (days < 30) return `${days}d ago`;
+  return new Date(isoStr).toLocaleDateString();
+}
 
-  // Restore persisted content
-  try {
-    const saved = localStorage.getItem("nai-story-v2");
-    if (saved) editor.innerHTML = saved;
-  } catch (_) { /* malformed — start fresh */ }
-
+function _attachEditorImageListeners(editor) {
   // Event delegation for image delete buttons (survives DOM mutations)
   editor.addEventListener("click", (e) => {
     const delBtn = e.target.closest(".story-inline-img-delete");
@@ -2294,6 +2343,169 @@ function setupStoryEditor() {
       storySaveContent();
     }
   });
+}
+
+function setupStoryEditor() {
+  const editor = $("#story-editor-content");
+  if (!editor) return;
+
+  const writingMode = $("#story-writing-mode");
+  const bookshelfMode = $("#story-bookshelf-mode");
+  const titleInput = $("#story-title");
+
+  /* ── Mode helpers ── */
+  function showWritingMode() {
+    writingMode.style.display = "";
+    bookshelfMode.style.display = "none";
+  }
+
+  async function showBookshelf() {
+    writingMode.style.display = "none";
+    bookshelfMode.style.display = "flex";
+    try {
+      const stories = await storyApiList();
+      renderBookshelfCards(stories);
+    } catch (_) {
+      renderBookshelfCards([]);
+    }
+  }
+
+  /* ── Open a story by ID ── */
+  async function openStory(id) {
+    try {
+      const story = await storyApiGet(id);
+      _activeStoryId = story.id;
+      editor.innerHTML = story.content || "";
+      titleInput.value = story.title || "Untitled Story";
+      // Re-enforce contentEditable=false on restored figures
+      editor.querySelectorAll(".story-inline-img").forEach((fig) => {
+        fig.contentEditable = "false";
+      });
+      showWritingMode();
+      storyUpdateWordCount();
+    } catch (_) {
+      // If story was deleted externally, fall back to bookshelf
+      showBookshelf();
+    }
+  }
+
+  /* ── Create a new story and open it ── */
+  async function createAndOpenStory() {
+    try {
+      const story = await storyApiCreate("Untitled Story", "");
+      await openStory(story.id);
+    } catch (_) { /* ignore */ }
+  }
+
+  /* ── Bookshelf rendering ── */
+  // Confirm-delete state: maps story id → timer handle
+  const _deleteConfirm = new Map();
+
+  function renderBookshelfCards(stories) {
+    const list = $("#bookshelf-list");
+    list.innerHTML = "";
+
+    if (!stories.length) {
+      const empty = document.createElement("div");
+      empty.className = "bookshelf-empty";
+      empty.textContent = "No stories yet. Start writing.";
+      list.appendChild(empty);
+      return;
+    }
+
+    // Sort by updated_at descending
+    const sorted = [...stories].sort((a, b) =>
+      new Date(b.updated_at) - new Date(a.updated_at)
+    );
+
+    for (const s of sorted) {
+      const card = document.createElement("div");
+      card.className = "bookshelf-card";
+      card.dataset.storyId = s.id;
+
+      const titleEl = document.createElement("div");
+      titleEl.className = "bookshelf-card-title";
+      titleEl.textContent = s.title || "Untitled Story";
+
+      const meta = document.createElement("div");
+      meta.className = "bookshelf-card-meta";
+
+      const info = document.createElement("span");
+      const wordCount = s.word_count != null ? `${s.word_count} word${s.word_count === 1 ? "" : "s"}` : "";
+      const time = relativeTime(s.updated_at);
+      info.textContent = wordCount ? `${wordCount} · ${time}` : time;
+
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "btn-action bookshelf-card-delete";
+      delBtn.dataset.deleteId = s.id;
+      delBtn.textContent = "Delete";
+
+      meta.appendChild(info);
+      meta.appendChild(delBtn);
+      card.appendChild(titleEl);
+      card.appendChild(meta);
+      list.appendChild(card);
+    }
+  }
+
+  /* ── Bookshelf event delegation ── */
+  const list = $("#bookshelf-list");
+  list.addEventListener("click", async (e) => {
+    // Delete button — two-click confirm
+    const delBtn = e.target.closest("[data-delete-id]");
+    if (delBtn) {
+      e.stopPropagation();
+      const id = delBtn.dataset.deleteId;
+      if (_deleteConfirm.has(id)) {
+        // Second click — confirmed
+        clearTimeout(_deleteConfirm.get(id));
+        _deleteConfirm.delete(id);
+        try {
+          await storyApiDelete(id);
+          // If we deleted the active story, clear it
+          if (_activeStoryId === id) {
+            _activeStoryId = null;
+          }
+        } catch (_) { /* ignore */ }
+        // Re-render bookshelf
+        try {
+          const stories = await storyApiList();
+          renderBookshelfCards(stories);
+        } catch (_) {
+          renderBookshelfCards([]);
+        }
+      } else {
+        // First click — arm the confirm
+        delBtn.textContent = "Confirm?";
+        delBtn.classList.add("bookshelf-card-delete--confirm");
+        const timer = setTimeout(() => {
+          _deleteConfirm.delete(id);
+          delBtn.textContent = "Delete";
+          delBtn.classList.remove("bookshelf-card-delete--confirm");
+        }, 3000);
+        _deleteConfirm.set(id, timer);
+      }
+      return;
+    }
+
+    // Card click — open story
+    const card = e.target.closest(".bookshelf-card[data-story-id]");
+    if (card) {
+      await openStory(card.dataset.storyId);
+    }
+  });
+
+  /* ── Header button wiring ── */
+  $("#story-btn-bookshelf").addEventListener("click", showBookshelf);
+  $("#story-btn-new").addEventListener("click", createAndOpenStory);
+  $("#bookshelf-btn-new").addEventListener("click", createAndOpenStory);
+
+  /* ── Title input saves ── */
+  titleInput.addEventListener("input", storySaveContent);
+
+  /* ── Editor event listeners ── */
+  _attachEditorImageListeners(editor);
 
   // Protect images from contentEditable corruption:
   // Re-enforce contentEditable=false on all figures after any mutation
@@ -2307,7 +2519,7 @@ function setupStoryEditor() {
   // Prevent contentEditable from resizing images (disable browser handles)
   editor.addEventListener("mousedown", (e) => {
     if (e.target.tagName === "IMG" && e.target.closest(".story-inline-img")) {
-      e.preventDefault(); // prevent browser resize handles
+      e.preventDefault();
     }
   });
 
@@ -2322,8 +2534,35 @@ function setupStoryEditor() {
   editor.addEventListener("mouseup", storySaveSelection);
   editor.addEventListener("blur", storySaveSelection);
 
-  storyUpdateWordCount();
+  /* ── Init: migrate localStorage if present, then load stories ── */
+  (async () => {
+    // Migration: if there is old localStorage content, create a story from it
+    try {
+      const legacy = localStorage.getItem("nai-story-v2");
+      if (legacy && legacy.trim() && legacy.trim() !== "<br>") {
+        await storyApiCreate("Imported Story", legacy);
+        localStorage.removeItem("nai-story-v2");
+        // Will be opened as the most recent story below
+      }
+    } catch (_) { /* migration failure is non-fatal */ }
 
+    // Load story list and open most recent, or create a fresh one
+    try {
+      const stories = await storyApiList();
+      if (stories.length) {
+        const sorted = [...stories].sort((a, b) =>
+          new Date(b.updated_at) - new Date(a.updated_at)
+        );
+        await openStory(sorted[0].id);
+      } else {
+        await createAndOpenStory();
+      }
+    } catch (_) {
+      // If API is unavailable, show writing mode with no active story
+      showWritingMode();
+      storyUpdateWordCount();
+    }
+  })();
 }
 
 // ── end of story editor ──────────────────────────────────
