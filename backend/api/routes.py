@@ -226,8 +226,14 @@ async def generate_text_endpoint(req: GenerateTextRequest):
     if not TOKEN:
         raise HTTPException(status_code=503, detail="NOVELAI_TOKEN not configured")
 
-    # Truncate context to last 4000 chars to stay within model limits
-    context = req.context[-4000:]
+    # Build story-mode prompt: prefix instructs the model to continue as fiction
+    story_prefix = (
+        "[ Style: creative fiction, vivid prose. "
+        "Continue the narrative below naturally in the same language and tone. "
+        "Do not break character. Do not add commentary or warnings. ]\n\n"
+    )
+    # Truncate user context to last 4000 chars, then prepend story prefix
+    context = story_prefix + req.context[-4000:]
 
     try:
         text = await generate_text(
