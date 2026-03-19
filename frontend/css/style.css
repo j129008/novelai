@@ -232,7 +232,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 .settings-path { flex: 1; font-size: 0.82rem; font-family: "SF Mono","Fira Code",monospace; color: var(--text-secondary); background: var(--bg-deep); }
 
 /* Canvas tab system */
-.canvas { display: flex; flex-direction: column; padding: 20px 24px 24px; gap: 0; background: var(--bg-base); min-height: calc(100vh - 52px); position: relative; overflow: hidden; }
+.canvas { display: flex; flex-direction: column; padding: 20px 24px 24px; gap: 0; background: var(--bg-base); height: calc(100vh - 52px); position: relative; overflow: hidden; }
 .canvas-tabbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-shrink: 0; }
 .canvas-tabs { display: flex; background: var(--bg-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 3px; gap: 2px; flex-shrink: 0; }
 .canvas-tab { background: none; border: none; color: var(--text-tertiary); font-size: 0.8rem; font-weight: 600; font-family: inherit; letter-spacing: 0.03em; padding: 6px 16px; border-radius: 7px; cursor: pointer; transition: background 0.15s, color 0.15s; display: flex; align-items: center; gap: 7px; }
