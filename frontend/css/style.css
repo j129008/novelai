@@ -910,26 +910,36 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   transform: scale(1.05);
 }
 
-/* Recent Characters chips — subtle accent tint to distinguish from regular chips */
-.tag-chip.tag-chip--recent {
-  background: rgba(124,92,252,0.08);
-  border-color: rgba(124,92,252,0.25);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.tag-chip.tag-chip--recent:hover {
+/* Recent character badge inside autocomplete dropdown */
+.tag-item-recent-badge {
   background: var(--accent-dim);
-  border-color: rgba(124,92,252,0.4);
-  color: var(--text-primary);
+  color: var(--accent-bright);
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 10px;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
 }
 
-/* Count badge inside recent character chips */
-.tag-chip-count {
-  font-size: 0.68rem;
+/* Delete button inside recent character dropdown items */
+.tag-item-delete {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
   color: var(--text-tertiary);
-  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s;
 }
+.tag-item-delete:hover { color: var(--danger); }
 
 /* Recent Characters section label with icon */
 .tag-browser-section-label--recent {
@@ -2261,25 +2271,6 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   display: flex;
   gap: 8px;
   flex-shrink: 0;
-}
-
-/* ═══════════════════════════════════════════════════════════
-   SPEC 3 — Recent Characters in sidebar + Surprise Me
-   ═══════════════════════════════════════════════════════════ */
-
-.recent-chars-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 4px;
-  border-top: 1px solid var(--border-subtle);
-  margin-top: 4px;
-}
-
-.recent-chars-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .tag-browser-surprise-btn {
