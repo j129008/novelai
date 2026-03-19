@@ -86,14 +86,15 @@ async def generate_text(
 
     if model in _OPENAI_MODELS:
         # OpenAI-compatible endpoint for GLM models
+        # The completions endpoint continues directly from the prompt text
         payload = {
             "model": model,
             "prompt": input_text,
             "max_tokens": max_length,
             "temperature": temperature,
             "top_p": 0.975,
-            "frequency_penalty": 0.0,
-            "presence_penalty": 0.0,
+            "frequency_penalty": 0.2,
+            "presence_penalty": 0.1,
         }
         api_url = TEXT_API_URL_OPENAI
     else:

@@ -2028,6 +2028,27 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   opacity: 1;
 }
 
+.story-block-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 1rem;
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+}
+.story-block-delete:hover { color: var(--danger); }
+.story-block--text:hover .story-block-delete { opacity: 1; }
+
 .story-insert-zone {
   height: 24px;
   display: flex;

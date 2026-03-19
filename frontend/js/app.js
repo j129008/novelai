@@ -2264,6 +2264,23 @@ function renderStoryBlocks() {
       });
       blockEl.appendChild(aiBtn);
 
+      // Delete button for text blocks (only if more than one block exists)
+      if (_storyBlocks.length > 1) {
+        const delTextBtn = document.createElement("button");
+        delTextBtn.type = "button";
+        delTextBtn.className = "story-block-delete";
+        delTextBtn.title = "Delete this block";
+        delTextBtn.textContent = "×";
+        delTextBtn.addEventListener("click", () => {
+          if (!confirm("Delete this text block?")) return;
+          const idx = _storyBlocks.indexOf(block);
+          if (idx !== -1) _storyBlocks.splice(idx, 1);
+          storySave();
+          renderStoryBlocks();
+        });
+        blockEl.appendChild(delTextBtn);
+      }
+
       // Restore focus
       if (activeId === block.id) {
         requestAnimationFrame(() => ta.focus());
