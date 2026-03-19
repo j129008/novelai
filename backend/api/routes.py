@@ -235,6 +235,7 @@ async def generate_text_endpoint(req: GenerateTextRequest):
             input_text=context,
             model=req.model,
             max_length=req.max_length,
+            temperature=req.temperature,
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"NovelAI text API error: {e}")
