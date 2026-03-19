@@ -151,6 +151,7 @@ async function init() {
   setupSettings();
   setupCharacters();
   setupLightbox();
+  setupStoryEditor();
 
   // Load recent characters at startup so sidebar section is populated immediately
   loadRecentCharacters().then(renderRecentCharsInSidebar);
@@ -1137,6 +1138,9 @@ async function generate() {
     state.canvasImageWidth = width;
     state.canvasImageHeight = height;
 
+    const storyInsertBtn = $("#story-insert-img");
+    if (storyInsertBtn) storyInsertBtn.disabled = false;
+
     const output = $("#output");
     const img = document.createElement("img");
     img.src = `data:image/png;base64,${data.image}`;
@@ -1672,8 +1676,10 @@ let _settingsLoadedToast = null;
 function setupHistoryTabs() {
   const tabCanvas = $("#tab-canvas");
   const tabHistory = $("#tab-history");
+  const tabStory = $("#tab-story");
   const panelCanvas = $("#panel-canvas");
   const panelHistory = $("#panel-history");
+  const panelStory = $("#panel-story");
   const searchWrap = $("#history-search-wrap");
   const searchInput = $("#gallery-search");
 
@@ -1685,22 +1691,38 @@ function setupHistoryTabs() {
   function showCanvas() {
     tabCanvas.classList.add("canvas-tab--active");
     tabHistory.classList.remove("canvas-tab--active");
+    if (tabStory) tabStory.classList.remove("canvas-tab--active");
     panelCanvas.style.display = "flex";
     panelHistory.style.display = "none";
+    if (panelStory) panelStory.style.display = "none";
     searchWrap.style.display = "none";
   }
 
   function showHistory() {
     tabHistory.classList.add("canvas-tab--active");
     tabCanvas.classList.remove("canvas-tab--active");
+    if (tabStory) tabStory.classList.remove("canvas-tab--active");
     panelHistory.style.display = "flex";
     panelCanvas.style.display = "none";
+    if (panelStory) panelStory.style.display = "none";
     searchWrap.style.display = "flex";
     searchInput.focus();
   }
 
+  function showStory() {
+    if (!tabStory || !panelStory) return;
+    tabStory.classList.add("canvas-tab--active");
+    tabCanvas.classList.remove("canvas-tab--active");
+    tabHistory.classList.remove("canvas-tab--active");
+    panelStory.style.display = "flex";
+    panelCanvas.style.display = "none";
+    panelHistory.style.display = "none";
+    searchWrap.style.display = "none";
+  }
+
   tabCanvas.addEventListener("click", showCanvas);
   tabHistory.addEventListener("click", showHistory);
+  if (tabStory) tabStory.addEventListener("click", showStory);
 
   if (searchInput) {
     searchInput.addEventListener("input", () => {
@@ -2068,6 +2090,233 @@ function navigateLightbox(delta) {
   // Wrap around
   _lightboxIndex = (_lightboxIndex + delta + total) % total;
   renderLightboxFrame();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   STORY EDITOR
+   ═══════════════════════════════════════════════════════════ */
+
+let _storyBlocks = [];
+let _storyFocusedBlockId = null;
+let _storySaveTimer = null;
+
+function storyUUID() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function storySave() {
+  clearTimeout(_storySaveTimer);
+  _storySaveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem("nai-story", JSON.stringify(_storyBlocks));
+    } catch (_) { /* quota */ }
+  }, 500);
+}
+
+function storyWordCount() {
+  let words = 0;
+  for (const block of _storyBlocks) {
+    if (block.type === "text" && block.content) {
+      const trimmed = block.content.trim();
+      if (trimmed) words += trimmed.split(/\s+/).length;
+    }
+  }
+  return words;
+}
+
+function renderStoryWordCount() {
+  const el = $("#story-word-count");
+  if (!el) return;
+  const w = storyWordCount();
+  el.textContent = w > 0 ? `${w} word${w === 1 ? "" : "s"}` : "";
+}
+
+function renderStoryBlocks() {
+  const container = $("#story-blocks");
+  if (!container) return;
+
+  // Remember which textarea had focus by block id
+  const activeId = _storyFocusedBlockId;
+
+  container.innerHTML = "";
+
+  const makeInsertZone = (insertIndex) => {
+    const zone = document.createElement("div");
+    zone.className = "story-insert-zone";
+    zone.setAttribute("aria-hidden", "true");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "story-insert-btn";
+    btn.title = "Insert text block here";
+    btn.textContent = "+";
+    btn.addEventListener("click", () => {
+      const newBlock = { id: storyUUID(), type: "text", content: "" };
+      _storyBlocks.splice(insertIndex, 0, newBlock);
+      _storyFocusedBlockId = newBlock.id;
+      storySave();
+      renderStoryBlocks();
+    });
+    zone.appendChild(btn);
+    return zone;
+  };
+
+  for (let i = 0; i < _storyBlocks.length; i++) {
+    const block = _storyBlocks[i];
+
+    // Insert zone before each block
+    container.appendChild(makeInsertZone(i));
+
+    const blockEl = document.createElement("div");
+
+    if (block.type === "text") {
+      blockEl.className = "story-block story-block--text";
+
+      const ta = document.createElement("textarea");
+      ta.value = block.content || "";
+      ta.placeholder = "Write your story…";
+      ta.spellcheck = true;
+      ta.rows = 1;
+
+      // Auto-resize
+      const resize = () => {
+        ta.style.height = "auto";
+        ta.style.height = ta.scrollHeight + "px";
+      };
+      // Schedule resize after insertion so DOM is live
+      requestAnimationFrame(resize);
+
+      ta.addEventListener("input", () => {
+        block.content = ta.value;
+        resize();
+        renderStoryWordCount();
+        storySave();
+      });
+      ta.addEventListener("focus", () => {
+        _storyFocusedBlockId = block.id;
+      });
+
+      blockEl.appendChild(ta);
+
+      // Restore focus
+      if (activeId === block.id) {
+        requestAnimationFrame(() => ta.focus());
+      }
+
+    } else if (block.type === "image") {
+      blockEl.className = "story-block story-block--image";
+
+      const figure = document.createElement("figure");
+
+      const img = document.createElement("img");
+      img.src = `data:image/png;base64,${block.base64}`;
+      img.alt = block.prompt || "Story image";
+      figure.appendChild(img);
+
+      if (block.prompt) {
+        const caption = document.createElement("figcaption");
+        caption.textContent = block.prompt;
+        figure.appendChild(caption);
+      }
+
+      if (block.seed != null) {
+        const seedBadge = document.createElement("div");
+        seedBadge.className = "story-img-seed-badge";
+        seedBadge.textContent = `Seed: ${Number(block.seed)}`;
+        figure.appendChild(seedBadge);
+      }
+
+      blockEl.appendChild(figure);
+
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "story-img-delete";
+      delBtn.textContent = "Remove";
+      delBtn.addEventListener("click", () => {
+        if (!confirm("Remove this image from the story?")) return;
+        _storyBlocks.splice(_storyBlocks.indexOf(block), 1);
+        storySave();
+        renderStoryBlocks();
+      });
+      blockEl.appendChild(delBtn);
+    }
+
+    container.appendChild(blockEl);
+  }
+
+  // Terminal insert zone (after all blocks)
+  container.appendChild(makeInsertZone(_storyBlocks.length));
+
+  renderStoryWordCount();
+}
+
+function setupStoryEditor() {
+  // Load persisted story
+  try {
+    const raw = localStorage.getItem("nai-story");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        _storyBlocks = parsed;
+      }
+    }
+  } catch (_) { /* malformed — start fresh */ }
+
+  // Ensure at least one text block
+  if (_storyBlocks.length === 0) {
+    _storyBlocks.push({ id: storyUUID(), type: "text", content: "" });
+  }
+
+  renderStoryBlocks();
+
+  // "Add Text" button at the bottom
+  const addTextBtn = $("#story-add-text");
+  if (addTextBtn) {
+    addTextBtn.addEventListener("click", () => {
+      const newBlock = { id: storyUUID(), type: "text", content: "" };
+      _storyBlocks.push(newBlock);
+      _storyFocusedBlockId = newBlock.id;
+      storySave();
+      renderStoryBlocks();
+      // Scroll new block into view
+      requestAnimationFrame(() => {
+        const panel = $("#panel-story");
+        if (panel) panel.scrollTop = panel.scrollHeight;
+      });
+    });
+  }
+
+  // "Insert Last Image" button
+  const insertImgBtn = $("#story-insert-img");
+  if (insertImgBtn) {
+    insertImgBtn.addEventListener("click", () => {
+      if (!state.lastImageBase64) return;
+      const prompt = $("#prompt") ? $("#prompt").value : "";
+      const newBlock = {
+        id: storyUUID(),
+        type: "image",
+        base64: state.lastImageBase64,
+        prompt,
+        seed: state.lastSeed,
+      };
+
+      // Insert after the currently focused text block, or at end
+      let insertIndex = _storyBlocks.length;
+      if (_storyFocusedBlockId) {
+        const idx = _storyBlocks.findIndex((b) => b.id === _storyFocusedBlockId);
+        if (idx !== -1) insertIndex = idx + 1;
+      }
+
+      _storyBlocks.splice(insertIndex, 0, newBlock);
+      storySave();
+      renderStoryBlocks();
+
+      // Scroll newly inserted image into view
+      requestAnimationFrame(() => {
+        const blocks = document.querySelectorAll(".story-block--image");
+        if (blocks.length) blocks[blocks.length - 1].scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+    });
+  }
 }
 
 function renderLightboxFrame() {
