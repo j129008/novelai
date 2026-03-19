@@ -409,7 +409,7 @@ def _get_stories_dir() -> Path:
     settings = _load_settings()
     output_dir = settings.get("output_dir")
     if output_dir:
-        stories_dir = Path(output_dir).parent / "stories"
+        stories_dir = Path(output_dir) / "stories"
     else:
         stories_dir = Path(__file__).resolve().parent.parent.parent / "stories"
     stories_dir.mkdir(parents=True, exist_ok=True)
