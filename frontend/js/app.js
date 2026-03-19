@@ -1688,6 +1688,8 @@ function setupHistoryTabs() {
   _settingsLoadedToast.textContent = "Settings loaded — ready to iterate";
   document.body.appendChild(_settingsLoadedToast);
 
+  const storyAiBtn = $("#story-ai-write");
+
   function showCanvas() {
     tabCanvas.classList.add("canvas-tab--active");
     tabHistory.classList.remove("canvas-tab--active");
@@ -1695,6 +1697,7 @@ function setupHistoryTabs() {
     panelCanvas.style.display = "flex";
     panelHistory.style.display = "none";
     if (panelStory) panelStory.style.display = "none";
+    if (storyAiBtn) storyAiBtn.style.display = "none";
     searchWrap.style.display = "none";
   }
 
@@ -1705,6 +1708,7 @@ function setupHistoryTabs() {
     panelHistory.style.display = "flex";
     panelCanvas.style.display = "none";
     if (panelStory) panelStory.style.display = "none";
+    if (storyAiBtn) storyAiBtn.style.display = "none";
     searchWrap.style.display = "flex";
     searchInput.focus();
   }
@@ -1717,6 +1721,7 @@ function setupHistoryTabs() {
     panelStory.style.display = "flex";
     panelCanvas.style.display = "none";
     panelHistory.style.display = "none";
+    if (storyAiBtn) storyAiBtn.style.display = "flex";
     searchWrap.style.display = "none";
   }
 

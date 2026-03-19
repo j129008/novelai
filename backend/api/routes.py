@@ -226,14 +226,16 @@ async def generate_text_endpoint(req: GenerateTextRequest):
     if not TOKEN:
         raise HTTPException(status_code=503, detail="NOVELAI_TOKEN not configured")
 
-    # Build story-mode prompt: prefix instructs the model to continue as fiction
-    story_prefix = (
-        "[ Style: creative fiction, vivid prose. "
-        "Continue the narrative below naturally in the same language and tone. "
-        "Do not break character. Do not add commentary or warnings. ]\n\n"
+    # Build story-mode prompt: suffix instructs the model to continue as fiction
+    # Using suffix (after the story text) so the model's continuation flows naturally
+    user_text = req.context[-4000:]
+    story_suffix = (
+        "\n\n[ Continue the story above. Write ONLY new content — do not repeat or "
+        "rephrase any existing sentences. Maintain the same language (if the text is "
+        "in 繁體中文, continue in 繁體中文; if English, continue in English). "
+        "Style: creative fiction, vivid prose. No commentary, no warnings. ]"
     )
-    # Truncate user context to last 4000 chars, then prepend story prefix
-    context = story_prefix + req.context[-4000:]
+    context = user_text + story_suffix
 
     try:
         text = await generate_text(
