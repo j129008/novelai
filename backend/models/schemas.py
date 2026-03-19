@@ -80,15 +80,3 @@ class GalleryListResponse(BaseModel):
     files: list[GalleryFileItem]
 
 
-VALID_TEXT_MODELS = Literal["glm-4-6", "llama-3-erato-v1", "kayra-v1", "clio-v1"]
-
-
-class GenerateTextRequest(BaseModel):
-    context: str = Field(min_length=1)
-    model: VALID_TEXT_MODELS = "glm-4-6"
-    max_length: int = Field(default=150, ge=1, le=300)
-    temperature: float = Field(default=1.0, ge=0.1, le=2.0)
-
-
-class GenerateTextResponse(BaseModel):
-    text: str

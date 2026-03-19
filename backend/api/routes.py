@@ -17,12 +17,9 @@ from models.schemas import (
     GalleryListResponse,
     GenerateRequest,
     GenerateResponse,
-    GenerateTextRequest,
-    GenerateTextResponse,
     RecordCharactersRequest,
 )
 from api.novelai import generate_image
-from api.text_novelai import generate_text
 
 router = APIRouter(prefix="/api")
 
@@ -219,40 +216,6 @@ async def generate(req: GenerateRequest):
         image=base64.b64encode(image_data).decode(),
         seed=seed,
     )
-
-
-@router.post("/generate-text", response_model=GenerateTextResponse)
-async def generate_text_endpoint(req: GenerateTextRequest):
-    if not TOKEN:
-        raise HTTPException(status_code=503, detail="NOVELAI_TOKEN not configured")
-
-    # For GLM models: frame as a novel excerpt so the model continues as fiction
-    # rather than switching to assistant/analysis mode.
-    # For legacy models (Kayra/Erato): send raw text (they're fiction-tuned).
-    raw = req.context[-4000:]
-    if req.model in ("glm-4-6",):
-        context = f"以下是一部奇幻小說的片段：\n\n{raw}"
-    else:
-        context = raw
-
-    try:
-        text = await generate_text(
-            token=TOKEN,
-            input_text=context,
-            model=req.model,
-            max_length=req.max_length,
-            temperature=req.temperature,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"NovelAI text API error: {e}")
-
-    # Post-process: truncate at any meta-commentary markers
-    # GLM sometimes switches to analysis mode mid-output
-    for marker in ["\n---\n", "\n**", "\n1.", "\n好的，", "\n這段", "\n這個", "\n為什麼", "\n分析"]:
-        idx = text.find(marker)
-        if idx > 20:  # keep at least 20 chars
-            text = text[:idx].rstrip()
-    return GenerateTextResponse(text=text)
 
 
 def _resolve_gallery_path(output_dir: Path, subpath: str) -> Path:
