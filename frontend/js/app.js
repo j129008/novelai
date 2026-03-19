@@ -2437,30 +2437,24 @@ function setupStoryEditor() {
     });
   }
 
-  // "AI Write" toolbar button
+  // "AI Write" floating button — always appends at the end of the story
   const aiWriteBtn = $("#story-ai-write");
   if (aiWriteBtn) {
     aiWriteBtn.addEventListener("click", async () => {
       const memory = ($("#story-memory") || {}).value || "";
       const authorsNote = ($("#story-authors-note") || {}).value || "";
 
-      // Collect text up to cursor position for context
-      let contextText = "";
-      storyRestoreSelection();
-      const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
-        const range = sel.getRangeAt(0);
-        const beforeRange = document.createRange();
-        beforeRange.setStart(editor, 0);
-        beforeRange.setEnd(range.startContainer, range.startOffset);
-        contextText = beforeRange.toString();
-      } else {
-        contextText = editor.textContent;
+      // Use the FULL story text as context (AI continues from the end)
+      const storyText = editor.textContent.trim();
+      if (!storyText && !memory.trim()) {
+        editor.focus();
+        return;
       }
 
+      // Build context: [Memory]\n\n[Full Story]\n\n[Author's Note]
       const parts = [];
       if (memory.trim()) parts.push(memory.trim());
-      parts.push(contextText.trim());
+      if (storyText) parts.push(storyText);
       if (authorsNote.trim()) parts.push(authorsNote.trim());
       const context = parts.join("\n\n");
 
@@ -2468,9 +2462,9 @@ function setupStoryEditor() {
       const temperature = parseFloat(($("#story-temperature") || {}).value) || 1.0;
 
       aiWriteBtn.disabled = true;
-      aiWriteBtn.classList.add("story-ai-write-btn--loading");
-      const originalText = aiWriteBtn.textContent;
-      aiWriteBtn.textContent = "Writing";
+      aiWriteBtn.classList.add("story-ai-float-btn--loading");
+      const originalHTML = aiWriteBtn.innerHTML;
+      aiWriteBtn.textContent = "Writing…";
 
       try {
         const res = await fetch("/api/generate-text", {
@@ -2482,16 +2476,17 @@ function setupStoryEditor() {
         const data = await res.json();
         const generated = data.text || "";
         if (generated) {
-          storyRestoreSelection();
-          const insertSel = window.getSelection();
-          if (insertSel && insertSel.rangeCount > 0 && editor.contains(insertSel.getRangeAt(0).startContainer)) {
-            document.execCommand("insertText", false, generated);
-          } else {
-            editor.focus();
-            document.execCommand("insertText", false, generated);
-          }
+          // Move cursor to end of editor and insert there
+          editor.focus();
+          const sel = window.getSelection();
+          sel.selectAllChildren(editor);
+          sel.collapseToEnd();
+          document.execCommand("insertText", false, generated);
           storyUpdateWordCount();
           storySaveContent();
+          // Auto-scroll to bottom
+          const panel = $("#panel-story");
+          if (panel) panel.scrollTop = panel.scrollHeight;
         }
       } catch (err) {
         const errEl = document.createElement("div");
@@ -2501,8 +2496,8 @@ function setupStoryEditor() {
         setTimeout(() => { if (errEl.parentNode) errEl.parentNode.removeChild(errEl); }, 4000);
       } finally {
         aiWriteBtn.disabled = false;
-        aiWriteBtn.classList.remove("story-ai-write-btn--loading");
-        aiWriteBtn.textContent = originalText;
+        aiWriteBtn.classList.remove("story-ai-float-btn--loading");
+        aiWriteBtn.innerHTML = originalHTML;
       }
     });
   }

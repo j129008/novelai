@@ -2023,22 +2023,35 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   background: var(--danger-bg);
 }
 
-/* AI Write toolbar button states */
-.story-ai-write-btn--loading {
-  pointer-events: none;
-  opacity: 0.7;
+/* AI Write floating button — sticky at bottom of story panel */
+.story-ai-float-btn {
+  position: sticky;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 16px auto 0;
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent-bright);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 16px var(--accent-glow);
+  transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+  z-index: 5;
 }
-.story-ai-write-btn--loading::after {
-  content: "";
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border: 2px solid rgba(124,92,252,0.3);
-  border-top-color: var(--accent-bright);
-  border-radius: 50%;
-  animation: spin 0.55s linear infinite;
-  margin-left: 6px;
-  vertical-align: middle;
+.story-ai-float-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px var(--accent-glow);
+}
+.story-ai-float-btn--loading {
+  pointer-events: none;
+  opacity: 0.8;
 }
 
 .story-ai-error {
