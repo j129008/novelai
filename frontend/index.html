@@ -407,22 +407,23 @@
         </div><!-- /.controls-scroll -->
 
         <div class="controls-footer">
+          <button id="generate-btn" class="btn-generate" type="button">
+            <span class="btn-generate-label">Generate</span>
+            <span class="btn-generate-hint">Enter</span>
+          </button>
           <div class="auto-toggles">
             <label class="toggle-switch" title="Automatically use output as img2img source for next generation">
               <input type="checkbox" id="auto-iterate">
               <span class="toggle-track" aria-hidden="true"><span class="toggle-knob"></span></span>
               <span class="toggle-label">Auto Iterate</span>
             </label>
+            <span class="auto-toggles-divider" aria-hidden="true"></span>
             <label class="toggle-switch" title="Automatically start next generation after completion">
               <input type="checkbox" id="auto-generate">
               <span class="toggle-track" aria-hidden="true"><span class="toggle-knob"></span></span>
               <span class="toggle-label">Auto Generate</span>
             </label>
           </div>
-          <button id="generate-btn" class="btn-generate" type="button">
-            <span class="btn-generate-label">Generate</span>
-            <span class="btn-generate-hint">Enter</span>
-          </button>
         </div>
 
       </aside>
