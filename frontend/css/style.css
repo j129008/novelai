@@ -2345,4 +2345,106 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   border-left-color: var(--accent);
 }
 
+/* ═══════════════════════════════════════════════════════════
+   INSPIRE PANEL — Prompt Recipe Cards
+   ═══════════════════════════════════════════════════════════ */
+
+#panel-inspire {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-muted) transparent;
+  flex-direction: column;
+}
+#panel-inspire::-webkit-scrollbar { width: 4px; }
+#panel-inspire::-webkit-scrollbar-thumb { background: var(--border-muted); border-radius: 4px; }
+
+.inspire-panel {
+  padding: 16px;
+  height: 100%;
+}
+
+.inspire-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.inspire-categories {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.inspire-cat-btn {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-muted);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.inspire-cat-btn:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.inspire-cat-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-bright); }
+.inspire-cat-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+
+.inspire-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
+.recipe-card {
+  background: var(--bg-float);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.15s, transform 0.1s;
+}
+.recipe-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+
+.recipe-card-title { font-size: 0.92rem; font-weight: 700; color: var(--text-primary); }
+.recipe-card-mood { font-size: 0.78rem; color: var(--text-secondary); font-style: italic; line-height: 1.4; }
+.recipe-card-template {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  background: var(--bg-deep);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  line-height: 1.5;
+  max-height: 60px;
+  overflow: hidden;
+}
+
+.recipe-card-pills { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.recipe-pill-label { font-size: 0.68rem; color: var(--text-tertiary); font-weight: 600; }
+.recipe-pill {
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border-muted);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.12s;
+  min-height: 24px;
+}
+.recipe-pill:hover { border-color: var(--accent); color: var(--accent-bright); }
+.recipe-pill.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-bright); }
+.recipe-pill:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+
+.recipe-card-use { align-self: flex-end; font-size: 0.75rem; padding: 6px 14px; }
 

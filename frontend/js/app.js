@@ -153,6 +153,7 @@ async function init() {
   setupCharacters();
   setupLightbox();
   setupStoryEditor();
+  setupInspirePanel();
 
   // Load recent characters at startup so autocomplete is populated immediately
   loadRecentCharacters();
@@ -1530,6 +1531,158 @@ function setCanvasImageAsSource() {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   INSPIRE PANEL
+   ═══════════════════════════════════════════════════════════ */
+
+function setupInspirePanel() {
+  const categoriesEl = $("#inspire-categories");
+  const grid = $("#inspire-grid");
+  if (!categoriesEl || !grid) return;
+
+  let activeCategory = "all";
+
+  // Build category filter buttons
+  const allBtn = document.createElement("button");
+  allBtn.className = "inspire-cat-btn active";
+  allBtn.type = "button";
+  allBtn.textContent = "All";
+  allBtn.addEventListener("click", () => setCategory("all"));
+  categoriesEl.appendChild(allBtn);
+
+  for (const cat of PROMPT_RECIPE_CATEGORIES) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "inspire-cat-btn";
+    btn.textContent = cat.label;
+    btn.addEventListener("click", () => setCategory(cat.id));
+    categoriesEl.appendChild(btn);
+  }
+
+  function setCategory(catId) {
+    activeCategory = catId;
+    categoriesEl.querySelectorAll(".inspire-cat-btn").forEach((b) => {
+      const isActive = catId === "all"
+        ? b.textContent === "All"
+        : b.textContent === (PROMPT_RECIPE_CATEGORIES.find((c) => c.id === catId) || {}).label;
+      b.classList.toggle("active", isActive);
+    });
+    renderRecipes();
+  }
+
+  function renderRecipes() {
+    grid.innerHTML = "";
+    const recipes = activeCategory === "all"
+      ? PROMPT_RECIPES
+      : PROMPT_RECIPES.filter((r) => r.category === activeCategory);
+
+    for (const recipe of recipes) {
+      const card = document.createElement("div");
+      card.className = "recipe-card";
+
+      // Title
+      const title = document.createElement("div");
+      title.className = "recipe-card-title";
+      title.textContent = recipe.title;
+
+      // Mood
+      const mood = document.createElement("div");
+      mood.className = "recipe-card-mood";
+      mood.textContent = recipe.mood;
+
+      // Template preview
+      const tmpl = document.createElement("div");
+      tmpl.className = "recipe-card-template";
+      tmpl.textContent = recipe.template;
+
+      // Character pills (from _recentCharacters)
+      const pillsWrap = document.createElement("div");
+      pillsWrap.className = "recipe-card-pills";
+      const placeholders = recipe.template.match(/\{character\d?\}/g) || [];
+      const selectedChars = {};
+
+      if (placeholders.length > 0 && _recentCharacters.length > 0) {
+        for (const ph of [...new Set(placeholders)]) {
+          const label = document.createElement("span");
+          label.className = "recipe-pill-label";
+          label.textContent = ph + ":";
+          pillsWrap.appendChild(label);
+
+          for (const rc of _recentCharacters.slice(0, 6)) {
+            const pill = document.createElement("button");
+            pill.type = "button";
+            pill.className = "recipe-pill";
+            pill.textContent = rc.tag.replace(/_/g, " ");
+            pill.dataset.ph = ph;
+            pill.addEventListener("click", () => {
+              selectedChars[ph] = rc.tag.replace(/_/g, " ");
+              pillsWrap.querySelectorAll(`.recipe-pill[data-ph="${ph}"]`).forEach((p) => p.classList.remove("active"));
+              pill.classList.add("active");
+            });
+            pillsWrap.appendChild(pill);
+          }
+        }
+      }
+
+      // Use Recipe button
+      const useBtn = document.createElement("button");
+      useBtn.type = "button";
+      useBtn.className = "btn-action btn-action--primary recipe-card-use";
+      useBtn.textContent = "Use Recipe";
+      useBtn.addEventListener("click", () => applyRecipe(recipe, selectedChars));
+
+      card.appendChild(title);
+      card.appendChild(mood);
+      card.appendChild(tmpl);
+      if (pillsWrap.children.length > 0) card.appendChild(pillsWrap);
+      card.appendChild(useBtn);
+      grid.appendChild(card);
+    }
+  }
+
+  function applyRecipe(recipe, selectedChars) {
+    let prompt = recipe.template;
+    for (const [ph, val] of Object.entries(selectedChars)) {
+      prompt = prompt.replace(new RegExp(ph.replace(/[{}]/g, "\\$&"), "g"), val);
+    }
+
+    const promptEl = $("#prompt");
+    if (promptEl) {
+      if (promptEl.value.trim().length > 30) {
+        if (!confirm("Replace current prompt with this recipe?")) return;
+      }
+      promptEl.value = prompt;
+      localStorage.setItem("nai-prompt", prompt);
+    }
+
+    if (recipe.negative_hint) {
+      const negEl = $("#negative-prompt");
+      if (negEl && !negEl.value.includes(recipe.negative_hint)) {
+        negEl.value = negEl.value ? negEl.value + ", " + recipe.negative_hint : recipe.negative_hint;
+      }
+    }
+
+    $("#tab-canvas").click();
+  }
+
+  // Shuffle button — Fisher-Yates shuffle of displayed cards
+  const shuffleBtn = $("#inspire-shuffle");
+  if (shuffleBtn) {
+    shuffleBtn.addEventListener("click", () => {
+      const cards = Array.from(grid.children);
+      for (let i = cards.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [cards[i], cards[j]] = [cards[j], cards[i]];
+      }
+      for (const card of cards) {
+        grid.appendChild(card);
+      }
+    });
+  }
+
+  renderRecipes();
+}
+
+/* ═══════════════════════════════════════════════════════════
    RECENT CHARACTERS
    ═══════════════════════════════════════════════════════════ */
 
@@ -1911,9 +2064,11 @@ function setupHistoryTabs() {
   const tabCanvas = $("#tab-canvas");
   const tabHistory = $("#tab-history");
   const tabStory = $("#tab-story");
+  const tabInspire = $("#tab-inspire");
   const panelCanvas = $("#panel-canvas");
   const panelHistory = $("#panel-history");
   const panelStory = $("#panel-story");
+  const panelInspire = $("#panel-inspire");
   const searchWrap = $("#history-search-wrap");
   const searchInput = $("#gallery-search");
 
@@ -1922,24 +2077,34 @@ function setupHistoryTabs() {
   _settingsLoadedToast.textContent = "Settings loaded — ready to iterate";
   document.body.appendChild(_settingsLoadedToast);
 
-  function showCanvas() {
-    tabCanvas.classList.add("canvas-tab--active");
+  function clearAllTabs() {
+    tabCanvas.classList.remove("canvas-tab--active");
     tabHistory.classList.remove("canvas-tab--active");
     if (tabStory) tabStory.classList.remove("canvas-tab--active");
-    panelCanvas.style.display = "flex";
+    if (tabInspire) tabInspire.classList.remove("canvas-tab--active");
+  }
+
+  function hideAllPanels() {
+    panelCanvas.style.display = "none";
     panelHistory.style.display = "none";
     if (panelStory) panelStory.style.display = "none";
+    if (panelInspire) panelInspire.style.display = "none";
     searchWrap.style.display = "none";
+  }
+
+  function showCanvas() {
+    clearAllTabs();
+    hideAllPanels();
+    tabCanvas.classList.add("canvas-tab--active");
+    panelCanvas.style.display = "flex";
     localStorage.setItem("nai-active-tab", "canvas");
   }
 
   function showHistory() {
+    clearAllTabs();
+    hideAllPanels();
     tabHistory.classList.add("canvas-tab--active");
-    tabCanvas.classList.remove("canvas-tab--active");
-    if (tabStory) tabStory.classList.remove("canvas-tab--active");
     panelHistory.style.display = "flex";
-    panelCanvas.style.display = "none";
-    if (panelStory) panelStory.style.display = "none";
     searchWrap.style.display = "flex";
     searchInput.focus();
     localStorage.setItem("nai-active-tab", "history");
@@ -1947,24 +2112,32 @@ function setupHistoryTabs() {
 
   function showStory() {
     if (!tabStory || !panelStory) return;
+    clearAllTabs();
+    hideAllPanels();
     tabStory.classList.add("canvas-tab--active");
-    tabCanvas.classList.remove("canvas-tab--active");
-    tabHistory.classList.remove("canvas-tab--active");
     panelStory.style.display = "flex";
-    panelCanvas.style.display = "none";
-    panelHistory.style.display = "none";
-    searchWrap.style.display = "none";
     localStorage.setItem("nai-active-tab", "story");
+  }
+
+  function showInspire() {
+    if (!tabInspire || !panelInspire) return;
+    clearAllTabs();
+    hideAllPanels();
+    tabInspire.classList.add("canvas-tab--active");
+    panelInspire.style.display = "flex";
+    localStorage.setItem("nai-active-tab", "inspire");
   }
 
   tabCanvas.addEventListener("click", showCanvas);
   tabHistory.addEventListener("click", showHistory);
   if (tabStory) tabStory.addEventListener("click", showStory);
+  if (tabInspire) tabInspire.addEventListener("click", showInspire);
 
   // Restore last active tab (default: story)
   const savedTab = localStorage.getItem("nai-active-tab") || "story";
   if (savedTab === "story") showStory();
   else if (savedTab === "history") showHistory();
+  else if (savedTab === "inspire") showInspire();
   // else canvas is already active by default
 
   if (searchInput) {
