@@ -158,6 +158,31 @@ async function init() {
 
   $("#btn-set-as-source").addEventListener("click", setCanvasImageAsSource);
 
+  // "To Story" — insert canvas image into Story at cursor
+  const addToStoryBtn = $("#btn-add-to-story");
+  if (addToStoryBtn) {
+    addToStoryBtn.addEventListener("click", () => {
+      if (!state.canvasImageBase64) return;
+      const prompt = ($("#prompt") || {}).value || "";
+      insertImageAtCursor(state.canvasImageBase64, prompt, state.lastSeed);
+      showStatus("Image added to Story");
+    });
+  }
+
+  // "×" Clear canvas + img2img source
+  const clearCanvasBtn = $("#btn-clear-canvas");
+  if (clearCanvasBtn) {
+    clearCanvasBtn.addEventListener("click", () => {
+      clearImg2Img();
+      state.canvasImageBase64 = null;
+      state.lastImageBase64 = null;
+      const output = $("#output");
+      if (output) output.innerHTML = '<div class="placeholder"><div class="placeholder-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><p class="placeholder-title">Your creation awaits</p><p class="placeholder-sub">Press Generate or Enter</p></div>';
+      const actions = $("#image-actions");
+      if (actions) actions.style.display = "none";
+    });
+  }
+
   // Enter in prompt/negative textarea = generate (Shift+Enter = newline)
   const promptEl = $("#prompt");
   const negativeEl = $("#negative-prompt");
