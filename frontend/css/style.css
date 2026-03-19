@@ -1925,6 +1925,10 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   flex: 1;
 }
 
+.story-block--text {
+  position: relative;
+}
+
 .story-block--text textarea {
   width: 100%;
   background: transparent;
@@ -1942,6 +1946,10 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 .story-block--text textarea:focus {
   border-color: var(--border-muted);
   outline: none;
+}
+.story-block--text:hover textarea,
+.story-block--text:focus-within textarea {
+  padding-bottom: 36px;
 }
 .story-block--text textarea::placeholder {
   color: var(--text-tertiary);
@@ -2046,6 +2054,53 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   color: var(--accent-bright);
   border-color: var(--accent);
   background: var(--bg-raised);
+}
+
+.story-ai-write-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent-dim);
+  background: rgba(124,92,252,0.1);
+  color: var(--accent-bright);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+  font-family: inherit;
+}
+.story-block--text:hover .story-ai-write-btn,
+.story-block--text:focus-within .story-ai-write-btn {
+  opacity: 1;
+}
+.story-ai-write-btn:hover {
+  background: var(--accent-dim);
+}
+.story-ai-write-btn--loading {
+  pointer-events: none;
+  opacity: 1;
+}
+.story-ai-write-btn--loading::after {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(124,92,252,0.3);
+  border-top-color: var(--accent-bright);
+  border-radius: 50%;
+  animation: spin 0.55s linear infinite;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.story-ai-error {
+  font-size: 0.75rem;
+  color: var(--danger);
+  padding: 4px 16px;
+  animation: fadeIn 0.2s;
 }
 
 @keyframes lightboxImgIn {
