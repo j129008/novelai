@@ -1738,6 +1738,7 @@ function setupHistoryTabs() {
     panelHistory.style.display = "none";
     if (panelStory) panelStory.style.display = "none";
     searchWrap.style.display = "none";
+    localStorage.setItem("nai-active-tab", "canvas");
   }
 
   function showHistory() {
@@ -1749,6 +1750,7 @@ function setupHistoryTabs() {
     if (panelStory) panelStory.style.display = "none";
     searchWrap.style.display = "flex";
     searchInput.focus();
+    localStorage.setItem("nai-active-tab", "history");
   }
 
   function showStory() {
@@ -1760,11 +1762,18 @@ function setupHistoryTabs() {
     panelCanvas.style.display = "none";
     panelHistory.style.display = "none";
     searchWrap.style.display = "none";
+    localStorage.setItem("nai-active-tab", "story");
   }
 
   tabCanvas.addEventListener("click", showCanvas);
   tabHistory.addEventListener("click", showHistory);
   if (tabStory) tabStory.addEventListener("click", showStory);
+
+  // Restore last active tab (default: story)
+  const savedTab = localStorage.getItem("nai-active-tab") || "story";
+  if (savedTab === "story") showStory();
+  else if (savedTab === "history") showHistory();
+  // else canvas is already active by default
 
   if (searchInput) {
     searchInput.addEventListener("input", () => {
