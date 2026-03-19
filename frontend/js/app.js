@@ -22,7 +22,6 @@ const UC_PRESETS = {
 const state = {
   img2img: null,          // base64 PNG at exact output resolution, set after crop confirmed
   img2imgThumbDataUrl: null, // small data URL just for the thumbnail preview
-  vibe: null,
   lastSeed: null,
   lastImageBase64: null,
   // canvas-displayed image (may be a gallery preview, not necessarily last generated)
@@ -30,6 +29,10 @@ const state = {
   canvasImageWidth: null,
   canvasImageHeight: null,
 };
+
+// ── VIBES ─────────────────────────────────────────────────
+// Each entry: { base64, infoExtracted, strength }
+const vibes = [];
 
 // ── CHARACTER SLOTS ──────────────────────────────────────────
 const characters = [];  // array of { prompt, x, y, positionAuto, interactions } — managed by setupCharacters()
@@ -115,10 +118,9 @@ async function init() {
 
   bindSlider("steps", "steps-val", 0);
   bindSlider("scale", "scale-val", 1);
+  bindSlider("cfg-rescale", "cfg-rescale-val", 2);
   bindSlider("strength", "strength-val", 2);
   bindSlider("noise", "noise-val", 2);
-  bindSlider("ref-strength", "ref-strength-val", 2);
-  bindSlider("ref-info", "ref-info-val", 2);
 
   // Persist resolution selection
   const resolutionEl = $("#resolution");
@@ -128,8 +130,7 @@ async function init() {
     });
   }
 
-  // Vibe/style-reference upload (sidebar, unchanged)
-  setupFileUpload("vibe-upload", "vibe-preview", "vibe-placeholder", "vibe-clear", "vibe");
+  setupVibes();
 
   setupImg2ImgControls();
 
@@ -1086,6 +1087,146 @@ function setupFileUpload(inputId, previewId, placeholderId, clearId, stateKey) {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   VIBES — multiple style reference images (up to 4)
+   ═══════════════════════════════════════════════════════════ */
+
+const MAX_VIBES = 4;
+
+function setupVibes() {
+  const addBtn = $("#btn-add-vibe");
+  const fileInput = $("#vibe-file-input");
+  if (!addBtn || !fileInput) return;
+
+  addBtn.addEventListener("click", () => {
+    if (vibes.length >= MAX_VIBES) return;
+    fileInput.value = "";
+    fileInput.click();
+  });
+
+  fileInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target.result.split(",")[1];
+      vibes.push({ base64, infoExtracted: 1.0, strength: 0.6 });
+      renderVibeList();
+    };
+    reader.readAsDataURL(file);
+    fileInput.value = "";
+  });
+}
+
+function renderVibeList() {
+  const list = $("#vibe-list");
+  const addBtn = $("#btn-add-vibe");
+  if (!list) return;
+
+  list.innerHTML = "";
+
+  if (vibes.length === 0) {
+    const hint = document.createElement("p");
+    hint.className = "vibe-empty-hint";
+    hint.textContent = 'No vibes added. Click "Add Vibe" to upload a style reference image.';
+    list.appendChild(hint);
+  } else {
+    vibes.forEach((vibe, idx) => {
+      list.appendChild(buildVibeEntry(vibe, idx));
+    });
+  }
+
+  if (addBtn) addBtn.disabled = vibes.length >= MAX_VIBES;
+}
+
+function buildVibeEntry(vibe, idx) {
+  const entry = document.createElement("div");
+  entry.className = "vibe-entry";
+
+  // Thumbnail
+  const thumb = document.createElement("img");
+  thumb.className = "vibe-thumb";
+  thumb.src = `data:image/png;base64,${vibe.base64}`;
+  thumb.alt = `Style reference ${idx + 1}`;
+  entry.appendChild(thumb);
+
+  // Sliders column
+  const sliders = document.createElement("div");
+  sliders.className = "vibe-sliders";
+
+  // Info Extracted row
+  const infoRow = document.createElement("div");
+  infoRow.className = "vibe-slider-row";
+  const infoHeader = document.createElement("div");
+  infoHeader.className = "vibe-slider-header";
+  const infoLabel = document.createElement("span");
+  infoLabel.className = "vibe-slider-label";
+  infoLabel.textContent = "Info";
+  const infoVal = document.createElement("span");
+  infoVal.className = "slider-value";
+  infoVal.textContent = vibe.infoExtracted.toFixed(2);
+  infoHeader.appendChild(infoLabel);
+  infoHeader.appendChild(infoVal);
+  const infoRange = document.createElement("input");
+  infoRange.type = "range";
+  infoRange.className = "field-range";
+  infoRange.min = "0";
+  infoRange.max = "1";
+  infoRange.step = "0.05";
+  infoRange.value = String(vibe.infoExtracted);
+  infoRange.addEventListener("input", () => {
+    vibe.infoExtracted = parseFloat(infoRange.value);
+    infoVal.textContent = vibe.infoExtracted.toFixed(2);
+  });
+  infoRow.appendChild(infoHeader);
+  infoRow.appendChild(infoRange);
+  sliders.appendChild(infoRow);
+
+  // Strength row
+  const strRow = document.createElement("div");
+  strRow.className = "vibe-slider-row";
+  const strHeader = document.createElement("div");
+  strHeader.className = "vibe-slider-header";
+  const strLabel = document.createElement("span");
+  strLabel.className = "vibe-slider-label";
+  strLabel.textContent = "Str";
+  const strVal = document.createElement("span");
+  strVal.className = "slider-value";
+  strVal.textContent = vibe.strength.toFixed(2);
+  strHeader.appendChild(strLabel);
+  strHeader.appendChild(strVal);
+  const strRange = document.createElement("input");
+  strRange.type = "range";
+  strRange.className = "field-range";
+  strRange.min = "0";
+  strRange.max = "1";
+  strRange.step = "0.05";
+  strRange.value = String(vibe.strength);
+  strRange.addEventListener("input", () => {
+    vibe.strength = parseFloat(strRange.value);
+    strVal.textContent = vibe.strength.toFixed(2);
+  });
+  strRow.appendChild(strHeader);
+  strRow.appendChild(strRange);
+  sliders.appendChild(strRow);
+
+  entry.appendChild(sliders);
+
+  // Remove button
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "vibe-remove-btn";
+  removeBtn.setAttribute("aria-label", `Remove style reference ${idx + 1}`);
+  removeBtn.textContent = "×";
+  removeBtn.addEventListener("click", () => {
+    vibes.splice(idx, 1);
+    renderVibeList();
+  });
+  entry.appendChild(removeBtn);
+
+  return entry;
+}
+
+/* ═══════════════════════════════════════════════════════════
    GENERATE
    ═══════════════════════════════════════════════════════════ */
 
@@ -1160,11 +1301,16 @@ async function generate() {
     body.image = state.img2img;
   }
 
-  if (state.vibe) {
-    body.reference_image = state.vibe;
-    body.reference_information_extracted = parseFloat($("#ref-info").value);
-    body.reference_strength = parseFloat($("#ref-strength").value);
+  if (vibes.length > 0) {
+    body.reference_images = vibes.map((v) => ({
+      image: v.base64,
+      information_extracted: v.infoExtracted,
+      strength: v.strength,
+    }));
   }
+
+  body.cfg_rescale = parseFloat($("#cfg-rescale").value);
+  body.noise_schedule = $("#noise-schedule").value;
 
   btn.disabled = true;
   btn.classList.add("loading");

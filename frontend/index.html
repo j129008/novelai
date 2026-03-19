@@ -343,6 +343,9 @@
           </button>
         </div>
 
+        <!-- Hidden file input for vibe uploads — triggered programmatically -->
+        <input type="file" id="vibe-file-input" accept="image/*" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" aria-hidden="true" tabindex="-1">
+
         <!-- Generation settings popover: Quality, Style Reference, Advanced -->
         <div id="gen-settings-popover" class="gen-settings-popover" style="display:none">
           <!-- Quality -->
@@ -350,34 +353,24 @@
             <div class="control-group">
               <div class="slider-header">
                 <label class="field-label" for="steps">Quality</label>
-                <span class="slider-value" id="steps-val">28</span>
+                <span class="slider-value" id="steps-val">23</span>
               </div>
-              <input type="range" id="steps" class="field-range" min="1" max="50" value="28">
+              <input type="range" id="steps" class="field-range" min="1" max="50" value="23">
               <div class="slider-endpoints"><span>Draft</span><span>Best</span></div>
             </div>
           </div>
           <div class="gen-settings-divider"></div>
           <!-- Style Reference -->
           <div class="gen-settings-section">
-            <span class="field-label">Style Reference</span>
-            <div class="upload-zone" id="vibe-zone">
-              <input type="file" id="vibe-upload" accept="image/*" class="upload-input" aria-label="Upload vibe image">
-              <div id="vibe-preview" class="upload-preview"></div>
-              <div class="upload-placeholder" id="vibe-placeholder">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                <span>Drop image or click to upload</span>
-              </div>
+            <div class="vibe-section-header">
+              <span class="field-label">Style Reference</span>
+              <button id="btn-add-vibe" class="btn-action btn-action--primary vibe-add-btn" type="button">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Vibe
+              </button>
             </div>
-            <button id="vibe-clear" class="btn-clear" style="display:none">Remove image</button>
-            <div class="control-group control-group--tight">
-              <div class="slider-header"><label class="field-label" for="ref-strength">Vibe Intensity</label><span class="slider-value" id="ref-strength-val">0.60</span></div>
-              <input type="range" id="ref-strength" class="field-range" min="0" max="1" step="0.05" value="0.6">
-              <div class="slider-endpoints"><span>Faint</span><span>Strong</span></div>
-            </div>
-            <div class="control-group control-group--tight">
-              <div class="slider-header"><label class="field-label" for="ref-info">Style Influence</label><span class="slider-value" id="ref-info-val">1.00</span></div>
-              <input type="range" id="ref-info" class="field-range" min="0" max="1" step="0.05" value="1.0">
-              <div class="slider-endpoints"><span>Less</span><span>More</span></div>
+            <div id="vibe-list" class="vibe-list">
+              <p class="vibe-empty-hint">No vibes added. Click "Add Vibe" to upload a style reference image.</p>
             </div>
           </div>
           <div class="gen-settings-divider"></div>
@@ -395,6 +388,22 @@
               </div>
               <input type="range" id="scale" class="field-range" min="0" max="10" step="0.1" value="5.0">
               <div class="slider-endpoints"><span>Creative</span><span>Precise</span></div>
+            </div>
+            <div class="control-group control-group--tight">
+              <div class="slider-header">
+                <label class="field-label" for="cfg-rescale">CFG Rescale</label>
+                <span class="slider-value" id="cfg-rescale-val">0.00</span>
+              </div>
+              <input type="range" id="cfg-rescale" class="field-range" min="0" max="1" step="0.05" value="0">
+              <div class="slider-endpoints"><span>Off</span><span>Full</span></div>
+            </div>
+            <div class="control-group control-group--tight">
+              <label class="field-label" for="noise-schedule">Noise Schedule</label>
+              <select id="noise-schedule" class="field-select">
+                <option value="karras" selected>Karras</option>
+                <option value="exponential">Exponential</option>
+                <option value="polyexponential">Polyexponential</option>
+              </select>
             </div>
             <!-- SMEA hidden, not supported on V4.5 -->
             <input type="checkbox" id="smea" style="display:none">
