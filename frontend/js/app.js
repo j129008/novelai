@@ -1688,8 +1688,6 @@ function setupHistoryTabs() {
   _settingsLoadedToast.textContent = "Settings loaded — ready to iterate";
   document.body.appendChild(_settingsLoadedToast);
 
-  const storyAiBtn = $("#story-ai-write");
-
   function showCanvas() {
     tabCanvas.classList.add("canvas-tab--active");
     tabHistory.classList.remove("canvas-tab--active");
@@ -1697,7 +1695,6 @@ function setupHistoryTabs() {
     panelCanvas.style.display = "flex";
     panelHistory.style.display = "none";
     if (panelStory) panelStory.style.display = "none";
-    if (storyAiBtn) storyAiBtn.style.display = "none";
     searchWrap.style.display = "none";
   }
 
@@ -1708,7 +1705,6 @@ function setupHistoryTabs() {
     panelHistory.style.display = "flex";
     panelCanvas.style.display = "none";
     if (panelStory) panelStory.style.display = "none";
-    if (storyAiBtn) storyAiBtn.style.display = "none";
     searchWrap.style.display = "flex";
     searchInput.focus();
   }
@@ -1721,7 +1717,6 @@ function setupHistoryTabs() {
     panelStory.style.display = "flex";
     panelCanvas.style.display = "none";
     panelHistory.style.display = "none";
-    if (storyAiBtn) storyAiBtn.style.display = "flex";
     searchWrap.style.display = "none";
   }
 
@@ -2195,151 +2190,6 @@ function insertImageAtCursor(base64, prompt, seed) {
 }
 
 /* Old block-based story code removed — replaced by contentEditable approach
-  const makeInsertZone = (insertIndex) => {
-    const zone = document.createElement("div");
-    zone.className = "story-insert-zone";
-    zone.setAttribute("aria-hidden", "true");
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "story-insert-btn";
-    btn.title = "Insert text block here";
-    btn.textContent = "+";
-    btn.addEventListener("click", () => {
-      const newBlock = { id: storyUUID(), type: "text", content: "" };
-      _storyBlocks.splice(insertIndex, 0, newBlock);
-      _storyFocusedBlockId = newBlock.id;
-      storySave();
-      renderStoryBlocks();
-    });
-    zone.appendChild(btn);
-    return zone;
-  };
-
-  for (let i = 0; i < _storyBlocks.length; i++) {
-    const block = _storyBlocks[i];
-
-    // Insert zone before each block
-    container.appendChild(makeInsertZone(i));
-
-    const blockEl = document.createElement("div");
-
-    if (block.type === "text") {
-      blockEl.className = "story-block story-block--text";
-
-      const ta = document.createElement("textarea");
-      ta.value = block.content || "";
-      ta.placeholder = "Write your story…";
-      ta.spellcheck = true;
-      ta.rows = 1;
-
-      // Auto-resize
-      const resize = () => {
-        ta.style.height = "auto";
-        ta.style.height = ta.scrollHeight + "px";
-      };
-      // Schedule resize after insertion so DOM is live
-      requestAnimationFrame(resize);
-
-      ta.addEventListener("input", () => {
-        block.content = ta.value;
-        resize();
-        renderStoryWordCount();
-        storySave();
-      });
-      ta.addEventListener("focus", () => {
-        _storyFocusedBlockId = block.id;
-      });
-
-      blockEl.appendChild(ta);
-
-      // AI Write button
-      const aiBtn = document.createElement("button");
-      aiBtn.type = "button";
-      aiBtn.className = "story-ai-write-btn";
-      aiBtn.textContent = "AI Write";
-      aiBtn.addEventListener("click", async () => {
-        // Collect context: all text blocks up to and including this one
-        const blockIndex = _storyBlocks.indexOf(block);
-        // Build context: Memory + story text + Author's Note
-        const memory = ($("#story-memory") || {}).value || "";
-        const authorsNote = ($("#story-authors-note") || {}).value || "";
-        const storyText = _storyBlocks
-          .slice(0, blockIndex + 1)
-          .filter((b) => b.type === "text")
-          .map((b) => b.content)
-          .join("\n\n");
-
-        // Context structure: [Memory]\n\n[Story Text...]\n\n[Author's Note]
-        const parts = [];
-        if (memory.trim()) parts.push(memory.trim());
-        parts.push(storyText);
-        if (authorsNote.trim()) parts.push(authorsNote.trim());
-        const context = parts.join("\n\n");
-
-        const maxTokens = parseInt(($("#story-max-tokens") || {}).value) || 150;
-        const temperature = parseFloat(($("#story-temperature") || {}).value) || 1.0;
-
-        aiBtn.disabled = true;
-        aiBtn.classList.add("story-ai-write-btn--loading");
-        const originalText = aiBtn.textContent;
-        aiBtn.textContent = "Writing";
-
-        try {
-          const res = await fetch("/api/generate-text", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ context, model: "glm-4-6", max_length: maxTokens, temperature }),
-          });
-          if (!res.ok) throw new Error(`Server error ${res.status}`);
-          const data = await res.json();
-          const generated = data.text || "";
-          if (generated) {
-            block.content = block.content
-              ? block.content + (block.content.endsWith(" ") ? "" : " ") + generated
-              : generated;
-            ta.value = block.content;
-            resize();
-            renderStoryWordCount();
-            storySave();
-          }
-        } catch (err) {
-          // Show inline error below the textarea, auto-dismiss after 4s
-          const errEl = document.createElement("div");
-          errEl.className = "story-ai-error";
-          errEl.textContent = err.message || "AI Write failed";
-          blockEl.appendChild(errEl);
-          setTimeout(() => {
-            if (errEl.parentNode) errEl.parentNode.removeChild(errEl);
-          }, 4000);
-        } finally {
-          aiBtn.disabled = false;
-          aiBtn.classList.remove("story-ai-write-btn--loading");
-          aiBtn.textContent = originalText;
-        }
-      });
-      blockEl.appendChild(aiBtn);
-
-      // Delete button for text blocks (only if more than one block exists)
-      if (_storyBlocks.length > 1) {
-        const delTextBtn = document.createElement("button");
-        delTextBtn.type = "button";
-        delTextBtn.className = "story-block-delete";
-        delTextBtn.title = "Delete this block";
-        delTextBtn.textContent = "×";
-        delTextBtn.addEventListener("click", () => {
-          if (!confirm("Delete this text block?")) return;
-          const idx = _storyBlocks.indexOf(block);
-          if (idx !== -1) _storyBlocks.splice(idx, 1);
-          storySave();
-          renderStoryBlocks();
-        });
-        blockEl.appendChild(delTextBtn);
-      }
-
-      // Restore focus
-      if (activeId === block.id) {
-        requestAnimationFrame(() => ta.focus());
-      }
 
     } else if (block.type === "image") {
       blockEl.className = "story-block story-block--image";
@@ -2442,114 +2292,6 @@ function setupStoryEditor() {
     });
   }
 
-  // "AI Write" floating button — always appends at the end of the story
-  const aiWriteBtn = $("#story-ai-write");
-  if (aiWriteBtn) {
-    aiWriteBtn.addEventListener("click", async () => {
-      const memory = ($("#story-memory") || {}).value || "";
-      const authorsNote = ($("#story-authors-note") || {}).value || "";
-
-      // Use the FULL story text as context (AI continues from the end)
-      const storyText = editor.textContent.trim();
-      if (!storyText && !memory.trim()) {
-        editor.focus();
-        return;
-      }
-
-      // Build context: [Memory]\n\n[Full Story]\n\n[Author's Note]
-      const parts = [];
-      if (memory.trim()) parts.push(memory.trim());
-      if (storyText) parts.push(storyText);
-      if (authorsNote.trim()) parts.push(authorsNote.trim());
-      const context = parts.join("\n\n");
-
-      const maxTokens = parseInt(($("#story-max-tokens") || {}).value) || 150;
-      const temperature = parseFloat(($("#story-temperature") || {}).value) || 1.0;
-
-      aiWriteBtn.disabled = true;
-      aiWriteBtn.classList.add("story-ai-float-btn--loading");
-      const originalHTML = aiWriteBtn.innerHTML;
-      aiWriteBtn.textContent = "Writing…";
-
-      try {
-        const res = await fetch("/api/generate-text", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ context, model: "glm-4-6", max_length: maxTokens, temperature }),
-        });
-        if (!res.ok) throw new Error(`Server error ${res.status}`);
-        const data = await res.json();
-        const generated = data.text || "";
-        if (generated) {
-          // Move cursor to end of editor and insert there
-          editor.focus();
-          const sel = window.getSelection();
-          sel.selectAllChildren(editor);
-          sel.collapseToEnd();
-          document.execCommand("insertText", false, generated);
-          storyUpdateWordCount();
-          storySaveContent();
-          // Auto-scroll to bottom
-          const panel = $("#panel-story");
-          if (panel) panel.scrollTop = panel.scrollHeight;
-        }
-      } catch (err) {
-        const errEl = document.createElement("div");
-        errEl.className = "story-ai-error";
-        errEl.textContent = err.message || "AI Write failed";
-        editor.parentNode.insertBefore(errEl, editor.nextSibling);
-        setTimeout(() => { if (errEl.parentNode) errEl.parentNode.removeChild(errEl); }, 4000);
-      } finally {
-        aiWriteBtn.disabled = false;
-        aiWriteBtn.classList.remove("story-ai-float-btn--loading");
-        aiWriteBtn.innerHTML = originalHTML;
-      }
-    });
-  }
-
-  // ── Settings toggle ──────────────────────────────────────
-  const settingsBtn = $("#story-toggle-settings");
-  const settingsPanel = $("#story-settings");
-  if (settingsBtn && settingsPanel) {
-    settingsBtn.addEventListener("click", () => {
-      const visible = settingsPanel.style.display !== "none";
-      settingsPanel.style.display = visible ? "none" : "";
-      settingsBtn.classList.toggle("active", !visible);
-    });
-  }
-
-  // ── Persist Memory & Author's Note ──────────────────────
-  const memoryEl = $("#story-memory");
-  const authorsNoteEl = $("#story-authors-note");
-  const tempEl = $("#story-temperature");
-  const tempValEl = $("#story-temperature-val");
-  const maxTokEl = $("#story-max-tokens");
-  const maxTokValEl = $("#story-max-tokens-val");
-
-  // Load saved settings
-  try {
-    const savedSettings = JSON.parse(localStorage.getItem("nai-story-settings") || "{}");
-    if (savedSettings.memory && memoryEl) memoryEl.value = savedSettings.memory;
-    if (savedSettings.authorsNote && authorsNoteEl) authorsNoteEl.value = savedSettings.authorsNote;
-    if (savedSettings.temperature && tempEl) { tempEl.value = savedSettings.temperature; if (tempValEl) tempValEl.textContent = parseFloat(savedSettings.temperature).toFixed(2); }
-    if (savedSettings.maxTokens && maxTokEl) { maxTokEl.value = savedSettings.maxTokens; if (maxTokValEl) maxTokValEl.textContent = savedSettings.maxTokens; }
-  } catch (_) {}
-
-  function saveStorySettings() {
-    try {
-      localStorage.setItem("nai-story-settings", JSON.stringify({
-        memory: memoryEl ? memoryEl.value : "",
-        authorsNote: authorsNoteEl ? authorsNoteEl.value : "",
-        temperature: tempEl ? tempEl.value : "1.0",
-        maxTokens: maxTokEl ? maxTokEl.value : "150",
-      }));
-    } catch (_) {}
-  }
-
-  if (memoryEl) memoryEl.addEventListener("input", saveStorySettings);
-  if (authorsNoteEl) authorsNoteEl.addEventListener("input", saveStorySettings);
-  if (tempEl) tempEl.addEventListener("input", () => { if (tempValEl) tempValEl.textContent = parseFloat(tempEl.value).toFixed(2); saveStorySettings(); });
-  if (maxTokEl) maxTokEl.addEventListener("input", () => { if (maxTokValEl) maxTokValEl.textContent = maxTokEl.value; saveStorySettings(); });
 }
 
 // ── end of story editor ──────────────────────────────────
