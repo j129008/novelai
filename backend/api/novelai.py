@@ -33,7 +33,7 @@ import random
 import zipfile
 from typing import Optional
 
-from models.schemas import CharCaption, CharCenter
+from models.schemas import CharCaption, CharCenter, VibeImage
 
 API_URL = "https://image.novelai.net/ai/generate-image"
 
@@ -54,21 +54,23 @@ async def generate_image(
     action: str = "generate",
     width: int = 832,
     height: int = 1216,
-    steps: int = 28,
+    steps: int = 23,
     scale: float = 5.0,
     sampler: str = "k_euler_ancestral",
     seed: int = 0,
     sm: bool = False,
     sm_dyn: bool = False,
+    noise_schedule: str = "karras",
+    cfg_rescale: float = 0.0,
     image: Optional[str] = None,
     strength: float = 0.7,
     noise: float = 0.0,
-    reference_image: Optional[str] = None,
-    reference_information_extracted: float = 1.0,
-    reference_strength: float = 0.6,
+    reference_images: Optional[list[VibeImage]] = None,
     char_captions: Optional[list[CharCaption]] = None,
     use_coords: Optional[bool] = None,
 ) -> tuple[bytes, int]:
+    if reference_images is None:
+        reference_images = []
     if char_captions is None:
         char_captions = []
     if seed == 0:
@@ -89,8 +91,8 @@ async def generate_image(
         "uc": negative_prompt,
         "qualityToggle": True,
         "dynamic_thresholding": False,
-        "cfg_rescale": 0,
-        "noise_schedule": "karras",
+        "cfg_rescale": cfg_rescale,
+        "noise_schedule": noise_schedule,
         "uncond_scale": 0.0,
         "prefer_brownian": True,
         "uncond_per_vibe": True,
@@ -134,10 +136,10 @@ async def generate_image(
         params["strength"] = strength
         params["noise"] = noise
 
-    if reference_image:
-        params["reference_image"] = reference_image
-        params["reference_information_extracted"] = reference_information_extracted
-        params["reference_strength"] = reference_strength
+    if reference_images:
+        params["reference_image_multiple"] = [v.image for v in reference_images]
+        params["reference_information_extracted_multiple"] = [v.information_extracted for v in reference_images]
+        params["reference_strength_multiple"] = [v.strength for v in reference_images]
 
     payload = {
         "input": prompt,
