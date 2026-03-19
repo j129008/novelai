@@ -525,6 +525,12 @@
 
         <div id="panel-story" class="story-panel" style="display:none">
           <div class="story-toolbar">
+            <select id="story-model" class="field-select field-select--compact" aria-label="AI writing model">
+              <option value="glm-4-6" selected>GLM-4.6</option>
+              <option value="llama-3-erato-v1">Erato 70B</option>
+              <option value="kayra-v1">Kayra</option>
+              <option value="clio-v1">Clio</option>
+            </select>
             <button id="story-insert-img" class="btn-action btn-action--primary" type="button" disabled title="Generate an image first">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
               Insert Last Image

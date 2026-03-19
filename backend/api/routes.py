@@ -17,9 +17,12 @@ from models.schemas import (
     GalleryListResponse,
     GenerateRequest,
     GenerateResponse,
+    GenerateTextRequest,
+    GenerateTextResponse,
     RecordCharactersRequest,
 )
 from api.novelai import generate_image
+from api.text_novelai import generate_text
 
 router = APIRouter(prefix="/api")
 
@@ -216,6 +219,27 @@ async def generate(req: GenerateRequest):
         image=base64.b64encode(image_data).decode(),
         seed=seed,
     )
+
+
+@router.post("/generate-text", response_model=GenerateTextResponse)
+async def generate_text_endpoint(req: GenerateTextRequest):
+    if not TOKEN:
+        raise HTTPException(status_code=503, detail="NOVELAI_TOKEN not configured")
+
+    # Truncate context to last 4000 chars to stay within model limits
+    context = req.context[-4000:]
+
+    try:
+        text = await generate_text(
+            token=TOKEN,
+            input_text=context,
+            model=req.model,
+            max_length=req.max_length,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"NovelAI text API error: {e}")
+
+    return GenerateTextResponse(text=text)
 
 
 def _resolve_gallery_path(output_dir: Path, subpath: str) -> Path:

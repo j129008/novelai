@@ -2197,6 +2197,62 @@ function renderStoryBlocks() {
 
       blockEl.appendChild(ta);
 
+      // AI Write button
+      const aiBtn = document.createElement("button");
+      aiBtn.type = "button";
+      aiBtn.className = "story-ai-write-btn";
+      aiBtn.textContent = "AI Write";
+      aiBtn.addEventListener("click", async () => {
+        // Collect context: all text blocks up to and including this one
+        const blockIndex = _storyBlocks.indexOf(block);
+        const context = _storyBlocks
+          .slice(0, blockIndex + 1)
+          .filter((b) => b.type === "text")
+          .map((b) => b.content)
+          .join("\n\n");
+
+        const model = (document.getElementById("story-model") || {}).value || "glm-4-6";
+
+        aiBtn.disabled = true;
+        aiBtn.classList.add("story-ai-write-btn--loading");
+        const originalText = aiBtn.textContent;
+        aiBtn.textContent = "Writing";
+
+        try {
+          const res = await fetch("/api/generate-text", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ context, model, max_length: 150 }),
+          });
+          if (!res.ok) throw new Error(`Server error ${res.status}`);
+          const data = await res.json();
+          const generated = data.text || "";
+          if (generated) {
+            block.content = block.content
+              ? block.content + (block.content.endsWith(" ") ? "" : " ") + generated
+              : generated;
+            ta.value = block.content;
+            resize();
+            renderStoryWordCount();
+            storySave();
+          }
+        } catch (err) {
+          // Show inline error below the textarea, auto-dismiss after 4s
+          const errEl = document.createElement("div");
+          errEl.className = "story-ai-error";
+          errEl.textContent = err.message || "AI Write failed";
+          blockEl.appendChild(errEl);
+          setTimeout(() => {
+            if (errEl.parentNode) errEl.parentNode.removeChild(errEl);
+          }, 4000);
+        } finally {
+          aiBtn.disabled = false;
+          aiBtn.classList.remove("story-ai-write-btn--loading");
+          aiBtn.textContent = originalText;
+        }
+      });
+      blockEl.appendChild(aiBtn);
+
       // Restore focus
       if (activeId === block.id) {
         requestAnimationFrame(() => ta.focus());
