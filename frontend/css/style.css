@@ -2155,6 +2155,25 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   background: var(--danger-bg);
 }
 
+.story-inline-img-redraw {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(124,92,252,0.4);
+  background: var(--bg-raised);
+  color: var(--accent-bright);
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.story-inline-img:hover .story-inline-img-redraw { opacity: 1; }
+.story-inline-img-redraw:hover { background: var(--accent-dim); }
+
 @keyframes lightboxImgIn {
   from { opacity: 0; transform: scale(0.97); }
   to   { opacity: 1; transform: scale(1); }

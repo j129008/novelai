@@ -1219,10 +1219,20 @@ async function generate() {
     const allPromptText = [prompt, ...characters.map((c) => c.prompt)].join(", ");
     recordRecentCharacters(allPromptText);
 
-    // If Story tab is active, auto-insert image at cursor position
-    const storyTab = $("#tab-story");
-    if (storyTab && storyTab.classList.contains("canvas-tab--active")) {
-      insertImageAtCursor(data.image, prompt, data.seed);
+    // If redrawing a story image, replace it in-place
+    if (state._storyRedrawFigure && state._storyRedrawFigure.parentNode) {
+      const fig = state._storyRedrawFigure;
+      const imgEl = fig.querySelector("img");
+      if (imgEl) imgEl.src = `data:image/png;base64,${data.image}`;
+      fig.dataset.seed = String(data.seed);
+      state._storyRedrawFigure = null;
+      storySaveContent();
+    } else {
+      // If Story tab is active, auto-insert image at cursor position
+      const storyTab = $("#tab-story");
+      if (storyTab && storyTab.classList.contains("canvas-tab--active")) {
+        insertImageAtCursor(data.image, prompt, data.seed);
+      }
     }
 
     // Auto Iterate: set output as img2img source for next generation
@@ -2273,15 +2283,23 @@ function insertImageAtCursor(base64, prompt, seed) {
   const caption = document.createElement("figcaption");
   caption.textContent = prompt || "";
 
+  const redrawBtn = document.createElement("button");
+  redrawBtn.type = "button";
+  redrawBtn.className = "story-inline-img-redraw";
+  redrawBtn.setAttribute("aria-label", "Redraw with img2img");
+  redrawBtn.textContent = "Redraw";
+  // Click handled by event delegation in _attachEditorImageListeners
+
   const delBtn = document.createElement("button");
   delBtn.type = "button";
   delBtn.className = "story-inline-img-delete";
   delBtn.setAttribute("aria-label", "Remove image");
   delBtn.textContent = "\u00d7";
-  // Click handled by event delegation in setupStoryEditor
+  // Click handled by event delegation in _attachEditorImageListeners
 
   figure.appendChild(img);
   if (prompt) figure.appendChild(caption);
+  figure.appendChild(redrawBtn);
   figure.appendChild(delBtn);
 
   storyRestoreSelection();
@@ -2363,8 +2381,8 @@ function relativeTime(isoStr) {
 }
 
 function _attachEditorImageListeners(editor) {
-  // Event delegation for image delete buttons (survives DOM mutations)
   editor.addEventListener("click", (e) => {
+    // Delete button
     const delBtn = e.target.closest(".story-inline-img-delete");
     if (delBtn) {
       e.preventDefault();
@@ -2373,6 +2391,44 @@ function _attachEditorImageListeners(editor) {
       if (figure) figure.remove();
       storyUpdateWordCount();
       storySaveContent();
+      return;
+    }
+
+    // Redraw button — set image as i2i source, load prompt, generate
+    const redrawBtn = e.target.closest(".story-inline-img-redraw");
+    if (redrawBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const figure = redrawBtn.closest(".story-inline-img");
+      if (!figure) return;
+
+      // Get the image base64 from the <img> src
+      const imgEl = figure.querySelector("img");
+      if (!imgEl || !imgEl.src) return;
+      const base64 = imgEl.src.replace(/^data:image\/png;base64,/, "");
+
+      // Set as img2img source
+      state.img2img = base64;
+      state.canvasImageBase64 = base64;
+      activateImg2ImgMode();
+      const accordion = $("#img2img-accordion");
+      if (accordion && !accordion.open) accordion.open = true;
+
+      // Load the stored prompt
+      const storedPrompt = figure.dataset.prompt || "";
+      if (storedPrompt) {
+        const promptEl = $("#prompt");
+        if (promptEl) {
+          promptEl.value = storedPrompt;
+          localStorage.setItem("nai-prompt", storedPrompt);
+        }
+      }
+
+      // Store reference to the figure so we can replace the image after generation
+      state._storyRedrawFigure = figure;
+
+      // Trigger generation
+      generate();
     }
   });
 }
