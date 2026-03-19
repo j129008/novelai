@@ -1151,8 +1151,6 @@ async function generate() {
     state.canvasImageWidth = width;
     state.canvasImageHeight = height;
 
-    const storyInsertBtn = $("#story-insert-img");
-    if (storyInsertBtn) storyInsertBtn.disabled = false;
 
     const output = $("#output");
     const img = document.createElement("img");
@@ -2300,16 +2298,6 @@ function setupStoryEditor() {
   editor.addEventListener("blur", storySaveSelection);
 
   storyUpdateWordCount();
-
-  // "Insert Image" button
-  const insertImgBtn = $("#story-insert-img");
-  if (insertImgBtn) {
-    insertImgBtn.addEventListener("click", () => {
-      if (!state.lastImageBase64) return;
-      const prompt = ($("#prompt") || {}).value || "";
-      insertImageAtCursor(state.lastImageBase64, prompt, state.lastSeed);
-    });
-  }
 
 }
 
