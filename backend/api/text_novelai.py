@@ -63,6 +63,7 @@ async def generate_text(
     input_text: str,
     model: str = "glm-4-6",
     max_length: int = 100,
+    temperature: float = 1.0,
 ) -> str:
     """Call the NovelAI text generation API and return the decoded output string.
 
@@ -89,7 +90,7 @@ async def generate_text(
             "model": model,
             "prompt": input_text,
             "max_tokens": max_length,
-            "temperature": 1.0,
+            "temperature": temperature,
             "top_p": 0.975,
             "frequency_penalty": 0.0,
             "presence_penalty": 0.0,
@@ -103,7 +104,7 @@ async def generate_text(
             "parameters": {
                 "max_length": max_length,
                 "min_length": 1,
-                "temperature": 1.0,
+                "temperature": temperature,
                 "top_k": 0,
                 "top_p": 0.975,
                 "tail_free_sampling": 0.975,

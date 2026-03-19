@@ -525,17 +525,40 @@
 
         <div id="panel-story" class="story-panel" style="display:none">
           <div class="story-toolbar">
-            <select id="story-model" class="field-select field-select--compact" aria-label="AI writing model">
-              <option value="glm-4-6" selected>GLM-4.6</option>
-              <option value="llama-3-erato-v1">Erato 70B</option>
-              <option value="kayra-v1">Kayra</option>
-              <option value="clio-v1">Clio</option>
-            </select>
             <button id="story-insert-img" class="btn-action btn-action--primary" type="button" disabled title="Generate an image first">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-              Insert Last Image
+              Insert Image
+            </button>
+            <button id="story-toggle-settings" class="btn-action" type="button" title="Writing settings">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06c.5.5 1.2.78 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.55.26.94.77 1 1.34V11a2 2 0 0 1 0 4h-.09c-.57.06-1.08.45-1.34 1z"/></svg>
+              Settings
             </button>
             <span id="story-word-count" class="story-word-count"></span>
+          </div>
+          <!-- Writing Settings Panel (toggle visibility) -->
+          <div id="story-settings" class="story-settings" style="display:none">
+            <div class="story-settings-inner">
+              <div class="story-setting-group">
+                <label class="field-label" for="story-memory">Memory <span class="story-setting-hint">(always included at context start)</span></label>
+                <textarea id="story-memory" class="field-textarea story-setting-textarea" rows="3" placeholder="Setting: A dark fantasy world. Characters: Aria is a warrior princess..."></textarea>
+              </div>
+              <div class="story-setting-group">
+                <label class="field-label" for="story-authors-note">Author's Note <span class="story-setting-hint">(injected near end of context — strong influence)</span></label>
+                <textarea id="story-authors-note" class="field-textarea story-setting-textarea" rows="2" placeholder="Style: vivid prose, dark atmosphere. Focus on dialogue and tension."></textarea>
+              </div>
+              <div class="story-setting-row">
+                <div class="story-setting-group">
+                  <label class="field-label" for="story-temperature">Temperature</label>
+                  <input type="range" id="story-temperature" class="field-range" min="0.1" max="2.0" step="0.05" value="1.0">
+                  <span class="slider-value" id="story-temperature-val">1.00</span>
+                </div>
+                <div class="story-setting-group">
+                  <label class="field-label" for="story-max-tokens">Max Tokens</label>
+                  <input type="range" id="story-max-tokens" class="field-range" min="20" max="300" step="10" value="150">
+                  <span class="slider-value" id="story-max-tokens-val">150</span>
+                </div>
+              </div>
+            </div>
           </div>
           <div id="story-blocks" class="story-blocks"></div>
           <button id="story-add-text" class="btn-action" type="button" style="max-width:720px;margin:8px auto 0;display:flex">+ Add Text</button>

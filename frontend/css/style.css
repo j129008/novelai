@@ -1900,7 +1900,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
   position: sticky;
   top: 0;
   z-index: 5;
@@ -1908,6 +1908,22 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   padding: 8px 0;
   flex-shrink: 0;
 }
+
+.story-settings {
+  max-width: 720px;
+  margin: 0 auto 16px;
+  background: var(--bg-float);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+}
+.story-settings-inner { display: flex; flex-direction: column; gap: 12px; }
+.story-setting-group { display: flex; flex-direction: column; gap: 5px; }
+.story-setting-hint { font-weight: 400; color: var(--text-tertiary); font-size: 0.7rem; }
+.story-setting-textarea { font-size: 0.85rem; line-height: 1.5; resize: vertical; min-height: 40px; }
+.story-setting-row { display: flex; gap: 16px; }
+.story-setting-row .story-setting-group { flex: 1; }
+.story-setting-row .slider-value { font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px; }
 
 .story-word-count {
   font-size: 0.72rem;

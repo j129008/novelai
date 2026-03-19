@@ -2205,13 +2205,24 @@ function renderStoryBlocks() {
       aiBtn.addEventListener("click", async () => {
         // Collect context: all text blocks up to and including this one
         const blockIndex = _storyBlocks.indexOf(block);
-        const context = _storyBlocks
+        // Build context: Memory + story text + Author's Note
+        const memory = ($("#story-memory") || {}).value || "";
+        const authorsNote = ($("#story-authors-note") || {}).value || "";
+        const storyText = _storyBlocks
           .slice(0, blockIndex + 1)
           .filter((b) => b.type === "text")
           .map((b) => b.content)
           .join("\n\n");
 
-        const model = (document.getElementById("story-model") || {}).value || "glm-4-6";
+        // Context structure: [Memory]\n\n[Story Text...]\n\n[Author's Note]
+        const parts = [];
+        if (memory.trim()) parts.push(memory.trim());
+        parts.push(storyText);
+        if (authorsNote.trim()) parts.push(authorsNote.trim());
+        const context = parts.join("\n\n");
+
+        const maxTokens = parseInt(($("#story-max-tokens") || {}).value) || 150;
+        const temperature = parseFloat(($("#story-temperature") || {}).value) || 1.0;
 
         aiBtn.disabled = true;
         aiBtn.classList.add("story-ai-write-btn--loading");
@@ -2222,7 +2233,7 @@ function renderStoryBlocks() {
           const res = await fetch("/api/generate-text", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ context, model, max_length: 150 }),
+            body: JSON.stringify({ context, model: "glm-4-6", max_length: maxTokens, temperature }),
           });
           if (!res.ok) throw new Error(`Server error ${res.status}`);
           const data = await res.json();
@@ -2373,6 +2384,50 @@ function setupStoryEditor() {
       });
     });
   }
+
+  // ── Settings toggle ──────────────────────────────────────
+  const settingsBtn = $("#story-toggle-settings");
+  const settingsPanel = $("#story-settings");
+  if (settingsBtn && settingsPanel) {
+    settingsBtn.addEventListener("click", () => {
+      const visible = settingsPanel.style.display !== "none";
+      settingsPanel.style.display = visible ? "none" : "";
+      settingsBtn.classList.toggle("active", !visible);
+    });
+  }
+
+  // ── Persist Memory & Author's Note ──────────────────────
+  const memoryEl = $("#story-memory");
+  const authorsNoteEl = $("#story-authors-note");
+  const tempEl = $("#story-temperature");
+  const tempValEl = $("#story-temperature-val");
+  const maxTokEl = $("#story-max-tokens");
+  const maxTokValEl = $("#story-max-tokens-val");
+
+  // Load saved settings
+  try {
+    const savedSettings = JSON.parse(localStorage.getItem("nai-story-settings") || "{}");
+    if (savedSettings.memory && memoryEl) memoryEl.value = savedSettings.memory;
+    if (savedSettings.authorsNote && authorsNoteEl) authorsNoteEl.value = savedSettings.authorsNote;
+    if (savedSettings.temperature && tempEl) { tempEl.value = savedSettings.temperature; if (tempValEl) tempValEl.textContent = parseFloat(savedSettings.temperature).toFixed(2); }
+    if (savedSettings.maxTokens && maxTokEl) { maxTokEl.value = savedSettings.maxTokens; if (maxTokValEl) maxTokValEl.textContent = savedSettings.maxTokens; }
+  } catch (_) {}
+
+  function saveStorySettings() {
+    try {
+      localStorage.setItem("nai-story-settings", JSON.stringify({
+        memory: memoryEl ? memoryEl.value : "",
+        authorsNote: authorsNoteEl ? authorsNoteEl.value : "",
+        temperature: tempEl ? tempEl.value : "1.0",
+        maxTokens: maxTokEl ? maxTokEl.value : "150",
+      }));
+    } catch (_) {}
+  }
+
+  if (memoryEl) memoryEl.addEventListener("input", saveStorySettings);
+  if (authorsNoteEl) authorsNoteEl.addEventListener("input", saveStorySettings);
+  if (tempEl) tempEl.addEventListener("input", () => { if (tempValEl) tempValEl.textContent = parseFloat(tempEl.value).toFixed(2); saveStorySettings(); });
+  if (maxTokEl) maxTokEl.addEventListener("input", () => { if (maxTokValEl) maxTokValEl.textContent = maxTokEl.value; saveStorySettings(); });
 }
 
 function renderLightboxFrame() {
