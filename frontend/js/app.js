@@ -291,6 +291,29 @@ function setupImg2ImgControls() {
   }
 }
 
+// Paste image from clipboard → img2img
+document.addEventListener("paste", (e) => {
+  // Don't intercept paste in text inputs
+  const active = document.activeElement;
+  if (active && (active.tagName === "TEXTAREA" || active.tagName === "INPUT" || active.isContentEditable)) return;
+
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith("image/")) {
+      e.preventDefault();
+      const file = item.getAsFile();
+      if (file) {
+        loadImageFile(file);
+        const accordion = $("#img2img-accordion");
+        if (accordion && !accordion.open) accordion.open = true;
+        showStatus("Image pasted as img2img source");
+      }
+      break;
+    }
+  }
+});
+
 function loadImageFile(file) {
   const reader = new FileReader();
   reader.onload = (ev) => {
