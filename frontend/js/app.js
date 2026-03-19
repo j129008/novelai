@@ -2160,11 +2160,7 @@ function insertImageAtCursor(base64, prompt, seed) {
   delBtn.className = "story-inline-img-delete";
   delBtn.setAttribute("aria-label", "Remove image");
   delBtn.textContent = "\u00d7";
-  delBtn.addEventListener("click", () => {
-    figure.remove();
-    storyUpdateWordCount();
-    storySaveContent();
-  });
+  // Click handled by event delegation in setupStoryEditor
 
   figure.appendChild(img);
   if (prompt) figure.appendChild(caption);
@@ -2386,21 +2382,37 @@ function setupStoryEditor() {
   // Restore persisted content
   try {
     const saved = localStorage.getItem("nai-story-v2");
-    if (saved) {
-      editor.innerHTML = saved;
-      // Re-attach delete listeners to restored figures
-      editor.querySelectorAll(".story-inline-img").forEach((figure) => {
-        const delBtn = figure.querySelector(".story-inline-img-delete");
-        if (delBtn) {
-          delBtn.addEventListener("click", () => {
-            figure.remove();
-            storyUpdateWordCount();
-            storySaveContent();
-          });
-        }
-      });
-    }
+    if (saved) editor.innerHTML = saved;
   } catch (_) { /* malformed — start fresh */ }
+
+  // Event delegation for image delete buttons (survives DOM mutations)
+  editor.addEventListener("click", (e) => {
+    const delBtn = e.target.closest(".story-inline-img-delete");
+    if (delBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const figure = delBtn.closest(".story-inline-img");
+      if (figure) figure.remove();
+      storyUpdateWordCount();
+      storySaveContent();
+    }
+  });
+
+  // Protect images from contentEditable corruption:
+  // Re-enforce contentEditable=false on all figures after any mutation
+  const observer = new MutationObserver(() => {
+    editor.querySelectorAll(".story-inline-img").forEach((fig) => {
+      if (fig.contentEditable !== "false") fig.contentEditable = "false";
+    });
+  });
+  observer.observe(editor, { childList: true, subtree: true, attributes: true });
+
+  // Prevent contentEditable from resizing images (disable browser handles)
+  editor.addEventListener("mousedown", (e) => {
+    if (e.target.tagName === "IMG" && e.target.closest(".story-inline-img")) {
+      e.preventDefault(); // prevent browser resize handles
+    }
+  });
 
   // Live save & word count on content changes
   editor.addEventListener("input", () => {

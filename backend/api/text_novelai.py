@@ -85,8 +85,7 @@ async def generate_text(
     }
 
     if model in _OPENAI_MODELS:
-        # OpenAI-compatible endpoint for GLM models
-        # The completions endpoint continues directly from the prompt text
+        # Completions endpoint for GLM models — continues directly from prompt
         payload = {
             "model": model,
             "prompt": input_text,
@@ -122,9 +121,11 @@ async def generate_text(
         data = resp.json()
 
     if model in _OPENAI_MODELS:
-        # OpenAI format: {"choices": [{"text": "..."}]}
+        # Completions format: {"choices": [{"text": "..."}]}
         choices = data.get("choices", [])
-        return choices[0]["text"] if choices else ""
+        if choices:
+            return choices[0].get("text", choices[0].get("message", {}).get("content", ""))
+        return ""
     else:
         raw_output = data.get("output", "")
         return _decode_output(raw_output, model)

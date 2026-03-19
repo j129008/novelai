@@ -1982,6 +1982,8 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   border-radius: var(--radius-lg);
   display: block;
   margin: 0 auto;
+  pointer-events: none; /* prevent browser resize handles */
+  -webkit-user-drag: none;
 }
 
 .story-inline-img figcaption {
