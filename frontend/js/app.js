@@ -158,6 +158,23 @@ async function init() {
 
   $("#btn-set-as-source").addEventListener("click", setCanvasImageAsSource);
 
+  // Enter in prompt/negative textarea = generate (Shift+Enter = newline)
+  const promptEl = $("#prompt");
+  const negativeEl = $("#negative-prompt");
+  [promptEl, negativeEl].forEach((el) => {
+    if (!el) return;
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        // Don't generate if autocomplete dropdown is visible
+        const dd = $("#tag-dropdown");
+        if (dd && dd.classList.contains("visible")) return;
+        e.preventDefault();
+        generate();
+      }
+    });
+  });
+
+  // Also keep Cmd/Ctrl+Enter as global shortcut
   document.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
@@ -916,17 +933,13 @@ const _tagAC = (() => {
       selectedIdx = Math.max(selectedIdx - 1, 0);
       items.forEach((el, i) => el.classList.toggle("selected", i === selectedIdx));
       if (selectedIdx >= 0) items[selectedIdx].scrollIntoView({ block: "nearest" });
-    } else if (e.key === "Tab" || e.key === "Enter") {
-      // Tab: only complete if user has actively selected an item with arrow keys
-      // Enter: auto-select first item if nothing selected (more intentional action)
-      if (e.key === "Enter" && selectedIdx < 0 && items.length > 0) selectedIdx = 0;
+    } else if (e.key === "Tab") {
+      // Tab always autocompletes: select first item if none highlighted
+      if (selectedIdx < 0 && items.length > 0) selectedIdx = 0;
       if (selectedIdx >= 0) {
         e.preventDefault();
         const name = items[selectedIdx].querySelector(".tag-item-name").textContent;
         insert(name.replace(/ /g, "_"));
-      } else if (e.key === "Tab") {
-        // No selection — let Tab pass through naturally (dismiss dropdown)
-        hide();
       }
     } else if (e.key === "Escape") {
       hide();
@@ -1042,7 +1055,7 @@ function resetGenerateButton() {
   btn.classList.remove("loading", "stopping");
   btn.disabled = false;
   btn.querySelector(".btn-generate-label").textContent = "Generate";
-  btn.querySelector(".btn-generate-hint").textContent = "Cmd + Enter";
+  btn.querySelector(".btn-generate-hint").textContent = "Enter";
   _generateAbortController = null;
 }
 
