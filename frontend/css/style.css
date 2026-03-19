@@ -1908,6 +1908,11 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   padding: 8px 0;
   flex-shrink: 0;
 }
+.story-toolbar .btn-action.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent-bright);
+}
 
 .story-settings {
   max-width: 720px;
@@ -1931,62 +1936,55 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   margin-left: auto;
 }
 
-.story-blocks {
+/* ── contentEditable story editor (Notion-style) ── */
+
+.story-editor-content {
   max-width: 720px;
   margin: 0 auto;
   width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+  min-height: 300px;
   flex: 1;
-}
-
-.story-block--text {
-  position: relative;
-}
-
-.story-block--text textarea {
-  width: 100%;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  padding: 12px 16px;
   font-size: 1.05rem;
   line-height: 1.85;
   color: var(--text-primary);
-  font-family: inherit;
-  resize: none;
-  overflow: hidden;
-  transition: border-color 0.15s;
-}
-.story-block--text textarea:focus {
-  border-color: var(--border-muted);
   outline: none;
-}
-.story-block--text:hover textarea,
-.story-block--text:focus-within textarea {
-  padding-bottom: 36px;
-}
-.story-block--text textarea::placeholder {
-  color: var(--text-tertiary);
+  padding: 0 16px 80px;
+  caret-color: var(--accent-bright);
 }
 
-.story-block--image {
+.story-editor-content:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-tertiary);
+  pointer-events: none;
+  display: block;
+}
+
+.story-editor-content p {
+  margin: 0 0 0.8em;
+}
+
+.story-editor-content div {
+  margin: 0 0 0.5em;
+}
+
+/* Inline figure inserted at cursor position */
+.story-inline-img {
+  display: block;
+  margin: 28px auto;
   text-align: center;
-  padding: 16px 0;
   position: relative;
-}
-.story-block--image figure {
-  margin: 0;
-}
-.story-block--image img {
   max-width: 480px;
-  width: 100%;
+  user-select: none;
+}
+
+.story-inline-img img {
+  max-width: 100%;
   border-radius: var(--radius-lg);
   display: block;
   margin: 0 auto;
 }
-.story-block--image figcaption {
+
+.story-inline-img figcaption {
   font-size: 0.78rem;
   color: var(--text-tertiary);
   margin-top: 8px;
@@ -1994,131 +1992,39 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   padding: 0 8px;
 }
 
-.story-img-seed-badge {
-  display: inline-block;
-  font-size: 0.68rem;
-  font-weight: 700;
-  font-family: "SF Mono","Fira Code","Cascadia Code",monospace;
-  color: var(--accent-bright);
-  background: var(--accent-dim);
-  border: 1px solid rgba(124,92,252,0.35);
-  border-radius: 10px;
-  padding: 1px 8px;
-  margin-top: 6px;
-  font-variant-numeric: tabular-nums;
-}
-
-.story-img-delete {
+.story-inline-img-delete {
   position: absolute;
-  top: 24px;
-  right: 8px;
-  opacity: 0;
-  transition: opacity 0.15s;
-  background: var(--danger-bg);
-  border: 1px solid var(--danger-border);
-  color: var(--danger);
-  border-radius: var(--radius-sm);
-  font-size: 0.72rem;
-  font-family: inherit;
-  font-weight: 600;
-  padding: 4px 10px;
-  cursor: pointer;
-}
-.story-block--image:hover .story-img-delete {
-  opacity: 1;
-}
-
-.story-block-delete {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  opacity: 0;
-  transition: opacity 0.15s;
-  background: none;
-  border: none;
-  color: var(--text-tertiary);
-  font-size: 1rem;
-  cursor: pointer;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-sm);
-}
-.story-block-delete:hover { color: var(--danger); }
-.story-block--text:hover .story-block-delete { opacity: 1; }
-
-.story-insert-zone {
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.15s;
-  position: relative;
-}
-.story-insert-zone:hover {
-  opacity: 1;
-}
-.story-insert-zone::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 1px;
-  background: var(--border-muted);
-}
-.story-insert-btn {
-  width: 24px;
-  height: 24px;
+  top: -8px;
+  right: -8px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  border: 1px dashed var(--border-muted);
-  background: var(--bg-base);
-  color: var(--text-tertiary);
-  font-size: 0.85rem;
+  border: 1px solid var(--danger-border);
+  background: var(--bg-raised);
+  color: var(--danger);
+  font-size: 1rem;
+  line-height: 1;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.12s, border-color 0.12s, background 0.12s;
-  position: relative;
-  z-index: 1;
-  line-height: 1;
-}
-.story-insert-btn:hover {
-  color: var(--accent-bright);
-  border-color: var(--accent);
-  background: var(--bg-raised);
-}
-
-.story-ai-write-btn {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  padding: 4px 10px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--accent-dim);
-  background: rgba(124,92,252,0.1);
-  color: var(--accent-bright);
-  cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s, background 0.15s;
   font-family: inherit;
 }
-.story-block--text:hover .story-ai-write-btn,
-.story-block--text:focus-within .story-ai-write-btn {
+
+.story-inline-img:hover .story-inline-img-delete {
   opacity: 1;
 }
-.story-ai-write-btn:hover {
-  background: var(--accent-dim);
+
+.story-inline-img-delete:hover {
+  background: var(--danger-bg);
 }
+
+/* AI Write toolbar button states */
 .story-ai-write-btn--loading {
   pointer-events: none;
-  opacity: 1;
+  opacity: 0.7;
 }
 .story-ai-write-btn--loading::after {
   content: "";
@@ -2134,6 +2040,8 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 }
 
 .story-ai-error {
+  max-width: 720px;
+  margin: 0 auto;
   font-size: 0.75rem;
   color: var(--danger);
   padding: 4px 16px;

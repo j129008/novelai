@@ -2096,50 +2096,104 @@ function navigateLightbox(delta) {
    STORY EDITOR
    ═══════════════════════════════════════════════════════════ */
 
-let _storyBlocks = [];
-let _storyFocusedBlockId = null;
 let _storySaveTimer = null;
+// Saved selection range so toolbar buttons don't lose cursor position
+let _storySavedRange = null;
 
-function storyUUID() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
-
-function storySave() {
+function storySaveContent() {
   clearTimeout(_storySaveTimer);
   _storySaveTimer = setTimeout(() => {
+    const editor = $("#story-editor-content");
+    if (!editor) return;
     try {
-      localStorage.setItem("nai-story", JSON.stringify(_storyBlocks));
+      localStorage.setItem("nai-story-v2", editor.innerHTML);
     } catch (_) { /* quota */ }
   }, 500);
 }
 
-function storyWordCount() {
-  let words = 0;
-  for (const block of _storyBlocks) {
-    if (block.type === "text" && block.content) {
-      const trimmed = block.content.trim();
-      if (trimmed) words += trimmed.split(/\s+/).length;
-    }
-  }
-  return words;
-}
-
-function renderStoryWordCount() {
+function storyUpdateWordCount() {
+  const editor = $("#story-editor-content");
   const el = $("#story-word-count");
-  if (!el) return;
-  const w = storyWordCount();
+  if (!editor || !el) return;
+  const text = editor.textContent.trim();
+  const w = text ? text.split(/\s+/).length : 0;
   el.textContent = w > 0 ? `${w} word${w === 1 ? "" : "s"}` : "";
 }
 
-function renderStoryBlocks() {
-  const container = $("#story-blocks");
-  if (!container) return;
+function storySaveSelection() {
+  const sel = window.getSelection();
+  const editor = $("#story-editor-content");
+  if (!editor || !sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  if (editor.contains(range.commonAncestorContainer)) {
+    _storySavedRange = range.cloneRange();
+  }
+}
 
-  // Remember which textarea had focus by block id
-  const activeId = _storyFocusedBlockId;
+function storyRestoreSelection() {
+  if (!_storySavedRange) return;
+  const sel = window.getSelection();
+  if (!sel) return;
+  sel.removeAllRanges();
+  sel.addRange(_storySavedRange);
+}
 
-  container.innerHTML = "";
+function insertImageAtCursor(base64, prompt, seed) {
+  const editor = $("#story-editor-content");
+  if (!editor) return;
 
+  const figure = document.createElement("figure");
+  figure.className = "story-inline-img";
+  figure.contentEditable = "false";
+  figure.dataset.prompt = prompt || "";
+  figure.dataset.seed = seed != null ? String(seed) : "";
+
+  const img = document.createElement("img");
+  img.src = `data:image/png;base64,${base64}`;
+  img.alt = "AI generated illustration";
+
+  const caption = document.createElement("figcaption");
+  caption.textContent = prompt || "";
+
+  const delBtn = document.createElement("button");
+  delBtn.type = "button";
+  delBtn.className = "story-inline-img-delete";
+  delBtn.setAttribute("aria-label", "Remove image");
+  delBtn.textContent = "\u00d7";
+  delBtn.addEventListener("click", () => {
+    figure.remove();
+    storyUpdateWordCount();
+    storySaveContent();
+  });
+
+  figure.appendChild(img);
+  if (prompt) figure.appendChild(caption);
+  figure.appendChild(delBtn);
+
+  storyRestoreSelection();
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0) {
+    const range = sel.getRangeAt(0);
+    if (editor.contains(range.commonAncestorContainer)) {
+      range.deleteContents();
+      range.insertNode(figure);
+      range.setStartAfter(figure);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      _storySavedRange = range.cloneRange();
+    } else {
+      editor.appendChild(figure);
+    }
+  } else {
+    editor.appendChild(figure);
+  }
+
+  storySaveContent();
+  storyUpdateWordCount();
+}
+
+/* Old block-based story code removed — replaced by contentEditable approach
   const makeInsertZone = (insertIndex) => {
     const zone = document.createElement("div");
     zone.className = "story-insert-zone";
@@ -2323,82 +2377,121 @@ function renderStoryBlocks() {
       });
       blockEl.appendChild(delBtn);
     }
-
-    container.appendChild(blockEl);
-  }
-
-  // Terminal insert zone (after all blocks)
-  container.appendChild(makeInsertZone(_storyBlocks.length));
-
-  renderStoryWordCount();
-}
+*/
 
 function setupStoryEditor() {
-  // Load persisted story
+  const editor = $("#story-editor-content");
+  if (!editor) return;
+
+  // Restore persisted content
   try {
-    const raw = localStorage.getItem("nai-story");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        _storyBlocks = parsed;
-      }
+    const saved = localStorage.getItem("nai-story-v2");
+    if (saved) {
+      editor.innerHTML = saved;
+      // Re-attach delete listeners to restored figures
+      editor.querySelectorAll(".story-inline-img").forEach((figure) => {
+        const delBtn = figure.querySelector(".story-inline-img-delete");
+        if (delBtn) {
+          delBtn.addEventListener("click", () => {
+            figure.remove();
+            storyUpdateWordCount();
+            storySaveContent();
+          });
+        }
+      });
     }
   } catch (_) { /* malformed — start fresh */ }
 
-  // Ensure at least one text block
-  if (_storyBlocks.length === 0) {
-    _storyBlocks.push({ id: storyUUID(), type: "text", content: "" });
-  }
+  // Live save & word count on content changes
+  editor.addEventListener("input", () => {
+    storyUpdateWordCount();
+    storySaveContent();
+  });
 
-  renderStoryBlocks();
+  // Save selection on every cursor movement so toolbar buttons know where to insert
+  editor.addEventListener("keyup", storySaveSelection);
+  editor.addEventListener("mouseup", storySaveSelection);
+  editor.addEventListener("blur", storySaveSelection);
 
-  // "Add Text" button at the bottom
-  const addTextBtn = $("#story-add-text");
-  if (addTextBtn) {
-    addTextBtn.addEventListener("click", () => {
-      const newBlock = { id: storyUUID(), type: "text", content: "" };
-      _storyBlocks.push(newBlock);
-      _storyFocusedBlockId = newBlock.id;
-      storySave();
-      renderStoryBlocks();
-      // Scroll new block into view
-      requestAnimationFrame(() => {
-        const panel = $("#panel-story");
-        if (panel) panel.scrollTop = panel.scrollHeight;
-      });
-    });
-  }
+  storyUpdateWordCount();
 
-  // "Insert Last Image" button
+  // "Insert Image" button
   const insertImgBtn = $("#story-insert-img");
   if (insertImgBtn) {
     insertImgBtn.addEventListener("click", () => {
       if (!state.lastImageBase64) return;
-      const prompt = $("#prompt") ? $("#prompt").value : "";
-      const newBlock = {
-        id: storyUUID(),
-        type: "image",
-        base64: state.lastImageBase64,
-        prompt,
-        seed: state.lastSeed,
-      };
+      const prompt = ($("#prompt") || {}).value || "";
+      insertImageAtCursor(state.lastImageBase64, prompt, state.lastSeed);
+    });
+  }
 
-      // Insert after the currently focused text block, or at end
-      let insertIndex = _storyBlocks.length;
-      if (_storyFocusedBlockId) {
-        const idx = _storyBlocks.findIndex((b) => b.id === _storyFocusedBlockId);
-        if (idx !== -1) insertIndex = idx + 1;
+  // "AI Write" toolbar button
+  const aiWriteBtn = $("#story-ai-write");
+  if (aiWriteBtn) {
+    aiWriteBtn.addEventListener("click", async () => {
+      const memory = ($("#story-memory") || {}).value || "";
+      const authorsNote = ($("#story-authors-note") || {}).value || "";
+
+      // Collect text up to cursor position for context
+      let contextText = "";
+      storyRestoreSelection();
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
+        const range = sel.getRangeAt(0);
+        const beforeRange = document.createRange();
+        beforeRange.setStart(editor, 0);
+        beforeRange.setEnd(range.startContainer, range.startOffset);
+        contextText = beforeRange.toString();
+      } else {
+        contextText = editor.textContent;
       }
 
-      _storyBlocks.splice(insertIndex, 0, newBlock);
-      storySave();
-      renderStoryBlocks();
+      const parts = [];
+      if (memory.trim()) parts.push(memory.trim());
+      parts.push(contextText.trim());
+      if (authorsNote.trim()) parts.push(authorsNote.trim());
+      const context = parts.join("\n\n");
 
-      // Scroll newly inserted image into view
-      requestAnimationFrame(() => {
-        const blocks = document.querySelectorAll(".story-block--image");
-        if (blocks.length) blocks[blocks.length - 1].scrollIntoView({ behavior: "smooth", block: "nearest" });
-      });
+      const maxTokens = parseInt(($("#story-max-tokens") || {}).value) || 150;
+      const temperature = parseFloat(($("#story-temperature") || {}).value) || 1.0;
+
+      aiWriteBtn.disabled = true;
+      aiWriteBtn.classList.add("story-ai-write-btn--loading");
+      const originalText = aiWriteBtn.textContent;
+      aiWriteBtn.textContent = "Writing";
+
+      try {
+        const res = await fetch("/api/generate-text", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ context, model: "glm-4-6", max_length: maxTokens, temperature }),
+        });
+        if (!res.ok) throw new Error(`Server error ${res.status}`);
+        const data = await res.json();
+        const generated = data.text || "";
+        if (generated) {
+          storyRestoreSelection();
+          const insertSel = window.getSelection();
+          if (insertSel && insertSel.rangeCount > 0 && editor.contains(insertSel.getRangeAt(0).startContainer)) {
+            document.execCommand("insertText", false, generated);
+          } else {
+            editor.focus();
+            document.execCommand("insertText", false, generated);
+          }
+          storyUpdateWordCount();
+          storySaveContent();
+        }
+      } catch (err) {
+        const errEl = document.createElement("div");
+        errEl.className = "story-ai-error";
+        errEl.textContent = err.message || "AI Write failed";
+        editor.parentNode.insertBefore(errEl, editor.nextSibling);
+        setTimeout(() => { if (errEl.parentNode) errEl.parentNode.removeChild(errEl); }, 4000);
+      } finally {
+        aiWriteBtn.disabled = false;
+        aiWriteBtn.classList.remove("story-ai-write-btn--loading");
+        aiWriteBtn.textContent = originalText;
+      }
     });
   }
 
@@ -2446,6 +2539,8 @@ function setupStoryEditor() {
   if (tempEl) tempEl.addEventListener("input", () => { if (tempValEl) tempValEl.textContent = parseFloat(tempEl.value).toFixed(2); saveStorySettings(); });
   if (maxTokEl) maxTokEl.addEventListener("input", () => { if (maxTokValEl) maxTokValEl.textContent = maxTokEl.value; saveStorySettings(); });
 }
+
+// ── end of story editor ──────────────────────────────────
 
 function renderLightboxFrame() {
   const overlay = _lightboxOverlay;
