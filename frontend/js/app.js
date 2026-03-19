@@ -1173,6 +1173,12 @@ async function generate() {
     const allPromptText = [prompt, ...characters.map((c) => c.prompt)].join(", ");
     recordRecentCharacters(allPromptText);
 
+    // If Story tab is active, auto-insert image at cursor position
+    const storyTab = $("#tab-story");
+    if (storyTab && storyTab.classList.contains("canvas-tab--active")) {
+      insertImageAtCursor(data.image, prompt, data.seed);
+    }
+
     // Auto Iterate: set output as img2img source for next generation
     if ($("#auto-iterate") && $("#auto-iterate").checked) {
       iterateOnResult();
