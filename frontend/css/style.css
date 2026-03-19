@@ -2025,12 +2025,12 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 
 /* AI Write floating button — sticky at bottom of story panel */
 .story-ai-float-btn {
-  position: sticky;
-  bottom: 16px;
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 16px auto 0;
   padding: 10px 20px;
   border-radius: 999px;
   border: 1px solid var(--accent);
@@ -2041,7 +2041,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   cursor: pointer;
   box-shadow: 0 4px 16px var(--accent-glow);
   transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
-  z-index: 5;
+  z-index: 50;
 }
 .story-ai-float-btn:hover {
   background: var(--accent);
