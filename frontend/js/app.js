@@ -154,8 +154,8 @@ async function init() {
   setupLightbox();
   setupStoryEditor();
 
-  // Load recent characters at startup so sidebar section is populated immediately
-  loadRecentCharacters().then(renderRecentCharsInSidebar);
+  // Load recent characters at startup so autocomplete is populated immediately
+  loadRecentCharacters();
 
   $("#btn-set-as-source").addEventListener("click", setCanvasImageAsSource);
 
@@ -881,35 +881,100 @@ const _tagAC = (() => {
 
   // ── Dropdown render ──────────────────────────────────────
   async function fetchAndShow(query) {
-    if (query.length < 2) { hide(); return; }
+    const isCharTextarea = activeEl && activeEl.classList.contains("char-slot-textarea");
+    const minLen = isCharTextarea ? 1 : 2;
+    if (query.length < minLen) { hide(); return; }
     try {
       const resp = await fetch(`/api/tags?q=${encodeURIComponent(query)}`);
       if (!resp.ok) return;
-      const tags = await resp.json();
-      show(tags, query);
+      const apiTags = await resp.json();
+
+      // For character textareas, find recent matches and prepend them
+      if (isCharTextarea && _recentCharacters.length) {
+        const qNorm = query.toLowerCase().replace(/ /g, "_");
+        const recentMatches = _recentCharacters
+          .filter(rc => rc.tag.toLowerCase().includes(qNorm))
+          .slice(0, 3);
+        const recentTagNames = new Set(recentMatches.map(r => r.tag));
+        const dedupedTags = apiTags.filter(t => !recentTagNames.has(t.name));
+        show(dedupedTags, query, recentMatches);
+      } else {
+        show(apiTags, query, []);
+      }
     } catch { /* ignore */ }
   }
 
-  function show(tags, query) {
-    if (!tags.length) { hide(); return; }
+  function buildNameSpan(tagName, q) {
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "tag-item-name";
+    const name = tagName.replace(/_/g, " ");
+    const qDisplay = q.replace(/_/g, " ");
+    const idx = name.toLowerCase().indexOf(qDisplay.toLowerCase());
+    if (idx >= 0) {
+      nameSpan.innerHTML = escapeHtml(name.slice(0, idx))
+        + "<mark>" + escapeHtml(name.slice(idx, idx + qDisplay.length)) + "</mark>"
+        + escapeHtml(name.slice(idx + qDisplay.length));
+    } else {
+      nameSpan.textContent = name;
+    }
+    return nameSpan;
+  }
+
+  function show(tags, query, recentMatches) {
+    if (!tags.length && !recentMatches.length) { hide(); return; }
     selectedIdx = -1;
     const q = query.toLowerCase();
     dropdown.innerHTML = "";
+
+    // Prepend recent character matches
+    for (const rc of recentMatches) {
+      const item = document.createElement("div");
+      item.className = "tag-item tag-item--recent";
+
+      const nameSpan = buildNameSpan(rc.tag, q);
+
+      const badgeSpan = document.createElement("span");
+      badgeSpan.className = "tag-item-recent-badge";
+      badgeSpan.textContent = "RECENT";
+
+      const countSpan = document.createElement("span");
+      countSpan.className = "tag-item-count";
+      countSpan.textContent = `\u00d7${rc.count}`;
+
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "tag-item-delete";
+      delBtn.textContent = "\u00d7";
+      delBtn.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        fetch(`/api/recent-characters/${encodeURIComponent(rc.tag)}`, { method: "DELETE" });
+        const idx = _recentCharacters.indexOf(rc);
+        if (idx >= 0) _recentCharacters.splice(idx, 1);
+        item.remove();
+        if (!dropdown.querySelectorAll(".tag-item").length) hide();
+      });
+
+      item.appendChild(nameSpan);
+      item.appendChild(badgeSpan);
+      item.appendChild(countSpan);
+      item.appendChild(delBtn);
+
+      item.addEventListener("mousedown", (e) => {
+        if (e.target.closest(".tag-item-delete")) return;
+        e.preventDefault();
+        insert(rc.tag);
+      });
+
+      dropdown.appendChild(item);
+    }
+
+    // API results
     tags.forEach((tag) => {
       const item = document.createElement("div");
       item.className = "tag-item";
 
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "tag-item-name";
-      const name = tag.name.replace(/_/g, " ");
-      const idx = name.toLowerCase().indexOf(q.replace(/_/g, " "));
-      if (idx >= 0) {
-        nameSpan.innerHTML = escapeHtml(name.slice(0, idx))
-          + "<mark>" + escapeHtml(name.slice(idx, idx + q.length)) + "</mark>"
-          + escapeHtml(name.slice(idx + q.length));
-      } else {
-        nameSpan.textContent = name;
-      }
+      const nameSpan = buildNameSpan(tag.name, q);
 
       const catSpan = document.createElement("span");
       catSpan.className = "tag-item-cat";
@@ -1506,9 +1571,8 @@ async function recordRecentCharacters(rawPrompt) {
       body: JSON.stringify({ tags: confirmed }),
     });
 
-    // 6. Refresh sidebar recent chars section
+    // 6. Refresh recent characters list
     await loadRecentCharacters();
-    renderRecentCharsInSidebar();
   } catch { /* fire-and-forget, silent */ }
 }
 
@@ -1521,57 +1585,6 @@ async function loadRecentCharacters() {
   } catch { /* silent */ }
 }
 
-function renderRecentCharsInSidebar() {
-  const section = $("#recent-chars-section");
-  const chipsEl = $("#recent-chars-chips");
-  if (!section || !chipsEl) return;
-
-  if (!_recentCharacters.length) {
-    section.style.display = "none";
-    return;
-  }
-
-  section.style.display = "flex";
-  chipsEl.innerHTML = "";
-
-  for (const rc of _recentCharacters) {
-    const chip = document.createElement("button");
-    chip.className = "tag-chip tag-chip--recent";
-    chip.type = "button";
-
-    const nameSpan = document.createElement("span");
-    nameSpan.textContent = rc.tag.replace(/_/g, " ");
-
-    const countSpan = document.createElement("span");
-    countSpan.className = "tag-chip-count";
-    countSpan.textContent = `\u00d7${rc.count}`;
-
-    chip.appendChild(nameSpan);
-    chip.appendChild(countSpan);
-
-    chip.addEventListener("click", () => {
-      // Insert into whichever textarea is active — character slot or prompt
-      const activeEl = document.activeElement;
-      let targetEl = null;
-      if (activeEl && (activeEl.classList.contains("char-slot-textarea") || activeEl === $("#prompt") || activeEl === $("#negative-prompt"))) {
-        targetEl = activeEl;
-      } else {
-        targetEl = $("#prompt");
-      }
-      const tag = rc.tag.replace(/_/g, " ");
-      const val = targetEl.value;
-      const prefix = val.length > 0 && !val.trimEnd().endsWith(",") ? ", " : val.length > 0 ? " " : "";
-      targetEl.value = val + prefix + tag;
-      targetEl.dispatchEvent(new Event("input", { bubbles: true }));
-      targetEl.focus();
-
-      chip.classList.add("tag-chip--inserted");
-      setTimeout(() => chip.classList.remove("tag-chip--inserted"), 300);
-    });
-
-    chipsEl.appendChild(chip);
-  }
-}
 
 /* ═══════════════════════════════════════════════════════════
    TAG BROWSER
