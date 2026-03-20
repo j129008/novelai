@@ -349,7 +349,7 @@ async function init() {
   [promptEl, negativeEl].forEach((el) => {
     if (!el) return;
     el.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
         // Don't generate if autocomplete dropdown is visible
         const dd = $("#tag-dropdown");
         if (dd && dd.classList.contains("visible")) return;
@@ -5102,7 +5102,7 @@ function buildInteractionsSection(charData) {
   addBtn.addEventListener("click", addInteraction);
   actionInput.addEventListener("keydown", (e) => {
     // Only add on Enter when autocomplete dropdown is not navigating
-    if (e.key === "Enter" && !$("#tag-dropdown").classList.contains("visible")) {
+    if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229 && !$("#tag-dropdown").classList.contains("visible")) {
       e.preventDefault();
       addInteraction();
     }
