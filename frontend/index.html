@@ -315,14 +315,22 @@
 
         </div><!-- /.controls-scroll -->
 
-        <!-- Config bar: Canvas + Seed + gear button -->
+        <!-- Config bar: Provider + Canvas + Seed + gear button -->
         <div class="config-bar">
           <div class="config-bar-field">
+            <span class="config-bar-label">Provider</span>
+            <select id="provider" class="config-bar-select">
+              <option value="novelai">NovelAI</option>
+              <option value="grok">Grok</option>
+            </select>
+          </div>
+          <div class="config-bar-sep" id="provider-sep"></div>
+          <div class="config-bar-field" id="canvas-field">
             <span class="config-bar-label">Canvas</span>
             <select id="resolution" class="config-bar-select"></select>
           </div>
-          <div class="config-bar-sep"></div>
-          <div class="config-bar-field">
+          <div class="config-bar-sep" id="canvas-sep"></div>
+          <div class="config-bar-field" id="seed-field">
             <span class="config-bar-label">Seed</span>
             <div class="config-bar-seed-row">
               <input type="number" id="seed" class="config-bar-seed-input" value="0" min="0" placeholder="0">
@@ -330,6 +338,30 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
               </button>
             </div>
+          </div>
+          <!-- Grok: Aspect Ratio (replaces Canvas in Grok mode) -->
+          <div class="config-bar-field grok-only" style="display:none">
+            <span class="config-bar-label">Aspect Ratio</span>
+            <select id="grok-aspect-ratio" class="config-bar-select">
+              <option value="1:1">1:1</option>
+              <option value="16:9">16:9</option>
+              <option value="9:16">9:16</option>
+              <option value="4:3">4:3</option>
+              <option value="3:4">3:4</option>
+              <option value="3:2">3:2</option>
+              <option value="2:3">2:3</option>
+              <option value="2:1">2:1</option>
+              <option value="1:2">1:2</option>
+            </select>
+          </div>
+          <div class="config-bar-sep grok-only" style="display:none"></div>
+          <!-- Grok: Resolution -->
+          <div class="config-bar-field grok-only" style="display:none">
+            <span class="config-bar-label">Resolution</span>
+            <select id="grok-resolution" class="config-bar-select">
+              <option value="1k">1K</option>
+              <option value="2k">2K</option>
+            </select>
           </div>
           <button id="gen-settings-btn" class="config-bar-gear" type="button" title="Generation Settings">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.55.26.94.77 1 1.34V11a2 2 0 0 1 0 4h-.09c-.57.06-1.08.45-1.34 1z"/></svg>
@@ -401,6 +433,32 @@
             <!-- SMEA hidden, not supported on V4.5 -->
             <input type="checkbox" id="smea" style="display:none">
             <input type="checkbox" id="smea-dyn" style="display:none">
+          </div>
+        </div>
+
+        <!-- Grok output type toggle (hidden by default) -->
+        <div id="grok-output-type" class="grok-only" style="display:none">
+          <div class="output-type-toggle">
+            <button type="button" class="output-type-btn active" data-type="image">Image</button>
+            <button type="button" class="output-type-btn" data-type="video">Video</button>
+          </div>
+        </div>
+
+        <!-- Grok video controls (hidden by default) -->
+        <div id="grok-video-controls" class="grok-only" style="display:none">
+          <div class="field-group compact">
+            <label class="field-label" for="grok-duration">Duration</label>
+            <div class="field-range-row">
+              <input type="range" id="grok-duration" class="field-range" min="1" max="15" step="1" value="5">
+              <span id="grok-duration-val" class="field-range-value">5s</span>
+            </div>
+          </div>
+          <div class="field-group compact">
+            <label class="field-label" for="grok-video-resolution">Video Resolution</label>
+            <select id="grok-video-resolution" class="field-select">
+              <option value="480p">480p</option>
+              <option value="720p">720p</option>
+            </select>
           </div>
         </div>
 
