@@ -1910,9 +1910,11 @@ function setupCraftPanel() {
 
   // Track which tags are currently inserted
   const autopsyInserted = new Set();
+  let autopsyGeneration = 0; // Cancel stale polling loops
 
   function handleAutopsyFile(file) {
     if (!file || !file.type.startsWith("image/")) return;
+    autopsyGeneration++;
     const reader = new FileReader();
     reader.onload = (e) => {
       const dataUrl = e.target.result;
@@ -1926,12 +1928,12 @@ function setupCraftPanel() {
 
       // Strip data:image/...;base64, prefix to get raw base64
       const base64 = dataUrl.split(",")[1];
-      runAutopsyAnalysis(base64);
+      runAutopsyAnalysis(base64, autopsyGeneration);
     };
     reader.readAsDataURL(file);
   }
 
-  async function runAutopsyAnalysis(base64) {
+  async function runAutopsyAnalysis(base64, generation) {
     try {
       const resp = await fetch("/api/analyze-image", {
         method: "POST",
@@ -1945,8 +1947,9 @@ function setupCraftPanel() {
         if (autopsyStatus) autopsyStatus.textContent = "首次使用，正在下載分析模型（約 350MB）…";
         if (autopsyProgressWrap) autopsyProgressWrap.style.display = "block";
         if (autopsyProgressFill) autopsyProgressFill.style.width = (data.progress || 0) + "%";
-        // Poll until complete
-        setTimeout(() => runAutopsyAnalysis(base64), 2000);
+        // Poll until complete (bail if a newer file was dropped)
+        if (generation !== autopsyGeneration) return;
+        setTimeout(() => runAutopsyAnalysis(base64, generation), 2000);
         return;
       }
 

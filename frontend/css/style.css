@@ -2374,6 +2374,8 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
    ═══════════════════════════════════════════════════════════ */
 
 .craft-panel {
+  display: flex;
+  flex: 1;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--border-muted) transparent;

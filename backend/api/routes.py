@@ -524,9 +524,11 @@ async def suggest_tags(req: SuggestTagsRequest):
         and 0.05 <= score_tally[name] <= 0.2
         and 10_000 <= meta.get(name, {}).get("count", 0) <= 1_000_000
     ]
-    random.shuffle(wildcard_pool)
+    # Pick randomly from top candidates for variety
     wildcard_pool.sort(key=lambda x: x[1], reverse=True)
-    wildcards = [_make_suggestion(name, score) for name, score in wildcard_pool[:4]]
+    top_wildcards = wildcard_pool[:20]
+    random.shuffle(top_wildcards)
+    wildcards = [_make_suggestion(name, score) for name, score in top_wildcards[:4]]
 
     return SuggestTagsResponse(boosters=boosters, contrasts=contrasts, wildcards=wildcards)
 
