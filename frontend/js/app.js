@@ -926,22 +926,49 @@ function confirmCrop() {
   closeCropOverlay();
   activateImg2ImgMode();
 
-  // In Grok mode (no img2img support), show the cropped image on canvas
-  // so the user gets visual feedback
+  // In Grok mode, show the cropped image on canvas with a remove button
   const provider = document.getElementById("provider")?.value || "novelai";
   if (provider === "grok") {
-    const output = $("#output");
-    if (output) {
-      const img = document.createElement("img");
-      img.src = dataUrl;
-      img.alt = "Cropped image";
-      output.innerHTML = "";
-      output.appendChild(img);
-    }
+    showGrokSourceOnCanvas(dataUrl);
     state.canvasImageBase64 = state.img2img;
     state.canvasImageWidth = crop.targetW;
     state.canvasImageHeight = crop.targetH;
   }
+}
+
+function showGrokSourceOnCanvas(dataUrl) {
+  const output = $("#output");
+  if (!output) return;
+  output.innerHTML = "";
+
+  const wrap = document.createElement("div");
+  wrap.className = "grok-source-wrap";
+
+  const img = document.createElement("img");
+  img.src = dataUrl;
+  img.alt = "Source image";
+
+  const badge = document.createElement("div");
+  badge.className = "grok-source-badge";
+  badge.textContent = "Source";
+
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "grok-source-remove";
+  removeBtn.title = "移除來源圖片";
+  removeBtn.innerHTML = "✕";
+  removeBtn.addEventListener("click", () => {
+    clearImg2Img();
+    output.innerHTML = "";
+    state.canvasImageBase64 = null;
+    state.canvasImageWidth = null;
+    state.canvasImageHeight = null;
+  });
+
+  wrap.appendChild(img);
+  wrap.appendChild(badge);
+  wrap.appendChild(removeBtn);
+  output.appendChild(wrap);
 }
 
 function activateImg2ImgMode() {

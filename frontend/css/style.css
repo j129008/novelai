@@ -2694,6 +2694,50 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   cursor: pointer;
   flex-shrink: 0;
 }
+/* Grok source image overlay on canvas */
+.grok-source-wrap {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+.grok-source-wrap img {
+  width: 100%;
+  display: block;
+  border-radius: var(--radius-md);
+}
+.grok-source-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(0,0,0,0.65);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+}
+.grok-source-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.6);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.grok-source-remove:hover {
+  background: rgba(239,68,68,0.8);
+  color: #fff;
+}
+
 .grok-quota-track {
   flex: 1;
   height: 6px;
