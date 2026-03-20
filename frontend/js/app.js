@@ -450,33 +450,54 @@ function setupImg2ImgControls() {
 }
 
 // Paste image from clipboard → img2img
-document.addEventListener("paste", (e) => {
+function handlePastedImage(e) {
   const items = e.clipboardData && e.clipboardData.items;
-  if (!items) return;
-
-  // Check if clipboard contains an image
-  let hasImage = false;
-  for (const item of items) {
-    if (item.type.startsWith("image/")) { hasImage = true; break; }
-  }
-
-  // If no image in clipboard, let the browser handle it (text paste into inputs)
-  if (!hasImage) return;
+  if (!items) return false;
   for (const item of items) {
     if (item.type.startsWith("image/")) {
       e.preventDefault();
       const file = item.getAsFile();
-      if (!file) break;
+      if (!file || file.size === 0) return false;
       const provider = document.getElementById("provider")?.value || "novelai";
       if (provider === "grok") {
-        // Grok: skip popup, directly use as img2img source
         loadImageFile(file);
       } else {
         showPasteActionPopup(file);
       }
-      break;
+      return true;
     }
   }
+  return false;
+}
+
+// Listen on document for paste when NOT in a text field
+document.addEventListener("paste", (e) => {
+  const active = document.activeElement;
+  if (active && (active.tagName === "TEXTAREA" || active.tagName === "INPUT" || active.isContentEditable)) return;
+  handlePastedImage(e);
+});
+
+// Also listen on prompt/negative textareas specifically — image paste should
+// still be intercepted even when typing, but text paste must pass through
+["#prompt", "#negative-prompt"].forEach(sel => {
+  const el = document.querySelector(sel);
+  if (!el) return;
+  el.addEventListener("paste", (e) => {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    // Only intercept if clipboard has image AND no text (pure image copy)
+    let hasImage = false;
+    let hasText = false;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) hasImage = true;
+      if (item.type.startsWith("text/")) hasText = true;
+    }
+    // If it's a pure image paste (no text), intercept it
+    // If it has both text and image (e.g. copy from web page), let text paste through
+    if (hasImage && !hasText) {
+      handlePastedImage(e);
+    }
+  });
 });
 
 function showPasteActionPopup(file) {
@@ -558,14 +579,18 @@ function showPasteActionPopup(file) {
 }
 
 function loadImageFile(file) {
+  console.log("[loadImageFile] called, file:", file?.name, file?.size);
   const reader = new FileReader();
   reader.onload = (ev) => {
+    console.log("[loadImageFile] FileReader loaded, dataUrl length:", ev.target.result.length);
     const img = new Image();
     img.onload = () => {
       const provider = document.getElementById("provider")?.value || "novelai";
+      console.log("[loadImageFile] img loaded, provider:", provider, "size:", img.naturalWidth, "x", img.naturalHeight);
 
       if (provider === "grok") {
         const ar = document.getElementById("grok-aspect-ratio")?.value || "auto";
+        console.log("[loadImageFile] grok mode, aspect_ratio:", ar);
         if (ar === "auto") {
           // Auto: use image as-is, no crop
           state.img2img = ev.target.result.split(",")[1];
@@ -1985,6 +2010,7 @@ async function generateGrokVideo() {
   // Include source image for image-to-video: prefer explicit img2img source,
   // fall back to whatever is currently on the canvas
   const videoSourceImage = state.img2img || state.canvasImageBase64;
+  console.log("[generateGrokVideo] img2img:", !!state.img2img, "canvasImage:", !!state.canvasImageBase64, "sending image:", !!videoSourceImage);
   if (videoSourceImage) {
     body.image = videoSourceImage;
   }
