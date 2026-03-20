@@ -451,12 +451,17 @@ function setupImg2ImgControls() {
 
 // Paste image from clipboard → img2img
 document.addEventListener("paste", (e) => {
-  // Don't intercept paste in text inputs
-  const active = document.activeElement;
-  if (active && (active.tagName === "TEXTAREA" || active.tagName === "INPUT" || active.isContentEditable)) return;
-
   const items = e.clipboardData && e.clipboardData.items;
   if (!items) return;
+
+  // Check if clipboard contains an image
+  let hasImage = false;
+  for (const item of items) {
+    if (item.type.startsWith("image/")) { hasImage = true; break; }
+  }
+
+  // If no image in clipboard, let the browser handle it (text paste into inputs)
+  if (!hasImage) return;
   for (const item of items) {
     if (item.type.startsWith("image/")) {
       e.preventDefault();
