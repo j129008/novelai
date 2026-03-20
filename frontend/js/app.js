@@ -1886,9 +1886,11 @@ async function generateGrokImage() {
     resolution: document.getElementById("grok-resolution")?.value || "1k",
   };
 
-  // Include img2img source if set
-  if (state.img2img) {
-    body.image = state.img2img;
+  // Include source image: prefer explicit img2img source,
+  // fall back to whatever is currently on the canvas
+  const imgSource = state.img2img || state.canvasImageBase64;
+  if (imgSource) {
+    body.image = imgSource;
   }
 
   btn.disabled = true;
@@ -1977,9 +1979,11 @@ async function generateGrokVideo() {
     duration: parseInt(document.getElementById("grok-duration")?.value) || 5,
   };
 
-  // Include img2img source for image-to-video
-  if (state.img2img) {
-    body.image = state.img2img;
+  // Include source image for image-to-video: prefer explicit img2img source,
+  // fall back to whatever is currently on the canvas
+  const videoSourceImage = state.img2img || state.canvasImageBase64;
+  if (videoSourceImage) {
+    body.image = videoSourceImage;
   }
 
   btn.disabled = true;
