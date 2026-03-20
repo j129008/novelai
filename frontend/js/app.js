@@ -4536,6 +4536,13 @@ function renderCharacterMarkers() {
   const outputEl = $("#output");
   if (!outputEl) return;
 
+  // Grok has no character positioning — skip
+  const provider = document.getElementById("provider")?.value || "novelai";
+  if (provider === "grok") {
+    outputEl.querySelectorAll(".char-marker").forEach((m) => m.remove());
+    return;
+  }
+
   // Remove existing markers
   outputEl.querySelectorAll(".char-marker").forEach((m) => m.remove());
 
