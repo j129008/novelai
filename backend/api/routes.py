@@ -1,16 +1,20 @@
 import base64
 import csv
 import io
+import ipaddress
 import json
 import os
 import re
+import socket
 import subprocess
 import time
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 from pathlib import Path
+from urllib.parse import urljoin, urlparse
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from models.schemas import (
@@ -19,6 +23,10 @@ from models.schemas import (
     AnalyzedTag,
     CharacterUsage,
     CharacterUsageList,
+    ExploreImage,
+    ExploreLink,
+    ExplorePageRequest,
+    ExplorePageResponse,
     GalleryFileItem,
     GalleryListResponse,
     GenerateRequest,
@@ -770,3 +778,334 @@ async def delete_story(story_id: str):
         raise HTTPException(status_code=404, detail="Story not found")
     path.unlink()
     return None
+
+
+# ---------------------------------------------------------------------------
+# Image Explorer — web page proxy and image extraction
+# ---------------------------------------------------------------------------
+
+_BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/123.0.0.0 Safari/537.36"
+)
+
+_EXPLORE_MAX_IMAGES = 100
+_EXPLORE_MAX_LINKS = 50
+_EXPLORE_MAX_BYTES = 20 * 1024 * 1024  # 20 MB
+_EXPLORE_TIMEOUT = 15.0
+
+
+def _validate_explore_url(url: str) -> str:
+    """Validate URL scheme, strip credentials, and block private/loopback hosts.
+
+    Returns the sanitised URL string, or raises HTTPException on rejection.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise HTTPException(status_code=400, detail="URL must use http or https")
+
+    # Strip any embedded credentials
+    clean = parsed._replace(netloc=parsed.hostname + (f":{parsed.port}" if parsed.port else ""))
+    url = clean.geturl()
+
+    # Resolve hostname to IP and reject private/loopback ranges
+    hostname = parsed.hostname or ""
+    if not hostname:
+        raise HTTPException(status_code=400, detail="URL has no hostname")
+    try:
+        addr = socket.getaddrinfo(hostname, None, proto=socket.IPPROTO_TCP)
+        for item in addr:
+            ip = ipaddress.ip_address(item[4][0])
+            if ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_reserved:
+                raise HTTPException(status_code=400, detail="URL resolves to a private or reserved address")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=400, detail=f"Could not resolve hostname: {hostname}")
+
+    return url
+
+
+class _PageParser(HTMLParser):
+    """Extract <title>, <img>, <a>, <meta>, and srcset from an HTML document."""
+
+    def __init__(self, base_url: str) -> None:
+        super().__init__()
+        self.base_url = base_url
+        self.title = ""
+        self._in_title = False
+        self.images: list[dict] = []
+        self.links: list[dict] = []
+        self._seen_srcs: set[str] = set()
+
+    def _abs(self, href: str) -> str:
+        return urljoin(self.base_url, href)
+
+    def handle_starttag(self, tag: str, attrs_list: list) -> None:
+        attrs = dict(attrs_list)
+
+        if tag == "title":
+            self._in_title = True
+            return
+
+        if tag == "meta":
+            # og:image / twitter:image carry the canonical page image
+            prop = attrs.get("property", "") or attrs.get("name", "")
+            content = attrs.get("content", "").strip()
+            if prop in ("og:image", "twitter:image") and content:
+                self._add_image(content, alt="")
+            return
+
+        if tag == "img":
+            src = attrs.get("src", "").strip()
+            alt = attrs.get("alt", "").strip()
+            # Try to parse integer dimensions; ignore non-integer values
+            width = _try_int(attrs.get("width", ""))
+            height = _try_int(attrs.get("height", ""))
+            # Skip tiny images that are clearly tracking pixels / icons
+            if width is not None and width < 50:
+                return
+            if height is not None and height < 50:
+                return
+            if src:
+                self._add_image(src, alt=alt, width=width, height=height)
+            # Also harvest srcset — pick the largest listed URL
+            srcset = attrs.get("srcset", "").strip()
+            if srcset:
+                largest = _largest_srcset_url(srcset)
+                if largest:
+                    self._add_image(largest, alt=alt, width=width, height=height)
+            return
+
+        if tag == "a":
+            href = attrs.get("href", "").strip()
+            text = ""  # text collected in handle_data is too noisy at parse time
+            if href and not href.startswith(("javascript:", "#", "mailto:", "tel:")):
+                abs_href = self._abs(href)
+                self.links.append({"href": abs_href, "text": text})
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "title":
+            self._in_title = False
+
+    def handle_data(self, data: str) -> None:
+        if self._in_title:
+            self.title += data
+
+    def _add_image(
+        self,
+        src: str,
+        alt: str = "",
+        width: "int | None" = None,
+        height: "int | None" = None,
+    ) -> None:
+        if src.startswith("data:"):
+            return
+        abs_src = self._abs(src)
+        if abs_src in self._seen_srcs:
+            return
+        # Skip obvious tracking pixel filenames
+        lower = abs_src.lower()
+        if "favicon" in lower or "1x1" in lower or lower.endswith(".ico"):
+            return
+        self._seen_srcs.add(abs_src)
+        self.images.append({"src": abs_src, "alt": alt, "width": width, "height": height})
+
+
+def _try_int(value: str) -> "int | None":
+    """Return int if value is a plain positive integer string, else None."""
+    try:
+        n = int(value)
+        return n if n > 0 else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _largest_srcset_url(srcset: str) -> "str | None":
+    """Pick the URL with the largest declared width descriptor from a srcset string."""
+    best_url = None
+    best_w = -1
+    for part in srcset.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        tokens = part.split()
+        if not tokens:
+            continue
+        url = tokens[0]
+        if len(tokens) >= 2:
+            descriptor = tokens[1]
+            if descriptor.endswith("w"):
+                w = _try_int(descriptor[:-1])
+                if w is not None and w > best_w:
+                    best_w = w
+                    best_url = url
+            # x-descriptors: just keep the first URL we see
+            elif best_w == -1:
+                best_url = url
+        elif best_w == -1:
+            best_url = url
+    return best_url
+
+
+_JSON_IMG_RE = re.compile(
+    r'"(?:src|display_url|image_url|full_image_url|url)"\s*:\s*"(https?://[^"]+\.(?:jpg|jpeg|png|webp|gif)(?:[^"]*)?)"',
+    re.IGNORECASE,
+)
+
+
+def _extract_json_images(html: str, base_url: str) -> list[dict]:
+    """Scan raw HTML (e.g., inline <script> JSON blobs) for image URL patterns."""
+    results = []
+    seen: set[str] = set()
+    for m in _JSON_IMG_RE.finditer(html):
+        # Un-escape common JSON unicode escapes (\\u0026 → &, \\/ → /)
+        raw = m.group(1).replace("\\/", "/").replace("\\u0026", "&")
+        abs_src = urljoin(base_url, raw)
+        if abs_src not in seen:
+            seen.add(abs_src)
+            results.append({"src": abs_src, "alt": "", "width": None, "height": None})
+    return results
+
+
+def _filter_links(links: list[dict], base_url: str) -> list[dict]:
+    """Keep only content-looking links; deduplicate."""
+    base_host = urlparse(base_url).hostname or ""
+    seen: set[str] = set()
+    out = []
+    for link in links:
+        href = link["href"]
+        if href in seen:
+            continue
+        parsed = urlparse(href)
+        if parsed.scheme not in ("http", "https"):
+            continue
+        host = parsed.hostname or ""
+        # Accept same-domain links or links to common image / social hosts
+        if host == base_host or any(
+            host.endswith(domain)
+            for domain in (
+                "instagram.com", "pinterest.com", "twitter.com", "x.com",
+                "artstation.com", "deviantart.com", "flickr.com", "tumblr.com",
+                "pixiv.net", "danbooru.donmai.us", "gelbooru.com",
+            )
+        ):
+            seen.add(href)
+            out.append(link)
+    return out[:_EXPLORE_MAX_LINKS]
+
+
+@router.post("/explore/page", response_model=ExplorePageResponse)
+async def explore_page(req: ExplorePageRequest):
+    url = _validate_explore_url(req.url)
+
+    import httpx
+
+    headers = {
+        "User-Agent": _BROWSER_UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+    }
+    try:
+        async with httpx.AsyncClient(
+            timeout=_EXPLORE_TIMEOUT,
+            follow_redirects=True,
+            headers=headers,
+        ) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            # Respect the final URL after redirects for relative link resolution
+            final_url = str(resp.url)
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=502, detail=f"Remote server returned {exc.response.status_code}")
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch URL: {exc}")
+
+    content_type = resp.headers.get("content-type", "")
+    if "html" not in content_type and "xml" not in content_type:
+        raise HTTPException(status_code=422, detail="URL does not appear to be an HTML page")
+
+    # Decode with a fallback — many pages declare charset in headers or meta
+    try:
+        html = resp.text
+    except Exception:
+        html = resp.content.decode("utf-8", errors="replace")
+
+    # --- Parse with stdlib HTMLParser ---
+    parser = _PageParser(base_url=final_url)
+    try:
+        parser.feed(html)
+    except Exception:
+        pass  # HTMLParser is lenient; ignore any residual parse errors
+
+    images: list[dict] = list(parser.images)
+
+    # --- Augment with JSON-embedded image URLs from script tags ---
+    json_images = _extract_json_images(html, final_url)
+    seen_srcs = {img["src"] for img in images}
+    for img in json_images:
+        if img["src"] not in seen_srcs:
+            seen_srcs.add(img["src"])
+            images.append(img)
+
+    images = images[:_EXPLORE_MAX_IMAGES]
+    links = _filter_links(parser.links, final_url)
+
+    return ExplorePageResponse(
+        url=final_url,
+        title=parser.title.strip(),
+        images=[ExploreImage(**img) for img in images],
+        links=[ExploreLink(**lnk) for lnk in links],
+    )
+
+
+@router.get("/explore/image")
+async def proxy_image(url: str = Query(min_length=1)):
+    url = _validate_explore_url(url)
+
+    import httpx
+
+    headers = {
+        "User-Agent": _BROWSER_UA,
+        "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
+    }
+    try:
+        client = httpx.AsyncClient(
+            timeout=_EXPLORE_TIMEOUT,
+            follow_redirects=True,
+            headers=headers,
+        )
+        resp = await client.get(url)
+        resp.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=502, detail=f"Remote server returned {exc.response.status_code}")
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch image: {exc}")
+
+    content_type = resp.headers.get("content-type", "application/octet-stream").split(";")[0].strip()
+    if not content_type.startswith("image/"):
+        await client.aclose()
+        raise HTTPException(status_code=422, detail="URL does not point to an image")
+
+    content_length = int(resp.headers.get("content-length", 0))
+    if content_length > _EXPLORE_MAX_BYTES:
+        await client.aclose()
+        raise HTTPException(status_code=413, detail="Image exceeds 20 MB size limit")
+
+    async def _stream_and_close():
+        total = 0
+        try:
+            async for chunk in resp.aiter_bytes(chunk_size=65536):
+                total += len(chunk)
+                if total > _EXPLORE_MAX_BYTES:
+                    break
+                yield chunk
+        finally:
+            await client.aclose()
+
+    return StreamingResponse(
+        _stream_and_close(),
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=3600"},
+    )

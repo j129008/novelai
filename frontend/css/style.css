@@ -2886,3 +2886,100 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
+
+/* ── Explore panel ───────────────────────────────────────── */
+.explore-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-muted) transparent;
+}
+.explore-url-bar {
+  display: flex;
+  gap: 6px;
+  padding: 12px;
+  flex-shrink: 0;
+}
+.explore-url-input {
+  flex: 1;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.explore-url-input::placeholder { color: var(--text-tertiary); }
+.explore-url-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.explore-status {
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+.explore-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px;
+  padding: 0 12px 12px;
+}
+.explore-card {
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.explore-card:hover {
+  border-color: var(--accent);
+  transform: scale(1.02);
+}
+.explore-card img {
+  width: 100%;
+  display: block;
+  min-height: 80px;
+  background: var(--bg-deep);
+  object-fit: cover;
+}
+.explore-links {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-muted);
+  flex-shrink: 0;
+}
+.explore-links-header {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
+}
+.explore-links-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.explore-link {
+  font-size: 0.75rem;
+  color: var(--accent-bright);
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-muted);
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  display: inline-block;
+  transition: border-color 0.15s, background 0.15s;
+}
+.explore-link:hover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}

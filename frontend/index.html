@@ -504,6 +504,7 @@
             <button class="canvas-tab" id="tab-canvas" type="button">Canvas</button>
             <button class="canvas-tab" id="tab-history" type="button">History <span id="gallery-count" class="gallery-count-badge"></span></button>
             <button class="canvas-tab" id="tab-craft" type="button">Craft</button>
+            <button class="canvas-tab" id="tab-explore" type="button">Explore</button>
             <button class="canvas-tab" id="btn-tag-browser" type="button" title="Browse tags by category" aria-expanded="false">Tags</button>
           </div>
           <div id="history-search-wrap" class="history-search-wrap" style="display:none">
@@ -658,6 +659,19 @@
             </div>
           </details>
 
+        </div>
+
+        <div id="panel-explore" class="tab-panel explore-panel" style="display:none">
+          <div class="explore-url-bar">
+            <input type="text" id="explore-url" class="explore-url-input" placeholder="輸入網址，瀏覽任意網頁的圖片…" spellcheck="false">
+            <button id="explore-go" class="btn-action btn-action--primary" type="button">Go</button>
+          </div>
+          <div id="explore-status" class="explore-status" style="display:none"></div>
+          <div id="explore-grid" class="explore-grid"></div>
+          <div id="explore-links" class="explore-links" style="display:none">
+            <div class="explore-links-header">相關連結</div>
+            <div id="explore-links-list" class="explore-links-list"></div>
+          </div>
         </div>
 
         <div id="panel-story" class="story-panel" style="display:none">

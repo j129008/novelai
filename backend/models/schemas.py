@@ -185,3 +185,29 @@ class GrokVideoResponse(BaseModel):
     video: str  # base64 MP4
 
 
+# ---------------------------------------------------------------------------
+# Image Explorer — web page proxy and image extraction
+# ---------------------------------------------------------------------------
+
+class ExplorePageRequest(BaseModel):
+    url: str = Field(min_length=1)
+
+
+class ExploreImage(BaseModel):
+    src: str
+    alt: str = ""
+    width: Optional[int] = None
+    height: Optional[int] = None
+
+
+class ExploreLink(BaseModel):
+    href: str
+    text: str = ""
+
+
+class ExplorePageResponse(BaseModel):
+    url: str
+    title: str = ""
+    images: list[ExploreImage]
+    links: list[ExploreLink]
+

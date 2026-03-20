@@ -267,6 +267,7 @@ async function init() {
   setupLightbox();
   setupStoryEditor();
   setupCraftPanel();
+  setupExplorePanel();
 
   // Load recent characters at startup so autocomplete is populated immediately
   loadRecentCharacters();
@@ -3107,10 +3108,12 @@ function setupHistoryTabs() {
   const tabHistory = $("#tab-history");
   const tabStory = $("#tab-story");
   const tabCraft = $("#tab-craft");
+  const tabExplore = $("#tab-explore");
   const panelCanvas = $("#panel-canvas");
   const panelHistory = $("#panel-history");
   const panelStory = $("#panel-story");
   const panelCraft = $("#panel-craft");
+  const panelExplore = $("#panel-explore");
   const searchWrap = $("#history-search-wrap");
   const searchInput = $("#gallery-search");
 
@@ -3124,6 +3127,7 @@ function setupHistoryTabs() {
     tabHistory.classList.remove("canvas-tab--active");
     if (tabStory) tabStory.classList.remove("canvas-tab--active");
     if (tabCraft) tabCraft.classList.remove("canvas-tab--active");
+    if (tabExplore) tabExplore.classList.remove("canvas-tab--active");
   }
 
   function hideAllPanels() {
@@ -3131,6 +3135,7 @@ function setupHistoryTabs() {
     panelHistory.style.display = "none";
     if (panelStory) panelStory.style.display = "none";
     if (panelCraft) panelCraft.style.display = "none";
+    if (panelExplore) panelExplore.style.display = "none";
     searchWrap.style.display = "none";
   }
 
@@ -3170,10 +3175,20 @@ function setupHistoryTabs() {
     localStorage.setItem("nai-active-tab", "craft");
   }
 
+  function showExplore() {
+    if (!tabExplore || !panelExplore) return;
+    clearAllTabs();
+    hideAllPanels();
+    tabExplore.classList.add("canvas-tab--active");
+    panelExplore.style.display = "flex";
+    localStorage.setItem("nai-active-tab", "explore");
+  }
+
   tabCanvas.addEventListener("click", showCanvas);
   tabHistory.addEventListener("click", showHistory);
   if (tabStory) tabStory.addEventListener("click", showStory);
   if (tabCraft) tabCraft.addEventListener("click", showCraft);
+  if (tabExplore) tabExplore.addEventListener("click", showExplore);
 
   // Restore last active tab (default: story)
   // Migrate old "inspire" value to "craft"
@@ -3182,6 +3197,7 @@ function setupHistoryTabs() {
   if (savedTab === "story") showStory();
   else if (savedTab === "history") showHistory();
   else if (savedTab === "craft") showCraft();
+  else if (savedTab === "explore") showExplore();
   // else canvas is already active by default
 
   if (searchInput) {
@@ -4322,6 +4338,142 @@ function loadSettingsFromMeta(meta) {
     }
     }
   }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   EXPLORE PANEL — browse any page's images and load as img2img
+   ═══════════════════════════════════════════════════════════ */
+
+function setupExplorePanel() {
+  const urlInput = $("#explore-url");
+  const goBtn = $("#explore-go");
+  const grid = $("#explore-grid");
+  const status = $("#explore-status");
+  const linksSection = $("#explore-links");
+  const linksList = $("#explore-links-list");
+
+  if (!urlInput || !goBtn) return;
+
+  async function explorePage(url) {
+    // Normalize URL
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      url = "https://" + url;
+    }
+    urlInput.value = url;
+
+    grid.innerHTML = "";
+    if (linksSection) linksSection.style.display = "none";
+    status.style.display = "block";
+    status.textContent = "載入中…";
+    goBtn.disabled = true;
+
+    try {
+      const resp = await fetch("/api/explore/page", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      if (!resp.ok) throw new Error("Failed to load page");
+      const data = await resp.json();
+
+      status.style.display = "none";
+
+      if (data.images.length === 0) {
+        status.style.display = "block";
+        status.textContent = "找不到圖片";
+        return;
+      }
+
+      // Render image grid
+      for (const img of data.images) {
+        const card = document.createElement("div");
+        card.className = "explore-card";
+
+        const imgEl = document.createElement("img");
+        // Use proxy to avoid CORS
+        imgEl.src = "/api/explore/image?url=" + encodeURIComponent(img.src);
+        imgEl.alt = img.alt || "";
+        imgEl.loading = "lazy";
+        imgEl.addEventListener("click", () => {
+          useExploreImage(img.src);
+        });
+
+        card.appendChild(imgEl);
+        grid.appendChild(card);
+      }
+
+      // Render links for navigation
+      if (data.links && data.links.length > 0 && linksList) {
+        linksList.innerHTML = "";
+        for (const link of data.links.slice(0, 20)) {
+          const a = document.createElement("a");
+          a.href = "#";
+          a.className = "explore-link";
+          a.textContent = link.text || link.href;
+          a.title = link.href;
+          a.addEventListener("click", (e) => {
+            e.preventDefault();
+            explorePage(link.href);
+          });
+          linksList.appendChild(a);
+        }
+        linksSection.style.display = "";
+      }
+    } catch (err) {
+      status.style.display = "block";
+      status.textContent = "載入失敗：" + err.message;
+    } finally {
+      goBtn.disabled = false;
+    }
+  }
+
+  async function useExploreImage(imageUrl) {
+    try {
+      const resp = await fetch("/api/explore/image?url=" + encodeURIComponent(imageUrl));
+      if (!resp.ok) throw new Error("Failed to load image");
+      const blob = await resp.blob();
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target.result;
+        state.img2img = dataUrl.split(",")[1];
+        state.img2imgThumbDataUrl = dataUrl;
+        activateImg2ImgMode();
+
+        const provider = document.getElementById("provider")?.value || "novelai";
+        if (provider === "grok") {
+          showGrokSourceOnCanvas(dataUrl);
+          state.canvasImageBase64 = state.img2img;
+          state.canvasImageWidth = null;
+          state.canvasImageHeight = null;
+        } else {
+          const accordion = $("#img2img-accordion");
+          if (accordion && !accordion.open) accordion.open = true;
+        }
+
+        // Switch to Canvas tab so the user sees the loaded source
+        const canvasTab = $("#tab-canvas");
+        if (canvasTab) canvasTab.click();
+
+        showStatus("圖片已載入");
+      };
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      showError("圖片載入失敗：" + err.message);
+    }
+  }
+
+  goBtn.addEventListener("click", () => {
+    const url = urlInput.value.trim();
+    if (url) explorePage(url);
+  });
+
+  urlInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const url = urlInput.value.trim();
+      if (url) explorePage(url);
+    }
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════
