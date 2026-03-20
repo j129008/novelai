@@ -490,8 +490,11 @@ function showPasteActionPopup(file) {
   btnI2I.addEventListener("click", () => {
     popup.remove();
     loadImageFile(file);
-    const accordion = $("#img2img-accordion");
-    if (accordion && !accordion.open) accordion.open = true;
+    const provider = document.getElementById("provider")?.value || "novelai";
+    if (provider !== "grok") {
+      const accordion = $("#img2img-accordion");
+      if (accordion && !accordion.open) accordion.open = true;
+    }
     showStatus("Image set as img2img source");
   });
 
@@ -547,6 +550,20 @@ function loadImageFile(file) {
   reader.onload = (ev) => {
     const img = new Image();
     img.onload = () => {
+      const provider = document.getElementById("provider")?.value || "novelai";
+
+      if (provider === "grok") {
+        // Grok: use image directly as source, show on canvas
+        state.img2img = ev.target.result.split(",")[1];
+        state.img2imgThumbDataUrl = ev.target.result;
+        activateImg2ImgMode();
+        showGrokSourceOnCanvas(ev.target.result);
+        state.canvasImageBase64 = state.img2img;
+        state.canvasImageWidth = img.naturalWidth;
+        state.canvasImageHeight = img.naturalHeight;
+        return;
+      }
+
       const resVal = $("#resolution").value || "832x1216";
       const [tw, th] = resVal.split("x").map(Number);
       // Skip crop if image already matches target resolution
