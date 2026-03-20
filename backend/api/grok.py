@@ -95,7 +95,13 @@ async def generate_video(
         resp = await client.post(VIDEO_SUBMIT_URL, json=submit_payload, headers=headers)
         logger.info(f"[grok video] submit response: {resp.status_code} {resp.text[:300]}")
         if resp.status_code not in (200, 201, 202):
-            raise RuntimeError(f"{resp.status_code}: {resp.text[:500]}")
+            # Try to extract a readable error message
+            try:
+                err_data = resp.json()
+                err_msg = err_data.get("error", resp.text[:500])
+            except Exception:
+                err_msg = resp.text[:500]
+            raise RuntimeError(err_msg)
         request_id = resp.json()["request_id"]
 
         # Step 2: poll until done or failed
