@@ -560,15 +560,20 @@ function loadImageFile(file) {
       const provider = document.getElementById("provider")?.value || "novelai";
 
       if (provider === "grok") {
-        // Grok: use image directly as source, show on canvas
-        state.img2img = ev.target.result.split(",")[1];
-        state.img2imgThumbDataUrl = ev.target.result;
-        activateImg2ImgMode();
-        showGrokSourceOnCanvas(ev.target.result);
-        state.canvasImageBase64 = state.img2img;
-        state.canvasImageWidth = img.naturalWidth;
-        state.canvasImageHeight = img.naturalHeight;
-        // Switch to Canvas tab so user can see the image
+        const ar = document.getElementById("grok-aspect-ratio")?.value || "auto";
+        if (ar === "auto") {
+          // Auto: use image as-is, no crop
+          state.img2img = ev.target.result.split(",")[1];
+          state.img2imgThumbDataUrl = ev.target.result;
+          activateImg2ImgMode();
+          showGrokSourceOnCanvas(ev.target.result);
+          state.canvasImageBase64 = state.img2img;
+          state.canvasImageWidth = img.naturalWidth;
+          state.canvasImageHeight = img.naturalHeight;
+        } else {
+          // Specific aspect ratio: open crop overlay
+          openCropOverlay(img);
+        }
         const canvasTab = $("#tab-canvas");
         if (canvasTab) canvasTab.click();
         return;
