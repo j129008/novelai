@@ -190,7 +190,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 
 /* Output area */
 .output-area { flex: 1; background: var(--bg-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-xl); display: flex; align-items: center; justify-content: center; overflow: hidden; min-height: 480px; position: relative; }
-.output-area img { max-width: 100%; max-height: calc(100vh - 200px); display: block; border-radius: var(--radius-xl); -webkit-user-drag: none; user-drag: none; }
+.output-area img, .output-area video { max-width: 100%; max-height: calc(100vh - 200px); display: block; border-radius: var(--radius-xl); -webkit-user-drag: none; user-drag: none; }
 
 /* Placeholder */
 .placeholder { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; padding: 40px; }

@@ -2096,8 +2096,6 @@ async function generateGrokVideo() {
       video.loop = true;
       video.muted = true;
       video.controls = true;
-      video.style.width = "100%";
-      video.style.borderRadius = "var(--radius-md)";
       output.appendChild(video);
     }
 
