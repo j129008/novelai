@@ -561,6 +561,9 @@ function loadImageFile(file) {
         state.canvasImageBase64 = state.img2img;
         state.canvasImageWidth = img.naturalWidth;
         state.canvasImageHeight = img.naturalHeight;
+        // Switch to Canvas tab so user can see the image
+        const canvasTab = $("#tab-canvas");
+        if (canvasTab) canvasTab.click();
         return;
       }
 
