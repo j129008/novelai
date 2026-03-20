@@ -461,7 +461,13 @@ document.addEventListener("paste", (e) => {
       e.preventDefault();
       const file = item.getAsFile();
       if (!file) break;
-      showPasteActionPopup(file);
+      const provider = document.getElementById("provider")?.value || "novelai";
+      if (provider === "grok") {
+        // Grok: skip popup, directly use as img2img source
+        loadImageFile(file);
+      } else {
+        showPasteActionPopup(file);
+      }
       break;
     }
   }
