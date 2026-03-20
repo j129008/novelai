@@ -2886,6 +2886,20 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
+.video-progress-track {
+  width: 200px;
+  height: 6px;
+  background: var(--bg-deep);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.video-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent) 0%, #6ee7b7 100%);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
 
 /* ── Explore panel ───────────────────────────────────────── */
 .explore-panel {

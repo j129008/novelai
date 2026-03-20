@@ -284,29 +284,53 @@ async def grok_generate_image(req: GrokImageRequest):
     return GrokImageResponse(image=base64.b64encode(image_data).decode())
 
 
-@router.post("/grok/generate-video", response_model=GrokVideoResponse)
+@router.post("/grok/generate-video")
 async def grok_generate_video(req: GrokVideoRequest):
     if not XAI_API_KEY:
         raise HTTPException(status_code=503, detail="XAI_API_KEY not configured")
-    try:
+
+    import asyncio
+
+    progress_queue: asyncio.Queue = asyncio.Queue()
+
+    async def on_progress(status, progress):
+        await progress_queue.put({"status": status, "progress": progress})
+
+    async def event_stream():
         from api.grok import generate_video as grok_gen_video
-        video_data = await grok_gen_video(
+
+        # Run generation in a background task so we can stream progress
+        gen_task = asyncio.create_task(grok_gen_video(
             api_key=XAI_API_KEY,
             prompt=req.prompt,
             aspect_ratio=req.aspect_ratio,
             resolution=req.resolution,
             duration=req.duration,
             image=req.image,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Grok API error: {e}")
+            on_progress=on_progress,
+        ))
 
-    timestamp = int(time.time())
-    filename = f"{timestamp}-grok.mp4"
-    filepath = _get_output_dir() / filename
-    filepath.write_bytes(video_data)
+        # Stream progress events until generation completes
+        while not gen_task.done():
+            try:
+                msg = await asyncio.wait_for(progress_queue.get(), timeout=5.0)
+                yield f"data: {json.dumps(msg)}\n\n"
+            except asyncio.TimeoutError:
+                yield f"data: {json.dumps({'status': 'pending', 'progress': 0})}\n\n"
 
-    return GrokVideoResponse(video=base64.b64encode(video_data).decode())
+        # Get result or error
+        try:
+            video_data = gen_task.result()
+            timestamp = int(time.time())
+            filename = f"{timestamp}-grok.mp4"
+            filepath = _get_output_dir() / filename
+            filepath.write_bytes(video_data)
+            b64 = base64.b64encode(video_data).decode()
+            yield f"data: {json.dumps({'status': 'done', 'video': b64})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'status': 'error', 'detail': str(e)})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @router.get("/grok/usage")

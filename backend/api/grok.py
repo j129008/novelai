@@ -72,6 +72,7 @@ async def generate_video(
     resolution: str = "720p",
     duration: int = 5,
     image: str | None = None,
+    on_progress=None,
 ) -> bytes:
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -113,6 +114,9 @@ async def generate_video(
                 raise RuntimeError(f"{poll.status_code}: {poll.text[:500]}")
             data = poll.json()
             status = data.get("status")
+            progress = data.get("progress", 0)
+            if on_progress:
+                await on_progress(status, progress)
             if status == "done":
                 video_url = data["video"]["url"]
                 break

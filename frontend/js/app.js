@@ -2052,6 +2052,8 @@ async function generateGrokVideo() {
 
   // Show progress indicator in the canvas output area
   const output = $("#output");
+  let progressMsg = null;
+  let progressBar = null;
   if (output) {
     const progressEl = document.createElement("div");
     progressEl.className = "video-progress";
@@ -2059,11 +2061,19 @@ async function generateGrokVideo() {
     const spinnerEl = document.createElement("div");
     spinnerEl.className = "spinner";
 
-    const msgEl = document.createElement("p");
-    msgEl.textContent = "Generating video… this may take a few minutes";
+    progressMsg = document.createElement("p");
+    progressMsg.textContent = "影片生成中…";
+
+    progressBar = document.createElement("div");
+    progressBar.className = "video-progress-track";
+    const progressFill = document.createElement("div");
+    progressFill.className = "video-progress-fill";
+    progressFill.id = "video-progress-fill";
+    progressBar.appendChild(progressFill);
 
     progressEl.appendChild(spinnerEl);
-    progressEl.appendChild(msgEl);
+    progressEl.appendChild(progressMsg);
+    progressEl.appendChild(progressBar);
     output.innerHTML = "";
     output.appendChild(progressEl);
   }
@@ -2079,19 +2089,54 @@ async function generateGrokVideo() {
     clearTimeout(stopTimeout);
 
     if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
-      throw new Error(err.detail || "Video generation failed");
+      const text = await resp.text();
+      throw new Error(text || "Video generation failed");
     }
 
-    const data = await resp.json();
+    // Read SSE stream for progress updates
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let videoData = null;
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // Parse SSE events from buffer
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || ""; // keep incomplete line in buffer
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        try {
+          const msg = JSON.parse(line.slice(6));
+          if (msg.status === "pending" && msg.progress != null) {
+            const pct = Math.round(msg.progress);
+            if (progressMsg) progressMsg.textContent = `影片生成中… ${pct}%`;
+            const fill = document.getElementById("video-progress-fill");
+            if (fill) fill.style.width = pct + "%";
+          } else if (msg.status === "done" && msg.video) {
+            videoData = msg.video;
+          } else if (msg.status === "error") {
+            throw new Error(msg.detail || "Video generation failed");
+          }
+        } catch (parseErr) {
+          if (parseErr.message && !parseErr.message.includes("JSON")) throw parseErr;
+        }
+      }
+    }
+
+    if (!videoData) throw new Error("No video data received");
+
     state.lastSeed = null;
     state.lastImageBase64 = null;
-    state.lastVideoBase64 = data.video;
+    state.lastVideoBase64 = videoData;
 
     if (output) {
       output.innerHTML = "";
       const video = document.createElement("video");
-      video.src = `data:video/mp4;base64,${data.video}`;
+      video.src = `data:video/mp4;base64,${videoData}`;
       video.autoplay = true;
       video.loop = true;
       video.muted = true;
@@ -4169,6 +4214,29 @@ function renderLightboxFrame() {
   spinner.className = "lightbox-img-loading";
   imgWrap.appendChild(spinner);
 
+  const isVideo = file.name.toLowerCase().endsWith(".mp4");
+
+  if (isVideo) {
+    const video = document.createElement("video");
+    video.className = "lightbox-img";
+    video.src = galleryFileUrl(file.name);
+    video.autoplay = true;
+    video.loop = true;
+    video.muted = true;
+    video.controls = true;
+    video.onloadeddata = () => {
+      imgWrap.innerHTML = "";
+      imgWrap.appendChild(video);
+    };
+    video.onerror = () => {
+      imgWrap.innerHTML = "";
+      const err = document.createElement("p");
+      err.style.cssText = "color:var(--text-tertiary);font-size:0.83rem";
+      err.textContent = "Failed to load video";
+      imgWrap.appendChild(err);
+    };
+  } else {
+
   const img = document.createElement("img");
   img.className = "lightbox-img";
   img.alt = meta.prompt || file.name;
@@ -4185,6 +4253,8 @@ function renderLightboxFrame() {
     imgWrap.appendChild(err);
   };
   img.src = galleryFileUrl(file.name);
+
+  } // end else (not video)
 }
 
 async function setHistoryImageAsSource(url, meta) {
