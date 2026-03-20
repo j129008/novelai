@@ -997,6 +997,19 @@ function showGrokSourceOnCanvas(dataUrl) {
   output.appendChild(wrap);
 }
 
+function showSourceRefThumb(outputEl, thumbDataUrl) {
+  const thumb = document.createElement("img");
+  thumb.src = thumbDataUrl;
+  thumb.alt = "Reference";
+  thumb.className = "grok-ref-thumb";
+  thumb.title = "來源圖片（點擊移除）";
+  thumb.addEventListener("click", () => {
+    clearImg2Img();
+    thumb.remove();
+  });
+  outputEl.appendChild(thumb);
+}
+
 function activateImg2ImgMode() {
   const sourceEmpty  = $("#img2img-source-empty");
   const sourceActive = $("#img2img-source-active");
@@ -1910,6 +1923,11 @@ async function generateGrokImage() {
     img.alt = "Generated image";
     output.innerHTML = "";
     output.appendChild(img);
+
+    // Show source reference thumbnail if img2img was used
+    if (state.img2imgThumbDataUrl) {
+      showSourceRefThumb(output, state.img2imgThumbDataUrl);
+    }
 
     const actions = $("#image-actions");
     if (actions) actions.style.display = "flex";
