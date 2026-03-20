@@ -1765,6 +1765,8 @@ async function generateGrokImage() {
     state.lastSeed = null;
     state.lastImageBase64 = data.image;
     state.canvasImageBase64 = data.image;
+    state.canvasImageWidth = null;
+    state.canvasImageHeight = null;
 
     const output = $("#output");
     const img = document.createElement("img");
@@ -1820,6 +1822,10 @@ async function generateGrokVideo() {
   state.lastVideoBase64 = null;
   _generateAbortController = new AbortController();
 
+  const stopTimeout = setTimeout(() => {
+    if (_generateAbortController) setGenerateButtonStop();
+  }, 400);
+
   // Show progress indicator in the canvas output area
   const output = $("#output");
   if (output) {
@@ -1845,6 +1851,8 @@ async function generateGrokVideo() {
       body: JSON.stringify(body),
       signal: _generateAbortController.signal,
     });
+
+    clearTimeout(stopTimeout);
 
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({ detail: resp.statusText }));
@@ -1876,6 +1884,7 @@ async function generateGrokVideo() {
 
     loadGallery();
   } catch (e) {
+    clearTimeout(stopTimeout);
     if (e.name === "AbortError") {
       showStatus("Cancelled");
     } else {
@@ -1883,8 +1892,6 @@ async function generateGrokVideo() {
       showError(e.message);
     }
   } finally {
-    const labelEl = btn.querySelector(".btn-generate-label");
-    if (labelEl) labelEl.textContent = "Generate Video";
     resetGenerateButton();
   }
 }
