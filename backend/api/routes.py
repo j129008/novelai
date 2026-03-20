@@ -157,7 +157,7 @@ async def get_options():
         "samplers": SAMPLERS,
         "resolutions": RESOLUTIONS,
         "grok": {
-            "aspect_ratios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "2:1", "1:2"],
+            "aspect_ratios": ["auto", "1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "2:1", "1:2"],
             "image_resolutions": ["1k", "2k"],
             "video_resolutions": ["480p", "720p"],
         },

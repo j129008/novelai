@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Annotated, Literal, Optional
 
-VALID_GROK_ASPECT_RATIOS = Literal["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "2:1", "1:2"]
+VALID_GROK_ASPECT_RATIOS = Literal["auto", "1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "2:1", "1:2"]
 VALID_GROK_IMAGE_RESOLUTIONS = Literal["1k", "2k"]
 VALID_GROK_VIDEO_RESOLUTIONS = Literal["480p", "720p"]
 
