@@ -2919,6 +2919,16 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-dim);
 }
+.explore-filter-btn {
+  font-size: 1rem;
+  min-width: 36px;
+  padding: 4px 8px;
+}
+.explore-filter-btn.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent-bright);
+}
 .explore-status {
   padding: 8px 12px;
   font-size: 0.82rem;

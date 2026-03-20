@@ -4462,16 +4462,106 @@ function setupExplorePanel() {
     }
   }
 
+  // People filter
+  const filterBtn = $("#explore-filter-people");
+  let filterActive = false;
+
+  if (filterBtn) {
+    filterBtn.addEventListener("click", async () => {
+      if (filterActive) {
+        // Toggle off — show all cards again
+        filterActive = false;
+        filterBtn.classList.remove("active");
+        grid.querySelectorAll(".explore-card").forEach(c => { c.style.display = ""; });
+        if (status) status.style.display = "none";
+        return;
+      }
+
+      filterActive = true;
+      filterBtn.classList.add("active");
+
+      const cards = Array.from(grid.querySelectorAll(".explore-card"));
+      if (cards.length === 0) return;
+
+      if (status) {
+        status.style.display = "block";
+        status.textContent = "正在分析人物… (0/" + cards.length + ")";
+      }
+
+      let done = 0;
+      // Process in parallel batches of 3 for speed
+      const batchSize = 3;
+      for (let i = 0; i < cards.length; i += batchSize) {
+        if (!filterActive) break; // user toggled off mid-scan
+        const batch = cards.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (card) => {
+          const imgEl = card.querySelector("img");
+          if (!imgEl) { card.style.display = "none"; return; }
+          try {
+            // Fetch image as base64
+            const imgResp = await fetch(imgEl.src);
+            if (!imgResp.ok) { card.style.display = "none"; return; }
+            const blob = await imgResp.blob();
+            const b64 = await new Promise(resolve => {
+              const r = new FileReader();
+              r.onload = () => resolve(r.result.split(",")[1]);
+              r.readAsDataURL(blob);
+            });
+
+            // Check for person
+            const checkResp = await fetch("/api/explore/has-person", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ image: b64 }),
+            });
+            if (!checkResp.ok) { card.style.display = "none"; return; }
+            const result = await checkResp.json();
+
+            if (result.status === "downloading") {
+              // Model still downloading — show status and retry after delay
+              if (status) status.textContent = "正在下載分析模型（首次使用）… " + (result.progress || 0) + "%";
+              await new Promise(r => setTimeout(r, 3000));
+              // Don't hide, leave for next pass
+              return;
+            }
+
+            card.style.display = result.has_person ? "" : "none";
+          } catch {
+            card.style.display = "none";
+          }
+          done++;
+          if (status && filterActive) {
+            status.textContent = "正在分析人物… (" + done + "/" + cards.length + ")";
+          }
+        }));
+      }
+
+      if (status && filterActive) {
+        const visible = grid.querySelectorAll(".explore-card:not([style*='display: none'])").length;
+        status.textContent = "篩選完成：" + visible + " 張人物圖片";
+        if (visible === 0) status.textContent = "沒有找到人物圖片";
+      }
+    });
+  }
+
   goBtn.addEventListener("click", () => {
     const url = urlInput.value.trim();
-    if (url) explorePage(url);
+    if (url) {
+      filterActive = false;
+      if (filterBtn) filterBtn.classList.remove("active");
+      explorePage(url);
+    }
   });
 
   urlInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
       const url = urlInput.value.trim();
-      if (url) explorePage(url);
+      if (url) {
+        filterActive = false;
+        if (filterBtn) filterBtn.classList.remove("active");
+        explorePage(url);
+      }
     }
   });
 }

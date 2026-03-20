@@ -1168,3 +1168,34 @@ async def proxy_image(url: str = Query(min_length=1)):
         media_type=content_type,
         headers={"Cache-Control": "public, max-age=3600"},
     )
+
+
+_PERSON_TAGS = frozenset([
+    "1girl", "2girls", "3girls", "4girls", "5girls", "6+girls", "multiple_girls",
+    "1boy", "2boys", "3boys", "4boys", "5boys", "6+boys", "multiple_boys",
+    "1other", "person", "solo", "couple", "group",
+    "face", "portrait", "upper_body", "cowboy_shot", "full_body",
+])
+
+
+@router.post("/explore/has-person")
+async def explore_has_person(req: AnalyzeImageRequest):
+    """Quick check if an image contains a person using WD Tagger. Returns {has_person: bool}."""
+    from api.tagger import ensure_model_loaded, get_model_status, run_inference
+
+    status = ensure_model_loaded()
+    if status in ("not_started", "downloading"):
+        _, progress = get_model_status()
+        return {"has_person": None, "status": "downloading", "progress": progress}
+    if status == "failed":
+        return {"has_person": None, "status": "failed"}
+
+    try:
+        raw_tags = run_inference(req.image)
+    except RuntimeError:
+        return {"has_person": None, "status": "error"}
+
+    for t in raw_tags:
+        if t["name"] in _PERSON_TAGS and t["score"] >= 0.4:
+            return {"has_person": True, "status": "ready"}
+    return {"has_person": False, "status": "ready"}
