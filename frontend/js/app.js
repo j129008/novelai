@@ -451,36 +451,64 @@ function setupImg2ImgControls() {
 
 // Paste image from clipboard → img2img
 document.addEventListener("paste", (e) => {
-  // Try clipboardData.files first (works reliably even in textareas)
+  // Try to get image file from paste event
+  let file = null;
+
+  // Method 1: clipboardData.files
   const files = e.clipboardData && e.clipboardData.files;
-  if (files && files.length > 0 && files[0].type.startsWith("image/")) {
-    e.preventDefault();
-    const file = files[0];
-    const provider = document.getElementById("provider")?.value || "novelai";
-    if (provider === "grok") {
-      loadImageFile(file);
-    } else {
-      showPasteActionPopup(file);
+  if (files && files.length > 0 && files[0].type.startsWith("image/") && files[0].size > 0) {
+    file = files[0];
+  }
+
+  // Method 2: clipboardData.items
+  if (!file) {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (items) {
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          const f = item.getAsFile();
+          if (f && f.size > 0) { file = f; break; }
+        }
+      }
+    }
+  }
+
+  // Method 3: navigator.clipboard.read() for 0-byte cases (Finder copy on macOS)
+  if (!file) {
+    const items = e.clipboardData && e.clipboardData.items;
+    const hasImageType = items && Array.from(items).some(i => i.type.startsWith("image/"));
+    if (hasImageType) {
+      e.preventDefault();
+      navigator.clipboard.read().then(clipItems => {
+        for (const ci of clipItems) {
+          const imageType = ci.types.find(t => t.startsWith("image/"));
+          if (imageType) {
+            ci.getType(imageType).then(blob => {
+              if (blob.size > 0) {
+                const imageFile = new File([blob], "pasted-image.png", { type: imageType });
+                const provider = document.getElementById("provider")?.value || "novelai";
+                if (provider === "grok") {
+                  loadImageFile(imageFile);
+                } else {
+                  showPasteActionPopup(imageFile);
+                }
+              }
+            });
+            return;
+          }
+        }
+      }).catch(() => {});
+      return;
     }
     return;
   }
 
-  // Fallback: try clipboardData.items
-  const items = e.clipboardData && e.clipboardData.items;
-  if (!items) return;
-  for (const item of items) {
-    if (item.type.startsWith("image/")) {
-      const file = item.getAsFile();
-      if (!file || file.size === 0) return;
-      e.preventDefault();
-      const provider = document.getElementById("provider")?.value || "novelai";
-      if (provider === "grok") {
-        loadImageFile(file);
-      } else {
-        showPasteActionPopup(file);
-      }
-      return;
-    }
+  e.preventDefault();
+  const provider = document.getElementById("provider")?.value || "novelai";
+  if (provider === "grok") {
+    loadImageFile(file);
+  } else {
+    showPasteActionPopup(file);
   }
 });
 
