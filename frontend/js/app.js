@@ -2380,10 +2380,10 @@ function setupCraftPanel() {
       return { card, variant };
     });
 
-    // Generate all 4 in parallel
     const currentProvider = document.getElementById("provider")?.value || "novelai";
 
-    const promises = cards.map(async ({ card, variant }) => {
+    // Generate sequentially (one at a time) to avoid rate limits and save quota
+    for (const { card, variant } of cards) {
       const variantPrompt = buildVariantPrompt(prompt, variant.tags);
 
       let fetchUrl, body;
@@ -2498,9 +2498,8 @@ function setupCraftPanel() {
         errEl.textContent = "生成失敗";
         card.appendChild(errEl);
       }
-    });
+    } // end sequential for loop
 
-    await Promise.allSettled(promises);
     runBtn.disabled = false;
     runBtn.classList.remove("loading");
     updateRunBtn();
