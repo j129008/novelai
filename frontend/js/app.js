@@ -473,36 +473,22 @@ document.addEventListener("paste", (e) => {
     }
   }
 
-  // Method 3: navigator.clipboard.read() for 0-byte cases (Finder copy on macOS)
-  if (!file) {
-    const items = e.clipboardData && e.clipboardData.items;
-    const hasImageType = items && Array.from(items).some(i => i.type.startsWith("image/"));
-    if (hasImageType) {
-      e.preventDefault();
-      navigator.clipboard.read().then(clipItems => {
-        for (const ci of clipItems) {
-          const imageType = ci.types.find(t => t.startsWith("image/"));
-          if (imageType) {
-            ci.getType(imageType).then(blob => {
-              if (blob.size > 0) {
-                const imageFile = new File([blob], "pasted-image.png", { type: imageType });
-                const provider = document.getElementById("provider")?.value || "novelai";
-                if (provider === "grok") {
-                  loadImageFile(imageFile);
-                } else {
-                  showPasteActionPopup(imageFile);
-                }
-              }
-            });
-            return;
-          }
-        }
-      }).catch(() => {});
-      return;
-    }
-    return;
-  }
+  if (!file) return;
 
+  e.preventDefault();
+  const provider = document.getElementById("provider")?.value || "novelai";
+  if (provider === "grok") {
+    loadImageFile(file);
+  } else {
+    showPasteActionPopup(file);
+  }
+});
+
+// Global drag & drop — accept images dropped anywhere on the page
+document.addEventListener("dragover", (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
+document.addEventListener("drop", (e) => {
+  const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (!file || !file.type.startsWith("image/")) return;
   e.preventDefault();
   const provider = document.getElementById("provider")?.value || "novelai";
   if (provider === "grok") {
