@@ -996,6 +996,47 @@ def _filter_links(links: list[dict], base_url: str) -> list[dict]:
     return out[:_EXPLORE_MAX_LINKS]
 
 
+async def _explore_with_playwright(url: str) -> tuple[list[dict], list[dict], str, str]:
+    """Use headless Chrome via Playwright to extract images from JS-rendered pages."""
+    from playwright.async_api import async_playwright
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(channel="chrome", headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto(url, wait_until="networkidle", timeout=30000)
+            final_url = page.url
+            title = await page.title()
+
+            # Extract images and links from the rendered DOM
+            result = await page.evaluate("""() => {
+                const imgs = Array.from(document.querySelectorAll("img"))
+                    .map(img => ({
+                        src: img.src,
+                        alt: img.alt || "",
+                        w: img.naturalWidth || null,
+                        h: img.naturalHeight || null
+                    }))
+                    .filter(i => i.src && !i.src.startsWith("data:") &&
+                            (i.w === null || i.w > 50) && (i.h === null || i.h > 50));
+                const links = Array.from(document.querySelectorAll("a[href]"))
+                    .map(a => ({ href: a.href, text: (a.textContent || "").trim().slice(0, 80) }))
+                    .filter(l => l.href.startsWith("http"));
+                return { imgs, links };
+            }""")
+        finally:
+            await browser.close()
+
+    seen: set[str] = set()
+    images = []
+    for img in result["imgs"]:
+        if img["src"] not in seen:
+            seen.add(img["src"])
+            images.append({"src": img["src"], "alt": img["alt"], "width": img["w"], "height": img["h"]})
+
+    return images, result["links"], final_url, title
+
+
 @router.post("/explore/page", response_model=ExplorePageResponse)
 async def explore_page(req: ExplorePageRequest):
     url = _validate_explore_url(req.url)
@@ -1015,7 +1056,6 @@ async def explore_page(req: ExplorePageRequest):
         ) as client:
             resp = await client.get(url)
             resp.raise_for_status()
-            # Respect the final URL after redirects for relative link resolution
             final_url = str(resp.url)
     except httpx.HTTPStatusError as exc:
         raise HTTPException(status_code=502, detail=f"Remote server returned {exc.response.status_code}")
@@ -1026,7 +1066,6 @@ async def explore_page(req: ExplorePageRequest):
     if "html" not in content_type and "xml" not in content_type:
         raise HTTPException(status_code=422, detail="URL does not appear to be an HTML page")
 
-    # Decode with a fallback — many pages declare charset in headers or meta
     try:
         html = resp.text
     except Exception:
@@ -1037,7 +1076,7 @@ async def explore_page(req: ExplorePageRequest):
     try:
         parser.feed(html)
     except Exception:
-        pass  # HTMLParser is lenient; ignore any residual parse errors
+        pass
 
     images: list[dict] = list(parser.images)
 
@@ -1048,6 +1087,26 @@ async def explore_page(req: ExplorePageRequest):
         if img["src"] not in seen_srcs:
             seen_srcs.add(img["src"])
             images.append(img)
+
+    # --- Fallback: if no images found, try Playwright for JS-rendered pages ---
+    title = parser.title.strip()
+    if not images:
+        try:
+            pw_images, pw_links, final_url, pw_title = await _explore_with_playwright(url)
+            images = pw_images
+            if pw_title:
+                title = pw_title
+            # Use Playwright links if we got them
+            links = _filter_links(pw_links, final_url)
+            images = images[:_EXPLORE_MAX_IMAGES]
+            return ExplorePageResponse(
+                url=final_url,
+                title=title,
+                images=[ExploreImage(**img) for img in images],
+                links=[ExploreLink(**lnk) for lnk in links],
+            )
+        except Exception:
+            pass  # Fall through to return empty result
 
     images = images[:_EXPLORE_MAX_IMAGES]
     links = _filter_links(parser.links, final_url)
