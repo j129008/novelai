@@ -45,15 +45,16 @@ async def generate_image(
         }
         url = IMAGE_EDIT_URL
     else:
-        # Text-to-image generation
+        # Text-to-image generation — "auto" is not valid for generation
         payload = {
             "model": "grok-imagine-image",
             "prompt": prompt,
-            "aspect_ratio": aspect_ratio,
             "resolution": resolution,
             "response_format": "b64_json",
             "n": 1,
         }
+        if aspect_ratio and aspect_ratio != "auto":
+            payload["aspect_ratio"] = aspect_ratio
         url = IMAGE_URL
 
     async with httpx.AsyncClient(timeout=120.0) as client:
