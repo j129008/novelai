@@ -484,29 +484,28 @@ document.addEventListener("paste", (e) => {
     return;
   }
 
-  // Method 3: navigator.clipboard.read() — works on localhost (secure context)
-  // Needed for apps like qView that produce 0-byte paste blobs
+  // Method 3: read from macOS system clipboard via backend
+  // Needed for apps like qView that produce 0-byte paste blobs in Chrome
   const items = e.clipboardData && e.clipboardData.items;
   const hasImageType = items && Array.from(items).some(i => i.type.startsWith("image/"));
-  if (hasImageType && navigator.clipboard && navigator.clipboard.read) {
+  if (hasImageType) {
     e.preventDefault();
-    navigator.clipboard.read().then(clipItems => {
-      for (const ci of clipItems) {
-        const imageType = ci.types.find(t => t.startsWith("image/"));
-        if (imageType) {
-          ci.getType(imageType).then(blob => {
-            if (blob && blob.size > 0) {
-              const imageFile = new File([blob], "pasted-image.png", { type: imageType });
-              const provider = document.getElementById("provider")?.value || "novelai";
-              if (provider === "grok") {
-                loadImageFile(imageFile);
-              } else {
-                showPasteActionPopup(imageFile);
-              }
-            }
-          });
-          return;
-        }
+    fetch("/api/clipboard-image").then(r => {
+      if (!r.ok) return;
+      return r.json();
+    }).then(data => {
+      if (!data || !data.image) return;
+      const dataUrl = "data:image/png;base64," + data.image;
+      const provider = document.getElementById("provider")?.value || "novelai";
+      // Create a File from the base64 data
+      const byteStr = atob(data.image);
+      const bytes = new Uint8Array(byteStr.length);
+      for (let i = 0; i < byteStr.length; i++) bytes[i] = byteStr.charCodeAt(i);
+      const imageFile = new File([bytes], "clipboard.png", { type: "image/png" });
+      if (provider === "grok") {
+        loadImageFile(imageFile);
+      } else {
+        showPasteActionPopup(imageFile);
       }
     }).catch(() => {});
   }

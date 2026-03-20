@@ -348,6 +348,47 @@ async def grok_usage():
     }
 
 
+@router.get("/clipboard-image")
+async def get_clipboard_image():
+    """Read image from macOS system clipboard via osascript."""
+    try:
+        result = subprocess.run(
+            ["osascript", "-e", 'the clipboard as «class PNGf»'],
+            capture_output=True, timeout=5,
+        )
+        if result.returncode != 0:
+            raise HTTPException(status_code=404, detail="No image in clipboard")
+
+        # osascript returns hex-encoded data like: «data PNGf89504E4...»
+        # Extract the hex string between "PNGf" and the closing delimiter
+        raw = result.stdout
+        # Find "PNGf" marker and extract hex digits after it
+        marker = b"PNGf"
+        idx = raw.find(marker)
+        if idx < 0:
+            raise HTTPException(status_code=404, detail="No PNG data in clipboard")
+        hex_start = idx + len(marker)
+        # Extract all hex chars until a non-hex byte
+        hex_str = ""
+        for b in raw[hex_start:]:
+            c = chr(b)
+            if c in "0123456789ABCDEFabcdef":
+                hex_str += c
+            else:
+                break
+        if not hex_str:
+            raise HTTPException(status_code=404, detail="No PNG data in clipboard")
+
+        png_bytes = bytes.fromhex(hex_str)
+        return {"image": base64.b64encode(png_bytes).decode()}
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Clipboard read timed out")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Clipboard read failed: {e}")
+
+
 class ImageMetaRequest(BaseModel):
     image: str  # base64
 
