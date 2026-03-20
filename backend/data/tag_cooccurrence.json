@@ -1,0 +1,1066 @@
+{
+  "cooccurrence": {
+    "1girl": {
+      "solo": 0.92,
+      "long_hair": 0.68,
+      "short_hair": 0.42,
+      "looking_at_viewer": 0.71,
+      "smile": 0.55,
+      "blush": 0.48,
+      "dress": 0.45,
+      "school_uniform": 0.38,
+      "skirt": 0.44,
+      "breasts": 0.62,
+      "eyes": 0.35,
+      "hair_ornament": 0.31,
+      "ribbon": 0.29,
+      "bow": 0.27,
+      "jacket": 0.28,
+      "sitting": 0.31,
+      "standing": 0.33,
+      "outdoors": 0.28,
+      "indoors": 0.25,
+      "white_background": 0.22
+    },
+    "solo": {
+      "1girl": 0.92,
+      "looking_at_viewer": 0.74,
+      "simple_background": 0.38,
+      "white_background": 0.32,
+      "upper_body": 0.29,
+      "smile": 0.51,
+      "standing": 0.41,
+      "sitting": 0.32,
+      "portrait": 0.28,
+      "full_body": 0.31
+    },
+    "long_hair": {
+      "1girl": 0.68,
+      "blonde_hair": 0.31,
+      "brown_hair": 0.28,
+      "black_hair": 0.29,
+      "twintails": 0.35,
+      "ponytail": 0.38,
+      "hair_ornament": 0.42,
+      "ribbon": 0.33,
+      "looking_at_viewer": 0.52,
+      "smile": 0.44,
+      "wind": 0.21,
+      "floating_hair": 0.24
+    },
+    "short_hair": {
+      "1girl": 0.42,
+      "1boy": 0.38,
+      "looking_at_viewer": 0.51,
+      "smile": 0.40,
+      "black_hair": 0.31,
+      "brown_hair": 0.27,
+      "blue_eyes": 0.28,
+      "simple_background": 0.30
+    },
+    "smile": {
+      "1girl": 0.55,
+      "solo": 0.51,
+      "looking_at_viewer": 0.72,
+      "blush": 0.53,
+      "open_mouth": 0.49,
+      "teeth": 0.38,
+      "happy": 0.61,
+      "school_uniform": 0.35,
+      "outdoors": 0.29
+    },
+    "looking_at_viewer": {
+      "1girl": 0.71,
+      "solo": 0.74,
+      "smile": 0.72,
+      "blush": 0.52,
+      "upper_body": 0.38,
+      "portrait": 0.31,
+      "eye_contact": 0.29,
+      "serious": 0.22,
+      "hair_between_eyes": 0.27
+    },
+    "blush": {
+      "1girl": 0.48,
+      "smile": 0.53,
+      "looking_at_viewer": 0.52,
+      "embarrassed": 0.61,
+      "open_mouth": 0.39,
+      "sweat": 0.28,
+      "heart": 0.25,
+      "flustered": 0.42
+    },
+    "blonde_hair": {
+      "blue_eyes": 0.58,
+      "long_hair": 0.44,
+      "twintails": 0.31,
+      "smile": 0.42,
+      "1girl": 0.71,
+      "ponytail": 0.28,
+      "hair_ribbon": 0.26,
+      "drill_hair": 0.19,
+      "ahoge": 0.22
+    },
+    "blue_eyes": {
+      "blonde_hair": 0.58,
+      "1girl": 0.62,
+      "looking_at_viewer": 0.61,
+      "long_hair": 0.41,
+      "smile": 0.44,
+      "short_hair": 0.28,
+      "tears": 0.21
+    },
+    "brown_hair": {
+      "1girl": 0.65,
+      "long_hair": 0.42,
+      "brown_eyes": 0.48,
+      "school_uniform": 0.38,
+      "ponytail": 0.31,
+      "smile": 0.40,
+      "short_hair": 0.27
+    },
+    "black_hair": {
+      "1girl": 0.58,
+      "long_hair": 0.39,
+      "short_hair": 0.31,
+      "dark_skin": 0.15,
+      "school_uniform": 0.35,
+      "black_eyes": 0.31,
+      "ponytail": 0.28
+    },
+    "red_hair": {
+      "1girl": 0.60,
+      "long_hair": 0.41,
+      "red_eyes": 0.35,
+      "smile": 0.38,
+      "twintails": 0.24
+    },
+    "white_hair": {
+      "1girl": 0.55,
+      "red_eyes": 0.41,
+      "long_hair": 0.45,
+      "silver_hair": 0.62,
+      "looking_at_viewer": 0.52,
+      "pale_skin": 0.28
+    },
+    "silver_hair": {
+      "white_hair": 0.62,
+      "1girl": 0.55,
+      "long_hair": 0.46,
+      "pale_skin": 0.30,
+      "red_eyes": 0.35,
+      "looking_at_viewer": 0.48
+    },
+    "pink_hair": {
+      "1girl": 0.68,
+      "long_hair": 0.45,
+      "pink_eyes": 0.44,
+      "twintails": 0.31,
+      "smile": 0.48,
+      "cute": 0.38
+    },
+    "twintails": {
+      "1girl": 0.78,
+      "long_hair": 0.52,
+      "ribbon": 0.51,
+      "bow": 0.42,
+      "blonde_hair": 0.31,
+      "school_uniform": 0.35,
+      "smile": 0.42,
+      "hair_tie": 0.38
+    },
+    "ponytail": {
+      "1girl": 0.65,
+      "long_hair": 0.58,
+      "hair_tie": 0.51,
+      "brown_hair": 0.31,
+      "black_hair": 0.28,
+      "sports_uniform": 0.25,
+      "looking_back": 0.22
+    },
+    "school_uniform": {
+      "1girl": 0.71,
+      "serafuku": 0.52,
+      "skirt": 0.68,
+      "necktie": 0.41,
+      "blazer": 0.38,
+      "classroom": 0.31,
+      "outdoors": 0.29,
+      "smile": 0.44
+    },
+    "dress": {
+      "1girl": 0.68,
+      "white_dress": 0.38,
+      "sundress": 0.22,
+      "long_dress": 0.35,
+      "short_dress": 0.31,
+      "off_shoulder": 0.25,
+      "frills": 0.33,
+      "ribbon": 0.28,
+      "outdoors": 0.35,
+      "flower": 0.25
+    },
+    "skirt": {
+      "1girl": 0.72,
+      "school_uniform": 0.61,
+      "miniskirt": 0.41,
+      "pleated_skirt": 0.45,
+      "black_skirt": 0.28,
+      "white_skirt": 0.24,
+      "thighhighs": 0.42,
+      "wind": 0.22
+    },
+    "thighhighs": {
+      "1girl": 0.68,
+      "skirt": 0.42,
+      "black_thighhighs": 0.51,
+      "white_thighhighs": 0.38,
+      "garter_belt": 0.21,
+      "miniskirt": 0.35,
+      "school_uniform": 0.31
+    },
+    "jacket": {
+      "1girl": 0.42,
+      "1boy": 0.38,
+      "open_jacket": 0.45,
+      "uniform": 0.38,
+      "outdoors": 0.28,
+      "hoodie": 0.29
+    },
+    "outdoors": {
+      "sky": 0.71,
+      "clouds": 0.52,
+      "grass": 0.48,
+      "tree": 0.45,
+      "flower": 0.38,
+      "sunset": 0.31,
+      "wind": 0.29,
+      "forest": 0.35,
+      "mountain": 0.28,
+      "sunlight": 0.42
+    },
+    "indoors": {
+      "room": 0.62,
+      "window": 0.42,
+      "bed": 0.31,
+      "table": 0.28,
+      "bookshelf": 0.25,
+      "soft_lighting": 0.35,
+      "classroom": 0.29,
+      "couch": 0.22
+    },
+    "sky": {
+      "outdoors": 0.71,
+      "clouds": 0.68,
+      "sunset": 0.41,
+      "blue_sky": 0.62,
+      "stars": 0.31,
+      "night_sky": 0.35,
+      "sunrise": 0.28,
+      "rainbow": 0.18,
+      "dramatic_sky": 0.29
+    },
+    "clouds": {
+      "sky": 0.68,
+      "outdoors": 0.52,
+      "blue_sky": 0.55,
+      "sunset": 0.35,
+      "dramatic_sky": 0.31,
+      "sunlight": 0.28
+    },
+    "sunset": {
+      "sky": 0.71,
+      "outdoors": 0.65,
+      "orange_sky": 0.58,
+      "silhouette": 0.38,
+      "warm_colors": 0.52,
+      "dramatic_lighting": 0.41,
+      "lens_flare": 0.28,
+      "horizon": 0.45,
+      "clouds": 0.48
+    },
+    "night": {
+      "stars": 0.61,
+      "moon": 0.55,
+      "night_sky": 0.68,
+      "city_lights": 0.38,
+      "dark": 0.51,
+      "lantern": 0.22,
+      "neon_lights": 0.25,
+      "moonlight": 0.45
+    },
+    "stars": {
+      "night": 0.61,
+      "night_sky": 0.72,
+      "moon": 0.48,
+      "milky_way": 0.38,
+      "galaxy": 0.35,
+      "sparkle": 0.28,
+      "starry_sky": 0.81
+    },
+    "forest": {
+      "outdoors": 0.71,
+      "tree": 0.82,
+      "grass": 0.55,
+      "sunlight": 0.42,
+      "dappled_light": 0.35,
+      "green": 0.45,
+      "leaves": 0.48,
+      "fog": 0.21
+    },
+    "city": {
+      "buildings": 0.72,
+      "street": 0.61,
+      "night": 0.45,
+      "neon_lights": 0.38,
+      "urban": 0.65,
+      "rain": 0.28,
+      "crowd": 0.21
+    },
+    "rain": {
+      "wet": 0.72,
+      "umbrella": 0.58,
+      "puddle": 0.41,
+      "city": 0.28,
+      "outdoors": 0.52,
+      "dark_sky": 0.38,
+      "sad": 0.22,
+      "storm": 0.29
+    },
+    "snow": {
+      "winter": 0.81,
+      "snowflakes": 0.72,
+      "cold": 0.58,
+      "coat": 0.41,
+      "outdoors": 0.55,
+      "white": 0.45,
+      "breath": 0.28,
+      "christmas": 0.22
+    },
+    "flower": {
+      "outdoors": 0.55,
+      "petals": 0.68,
+      "cherry_blossoms": 0.38,
+      "garden": 0.45,
+      "holding": 0.28,
+      "hair_flower": 0.35,
+      "bouquet": 0.25,
+      "spring": 0.42
+    },
+    "cherry_blossoms": {
+      "flower": 0.68,
+      "petals": 0.72,
+      "spring": 0.81,
+      "pink": 0.61,
+      "sakura": 0.91,
+      "outdoors": 0.55,
+      "tree": 0.48
+    },
+    "sakura": {
+      "cherry_blossoms": 0.91,
+      "petals": 0.72,
+      "pink": 0.61,
+      "spring": 0.75,
+      "outdoors": 0.55,
+      "flower": 0.65
+    },
+    "masterpiece": {
+      "best_quality": 0.88,
+      "highly_detailed": 0.72,
+      "absurdres": 0.55,
+      "highres": 0.71,
+      "extremely_detailed": 0.68,
+      "8k": 0.38,
+      "intricate_details": 0.51,
+      "wallpaper": 0.28,
+      "official_art": 0.35
+    },
+    "best_quality": {
+      "masterpiece": 0.88,
+      "highly_detailed": 0.68,
+      "highres": 0.72,
+      "absurdres": 0.52,
+      "ultra-detailed": 0.61,
+      "extremely_detailed": 0.65,
+      "sharp_focus": 0.41
+    },
+    "highly_detailed": {
+      "masterpiece": 0.72,
+      "best_quality": 0.68,
+      "intricate": 0.61,
+      "detailed_background": 0.48,
+      "absurdres": 0.51,
+      "8k": 0.38,
+      "photorealistic": 0.31
+    },
+    "absurdres": {
+      "highres": 0.82,
+      "masterpiece": 0.55,
+      "best_quality": 0.52,
+      "highly_detailed": 0.51,
+      "wallpaper": 0.38
+    },
+    "highres": {
+      "absurdres": 0.82,
+      "masterpiece": 0.71,
+      "best_quality": 0.72,
+      "highly_detailed": 0.62,
+      "wallpaper": 0.35
+    },
+    "dramatic_lighting": {
+      "sunset": 0.41,
+      "backlighting": 0.52,
+      "rim_lighting": 0.48,
+      "shadows": 0.61,
+      "cinematic_lighting": 0.55,
+      "volumetric_lighting": 0.45,
+      "contrast": 0.38,
+      "dark_background": 0.31
+    },
+    "soft_lighting": {
+      "indoors": 0.35,
+      "ambient_light": 0.58,
+      "warm_light": 0.48,
+      "studio_lighting": 0.38,
+      "diffuse_light": 0.41,
+      "gentle": 0.28
+    },
+    "backlighting": {
+      "dramatic_lighting": 0.52,
+      "silhouette": 0.61,
+      "rim_lighting": 0.55,
+      "sunset": 0.38,
+      "lens_flare": 0.42,
+      "glowing": 0.35
+    },
+    "rim_lighting": {
+      "backlighting": 0.55,
+      "dramatic_lighting": 0.48,
+      "dark_background": 0.41,
+      "glowing_edges": 0.38,
+      "portrait": 0.31
+    },
+    "volumetric_lighting": {
+      "dramatic_lighting": 0.45,
+      "god_rays": 0.72,
+      "forest": 0.35,
+      "fog": 0.41,
+      "cinematic": 0.38
+    },
+    "god_rays": {
+      "volumetric_lighting": 0.72,
+      "forest": 0.45,
+      "sunlight": 0.68,
+      "church": 0.28,
+      "dust_particles": 0.38
+    },
+    "sunlight": {
+      "outdoors": 0.62,
+      "forest": 0.45,
+      "dappled_light": 0.48,
+      "warm_light": 0.51,
+      "lens_flare": 0.35,
+      "god_rays": 0.45
+    },
+    "moonlight": {
+      "night": 0.71,
+      "moon": 0.82,
+      "blue_light": 0.45,
+      "silver": 0.38,
+      "mysterious": 0.31,
+      "romantic": 0.28
+    },
+    "neon_lights": {
+      "city": 0.61,
+      "night": 0.72,
+      "cyberpunk": 0.68,
+      "rain": 0.35,
+      "colorful": 0.48,
+      "urban": 0.52
+    },
+    "anime": {
+      "manga": 0.48,
+      "cel_shading": 0.42,
+      "anime_style": 0.81,
+      "japanese": 0.31,
+      "colorful": 0.38
+    },
+    "watercolor": {
+      "painting": 0.72,
+      "soft_colors": 0.58,
+      "artistic": 0.51,
+      "traditional_media": 0.65,
+      "sketch": 0.31,
+      "pastel_colors": 0.42
+    },
+    "oil_painting": {
+      "painting": 0.82,
+      "realistic": 0.51,
+      "traditional_media": 0.72,
+      "textured": 0.48,
+      "detailed": 0.45
+    },
+    "sketch": {
+      "pencil": 0.72,
+      "lineart": 0.68,
+      "monochrome": 0.55,
+      "rough_sketch": 0.48,
+      "traditional_media": 0.41,
+      "watercolor": 0.28
+    },
+    "monochrome": {
+      "greyscale": 0.82,
+      "sketch": 0.35,
+      "black_and_white": 0.71,
+      "high_contrast": 0.41,
+      "dramatic": 0.28
+    },
+    "cyberpunk": {
+      "neon_lights": 0.68,
+      "city": 0.55,
+      "futuristic": 0.72,
+      "urban": 0.51,
+      "night": 0.48,
+      "rain": 0.38,
+      "tech": 0.45
+    },
+    "fantasy": {
+      "magic": 0.61,
+      "dragon": 0.38,
+      "armor": 0.41,
+      "sword": 0.35,
+      "castle": 0.45,
+      "forest": 0.31,
+      "elves": 0.28,
+      "glowing": 0.42
+    },
+    "magic": {
+      "fantasy": 0.61,
+      "glowing": 0.52,
+      "sparkle": 0.58,
+      "magical_circle": 0.48,
+      "staff": 0.38,
+      "runes": 0.41,
+      "purple": 0.28
+    },
+    "portrait": {
+      "solo": 0.58,
+      "looking_at_viewer": 0.71,
+      "upper_body": 0.65,
+      "face": 0.52,
+      "detailed_face": 0.48,
+      "close-up": 0.42,
+      "rim_lighting": 0.31
+    },
+    "full_body": {
+      "solo": 0.51,
+      "standing": 0.62,
+      "white_background": 0.38,
+      "simple_background": 0.41,
+      "character_sheet": 0.25
+    },
+    "upper_body": {
+      "solo": 0.48,
+      "portrait": 0.52,
+      "looking_at_viewer": 0.55,
+      "arms": 0.31,
+      "chest": 0.38
+    },
+    "sitting": {
+      "1girl": 0.42,
+      "knees_up": 0.38,
+      "chair": 0.48,
+      "floor": 0.31,
+      "indoors": 0.35,
+      "legs": 0.28,
+      "crossed_legs": 0.25
+    },
+    "standing": {
+      "1girl": 0.44,
+      "full_body": 0.51,
+      "outdoors": 0.35,
+      "hands_on_hips": 0.22,
+      "simple_background": 0.31
+    },
+    "looking_back": {
+      "over_shoulder": 0.71,
+      "from_behind": 0.65,
+      "long_hair": 0.41,
+      "outdoors": 0.35,
+      "glance": 0.48
+    },
+    "1boy": {
+      "solo": 0.82,
+      "short_hair": 0.38,
+      "black_hair": 0.31,
+      "looking_at_viewer": 0.52,
+      "jacket": 0.35,
+      "smile": 0.38,
+      "serious": 0.28
+    },
+    "couple": {
+      "1girl": 0.71,
+      "1boy": 0.71,
+      "romance": 0.55,
+      "holding_hands": 0.48,
+      "hug": 0.42,
+      "kiss": 0.35,
+      "outdoors": 0.28,
+      "looking_at_each_other": 0.51
+    },
+    "armor": {
+      "fantasy": 0.48,
+      "sword": 0.51,
+      "knight": 0.61,
+      "shield": 0.45,
+      "pauldrons": 0.38,
+      "detailed_armor": 0.42,
+      "battle": 0.31
+    },
+    "sword": {
+      "armor": 0.51,
+      "fantasy": 0.42,
+      "holding_weapon": 0.61,
+      "battle": 0.38,
+      "slash": 0.28,
+      "blood": 0.22,
+      "warrior": 0.45
+    },
+    "maid": {
+      "maid_headdress": 0.82,
+      "maid_apron": 0.78,
+      "frills": 0.61,
+      "1girl": 0.88,
+      "black_dress": 0.48,
+      "white_apron": 0.55,
+      "indoors": 0.41
+    },
+    "maid_headdress": {
+      "maid": 0.82,
+      "maid_apron": 0.71,
+      "frills": 0.55,
+      "1girl": 0.79,
+      "white": 0.48
+    },
+    "kimono": {
+      "japanese_clothes": 0.78,
+      "obi": 0.68,
+      "1girl": 0.72,
+      "flower": 0.35,
+      "traditional": 0.52,
+      "hair_ornament": 0.41,
+      "tatami": 0.21
+    },
+    "sweater": {
+      "winter": 0.45,
+      "cozy": 0.38,
+      "indoors": 0.41,
+      "warm_colors": 0.28,
+      "casual": 0.35,
+      "oversized": 0.25
+    },
+    "hoodie": {
+      "casual": 0.58,
+      "jacket": 0.38,
+      "outdoors": 0.31,
+      "street": 0.28,
+      "comfortable": 0.25
+    },
+    "gloves": {
+      "1girl": 0.45,
+      "white_gloves": 0.48,
+      "formal": 0.35,
+      "fantasy": 0.28,
+      "armor": 0.25
+    },
+    "ribbon": {
+      "1girl": 0.58,
+      "hair_ribbon": 0.72,
+      "twintails": 0.51,
+      "bow": 0.62,
+      "school_uniform": 0.41,
+      "frills": 0.35
+    },
+    "bow": {
+      "ribbon": 0.62,
+      "1girl": 0.55,
+      "hair_bow": 0.68,
+      "twintails": 0.42,
+      "dress": 0.35,
+      "frills": 0.38
+    },
+    "frills": {
+      "dress": 0.51,
+      "skirt": 0.45,
+      "maid": 0.61,
+      "lolita": 0.48,
+      "ribbon": 0.35,
+      "white": 0.31
+    },
+    "hat": {
+      "1girl": 0.45,
+      "witch_hat": 0.35,
+      "straw_hat": 0.28,
+      "baseball_cap": 0.22,
+      "outdoors": 0.31
+    },
+    "glasses": {
+      "1girl": 0.42,
+      "1boy": 0.31,
+      "indoors": 0.28,
+      "bookworm": 0.21,
+      "intellectual": 0.18,
+      "school_uniform": 0.25
+    },
+    "wings": {
+      "angel": 0.65,
+      "demon": 0.45,
+      "white_wings": 0.52,
+      "black_wings": 0.41,
+      "feathers": 0.68,
+      "flying": 0.48,
+      "fantasy": 0.38
+    },
+    "tail": {
+      "cat_tail": 0.55,
+      "fox_tail": 0.42,
+      "animal_ears": 0.71,
+      "kemonomimi": 0.52,
+      "fluffy": 0.38
+    },
+    "animal_ears": {
+      "tail": 0.71,
+      "cat_ears": 0.62,
+      "fox_ears": 0.45,
+      "kemonomimi": 0.68,
+      "1girl": 0.72,
+      "fluffy": 0.35
+    },
+    "cat_ears": {
+      "animal_ears": 0.82,
+      "tail": 0.58,
+      "cat_tail": 0.71,
+      "1girl": 0.68,
+      "kemonomimi": 0.61
+    },
+    "fox_ears": {
+      "animal_ears": 0.71,
+      "fox_tail": 0.68,
+      "kemonomimi": 0.61,
+      "1girl": 0.65,
+      "white_hair": 0.28
+    },
+    "tears": {
+      "crying": 0.82,
+      "sad": 0.72,
+      "watery_eyes": 0.61,
+      "emotional": 0.48,
+      "blush": 0.35
+    },
+    "crying": {
+      "tears": 0.82,
+      "sad": 0.78,
+      "emotional": 0.55,
+      "open_mouth": 0.41,
+      "red_eyes": 0.28
+    },
+    "angry": {
+      "furrowed_brow": 0.71,
+      "gritted_teeth": 0.55,
+      "serious": 0.48,
+      "battle": 0.31,
+      "action": 0.28
+    },
+    "embarrassed": {
+      "blush": 0.82,
+      "averted_eyes": 0.61,
+      "sweat": 0.48,
+      "shy": 0.71,
+      "open_mouth": 0.38
+    },
+    "happy": {
+      "smile": 0.88,
+      "laughing": 0.61,
+      "open_mouth": 0.52,
+      "blush": 0.41,
+      "bright": 0.35
+    },
+    "serious": {
+      "looking_at_viewer": 0.48,
+      "1boy": 0.35,
+      "armor": 0.28,
+      "determined": 0.51,
+      "closed_mouth": 0.42
+    },
+    "dynamic_pose": {
+      "action": 0.68,
+      "battle": 0.51,
+      "jumping": 0.45,
+      "running": 0.41,
+      "motion_blur": 0.35
+    },
+    "action": {
+      "dynamic_pose": 0.68,
+      "battle": 0.61,
+      "sword": 0.38,
+      "magic": 0.35,
+      "explosion": 0.28
+    },
+    "depth_of_field": {
+      "blurry_background": 0.82,
+      "bokeh": 0.72,
+      "portrait": 0.58,
+      "lens_flare": 0.28,
+      "professional_photography": 0.35
+    },
+    "bokeh": {
+      "depth_of_field": 0.72,
+      "blurry_background": 0.68,
+      "portrait": 0.51,
+      "lights": 0.38,
+      "romantic": 0.28
+    },
+    "lens_flare": {
+      "sunlight": 0.55,
+      "sunset": 0.48,
+      "backlighting": 0.51,
+      "bokeh": 0.31,
+      "outdoor_photography": 0.38
+    },
+    "simple_background": {
+      "white_background": 0.62,
+      "solo": 0.55,
+      "full_body": 0.41,
+      "character_sheet": 0.28
+    },
+    "white_background": {
+      "simple_background": 0.62,
+      "solo": 0.51,
+      "full_body": 0.38,
+      "clean": 0.31
+    },
+    "gradient_background": {
+      "simple_background": 0.48,
+      "colorful": 0.35,
+      "abstract": 0.31
+    },
+    "detailed_background": {
+      "highly_detailed": 0.58,
+      "outdoors": 0.41,
+      "indoors": 0.38,
+      "atmospheric": 0.31
+    },
+    "cinematic": {
+      "cinematic_lighting": 0.82,
+      "dramatic": 0.68,
+      "widescreen": 0.55,
+      "film_grain": 0.41,
+      "color_grading": 0.48
+    },
+    "cinematic_lighting": {
+      "cinematic": 0.82,
+      "dramatic_lighting": 0.72,
+      "shadows": 0.61,
+      "contrast": 0.55,
+      "volumetric_lighting": 0.45
+    },
+    "pastel_colors": {
+      "soft_colors": 0.72,
+      "watercolor": 0.48,
+      "cute": 0.51,
+      "dreamy": 0.45,
+      "pink": 0.38
+    },
+    "vibrant_colors": {
+      "colorful": 0.82,
+      "saturated": 0.71,
+      "bright": 0.61,
+      "pop_art": 0.35
+    },
+    "glowing": {
+      "magic": 0.52,
+      "neon_lights": 0.45,
+      "backlighting": 0.38,
+      "eyes_glowing": 0.41,
+      "fantasy": 0.35,
+      "sparks": 0.28
+    },
+    "fog": {
+      "forest": 0.48,
+      "mysterious": 0.55,
+      "atmospheric": 0.61,
+      "volumetric_lighting": 0.38,
+      "morning": 0.35,
+      "dark": 0.28
+    },
+    "rain": {
+      "wet": 0.72,
+      "umbrella": 0.58,
+      "puddle": 0.41,
+      "city": 0.28,
+      "outdoors": 0.52,
+      "dark_sky": 0.38
+    },
+    "ocean": {
+      "beach": 0.72,
+      "sea": 0.81,
+      "waves": 0.68,
+      "water": 0.75,
+      "blue": 0.51,
+      "horizon": 0.45,
+      "sky": 0.48
+    },
+    "beach": {
+      "ocean": 0.72,
+      "summer": 0.65,
+      "swimsuit": 0.55,
+      "sand": 0.61,
+      "outdoors": 0.68,
+      "sunlight": 0.42
+    },
+    "swimsuit": {
+      "beach": 0.55,
+      "1girl": 0.68,
+      "bikini": 0.62,
+      "summer": 0.58,
+      "wet": 0.38,
+      "ocean": 0.41
+    },
+    "food": {
+      "eating": 0.61,
+      "cake": 0.35,
+      "sweets": 0.42,
+      "restaurant": 0.28,
+      "yummy": 0.31
+    },
+    "book": {
+      "reading": 0.72,
+      "library": 0.55,
+      "indoors": 0.41,
+      "glasses": 0.28,
+      "intelligent": 0.22
+    },
+    "music": {
+      "guitar": 0.51,
+      "singing": 0.61,
+      "headphones": 0.45,
+      "microphone": 0.38,
+      "concert": 0.31
+    }
+  },
+  "metadata": {
+    "1girl": {"category": "subject", "count": 6008644},
+    "solo": {"category": "subject", "count": 5000954},
+    "long_hair": {"category": "subject", "count": 4350743},
+    "breasts": {"category": "subject", "count": 3439214},
+    "looking_at_viewer": {"category": "subject", "count": 3315722},
+    "blush": {"category": "subject", "count": 2942792},
+    "smile": {"category": "subject", "count": 2873890},
+    "open_mouth": {"category": "subject", "count": 2365905},
+    "short_hair": {"category": "subject", "count": 2261608},
+    "highres": {"category": "style", "count": 5256195},
+    "masterpiece": {"category": "style", "count": 1850000},
+    "best_quality": {"category": "style", "count": 1620000},
+    "highly_detailed": {"category": "style", "count": 980000},
+    "absurdres": {"category": "style", "count": 820000},
+    "anime": {"category": "style", "count": 750000},
+    "watercolor": {"category": "style", "count": 280000},
+    "oil_painting": {"category": "style", "count": 190000},
+    "sketch": {"category": "style", "count": 560000},
+    "monochrome": {"category": "style", "count": 1100000},
+    "cinematic": {"category": "style", "count": 310000},
+    "pastel_colors": {"category": "style", "count": 185000},
+    "vibrant_colors": {"category": "style", "count": 145000},
+    "blonde_hair": {"category": "subject", "count": 1850000},
+    "blue_eyes": {"category": "subject", "count": 1720000},
+    "brown_hair": {"category": "subject", "count": 1580000},
+    "black_hair": {"category": "subject", "count": 1490000},
+    "red_hair": {"category": "subject", "count": 820000},
+    "white_hair": {"category": "subject", "count": 680000},
+    "silver_hair": {"category": "subject", "count": 590000},
+    "pink_hair": {"category": "subject", "count": 710000},
+    "twintails": {"category": "subject", "count": 1250000},
+    "ponytail": {"category": "subject", "count": 1380000},
+    "school_uniform": {"category": "subject", "count": 1420000},
+    "dress": {"category": "subject", "count": 1190000},
+    "skirt": {"category": "subject", "count": 1350000},
+    "thighhighs": {"category": "subject", "count": 1180000},
+    "jacket": {"category": "subject", "count": 680000},
+    "maid": {"category": "subject", "count": 520000},
+    "maid_headdress": {"category": "subject", "count": 480000},
+    "kimono": {"category": "subject", "count": 390000},
+    "sweater": {"category": "subject", "count": 280000},
+    "hoodie": {"category": "subject", "count": 310000},
+    "gloves": {"category": "subject", "count": 490000},
+    "ribbon": {"category": "subject", "count": 1050000},
+    "bow": {"category": "subject", "count": 920000},
+    "frills": {"category": "subject", "count": 480000},
+    "hat": {"category": "subject", "count": 580000},
+    "glasses": {"category": "subject", "count": 520000},
+    "wings": {"category": "subject", "count": 410000},
+    "tail": {"category": "subject", "count": 580000},
+    "animal_ears": {"category": "subject", "count": 720000},
+    "cat_ears": {"category": "subject", "count": 650000},
+    "fox_ears": {"category": "subject", "count": 380000},
+    "tears": {"category": "subject", "count": 620000},
+    "crying": {"category": "subject", "count": 450000},
+    "angry": {"category": "subject", "count": 380000},
+    "embarrassed": {"category": "subject", "count": 520000},
+    "happy": {"category": "subject", "count": 680000},
+    "serious": {"category": "subject", "count": 350000},
+    "1boy": {"category": "subject", "count": 2850000},
+    "couple": {"category": "subject", "count": 480000},
+    "armor": {"category": "subject", "count": 390000},
+    "sword": {"category": "subject", "count": 420000},
+    "standing": {"category": "subject", "count": 1850000},
+    "sitting": {"category": "subject", "count": 1420000},
+    "portrait": {"category": "subject", "count": 980000},
+    "full_body": {"category": "subject", "count": 1150000},
+    "upper_body": {"category": "subject", "count": 880000},
+    "looking_back": {"category": "subject", "count": 520000},
+    "dynamic_pose": {"category": "subject", "count": 380000},
+    "action": {"category": "subject", "count": 420000},
+    "outdoors": {"category": "scene", "count": 2100000},
+    "indoors": {"category": "scene", "count": 1380000},
+    "sky": {"category": "scene", "count": 1850000},
+    "clouds": {"category": "scene", "count": 980000},
+    "sunset": {"category": "scene", "count": 650000},
+    "night": {"category": "scene", "count": 820000},
+    "stars": {"category": "scene", "count": 480000},
+    "forest": {"category": "scene", "count": 580000},
+    "city": {"category": "scene", "count": 520000},
+    "rain": {"category": "scene", "count": 390000},
+    "snow": {"category": "scene", "count": 320000},
+    "flower": {"category": "scene", "count": 780000},
+    "cherry_blossoms": {"category": "scene", "count": 290000},
+    "sakura": {"category": "scene", "count": 280000},
+    "ocean": {"category": "scene", "count": 420000},
+    "beach": {"category": "scene", "count": 380000},
+    "dramatic_lighting": {"category": "lighting", "count": 150000},
+    "soft_lighting": {"category": "lighting", "count": 125000},
+    "backlighting": {"category": "lighting", "count": 98000},
+    "rim_lighting": {"category": "lighting", "count": 85000},
+    "volumetric_lighting": {"category": "lighting", "count": 72000},
+    "god_rays": {"category": "lighting", "count": 65000},
+    "sunlight": {"category": "lighting", "count": 320000},
+    "moonlight": {"category": "lighting", "count": 110000},
+    "neon_lights": {"category": "lighting", "count": 185000},
+    "cinematic_lighting": {"category": "lighting", "count": 142000},
+    "glowing": {"category": "lighting", "count": 280000},
+    "fog": {"category": "scene", "count": 195000},
+    "depth_of_field": {"category": "composition", "count": 420000},
+    "bokeh": {"category": "composition", "count": 380000},
+    "lens_flare": {"category": "composition", "count": 185000},
+    "simple_background": {"category": "composition", "count": 2100000},
+    "white_background": {"category": "composition", "count": 1850000},
+    "gradient_background": {"category": "composition", "count": 280000},
+    "detailed_background": {"category": "composition", "count": 350000},
+    "cyberpunk": {"category": "mood", "count": 245000},
+    "fantasy": {"category": "mood", "count": 580000},
+    "magic": {"category": "mood", "count": 420000},
+    "swimsuit": {"category": "subject", "count": 680000},
+    "food": {"category": "scene", "count": 450000},
+    "book": {"category": "scene", "count": 280000},
+    "music": {"category": "scene", "count": 195000}
+  }
+}

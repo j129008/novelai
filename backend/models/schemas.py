@@ -114,3 +114,44 @@ class StoryListItem(BaseModel):
     updated_at: str
 
 
+# ---------------------------------------------------------------------------
+# Prompt DNA — tag suggestion
+# ---------------------------------------------------------------------------
+
+class SuggestTagsRequest(BaseModel):
+    tags: list[Annotated[str, Field(min_length=1)]] = Field(default_factory=list)
+
+
+class TagSuggestion(BaseModel):
+    name: str
+    score: float = Field(ge=0.0, le=1.0)
+    category: str
+    count: int = Field(ge=0)
+
+
+class SuggestTagsResponse(BaseModel):
+    boosters: list[TagSuggestion]
+    contrasts: list[TagSuggestion]
+    wildcards: list[TagSuggestion]
+
+
+# ---------------------------------------------------------------------------
+# Prompt Autopsy — image analysis
+# ---------------------------------------------------------------------------
+
+class AnalyzeImageRequest(BaseModel):
+    image: str  # base64 encoded image
+
+
+class AnalyzedTag(BaseModel):
+    name: str
+    score: float = Field(ge=0.0, le=1.0)
+    category: str
+
+
+class AnalyzeImageResponse(BaseModel):
+    status: Literal["complete", "downloading"]
+    tags: list[AnalyzedTag] = Field(default_factory=list)
+    progress: Optional[int] = None  # set when status == "downloading"
+
+
