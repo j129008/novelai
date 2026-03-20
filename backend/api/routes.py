@@ -42,6 +42,8 @@ router = APIRouter(prefix="/api")
 
 TOKEN = os.getenv("NOVELAI_TOKEN", "")
 XAI_API_KEY = os.getenv("XAI_API_KEY", "")
+XAI_MANAGEMENT_KEY = os.getenv("XAI_MANAGEMENT_KEY", "")
+XAI_TEAM_ID = os.getenv("XAI_TEAM_ID", "")
 
 # Settings file for persistent config
 _settings_file = Path(__file__).resolve().parent.parent.parent / ".app-settings.json"
@@ -296,6 +298,45 @@ async def grok_generate_video(req: GrokVideoRequest):
     filepath.write_bytes(video_data)
 
     return GrokVideoResponse(video=base64.b64encode(video_data).decode())
+
+
+@router.get("/grok/usage")
+async def grok_usage():
+    if not XAI_MANAGEMENT_KEY or not XAI_TEAM_ID:
+        raise HTTPException(status_code=503, detail="XAI_MANAGEMENT_KEY or XAI_TEAM_ID not configured")
+    import httpx
+    url = f"https://management-api.x.ai/v1/billing/teams/{XAI_TEAM_ID}/postpaid/invoice/preview"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, headers={"Authorization": f"Bearer {XAI_MANAGEMENT_KEY}"})
+            if resp.status_code != 200:
+                raise RuntimeError(f"{resp.status_code}: {resp.text[:300]}")
+            data = resp.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Grok billing API error: {e}")
+
+    invoice = data.get("coreInvoice", {})
+    lines = invoice.get("lines", [])
+    prepaid = int(invoice.get("prepaidCredits", {}).get("val", "0"))
+    used = int(invoice.get("prepaidCreditsUsed", {}).get("val", "0"))
+    total_cost = int(invoice.get("totalWithCorr", {}).get("val", "0"))
+
+    # Parse line items into readable format
+    items = []
+    for line in lines:
+        items.append({
+            "model": line.get("description", ""),
+            "type": line.get("unitType", ""),
+            "count": int(line.get("numUnits", "0")),
+            "cost_cents": int(line.get("amount", "0")),
+        })
+
+    return {
+        "balance_cents": abs(prepaid),
+        "used_cents": abs(used),
+        "remaining_cents": abs(prepaid) - abs(used),
+        "items": items,
+    }
 
 
 class ImageMetaRequest(BaseModel):

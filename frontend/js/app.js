@@ -161,6 +161,32 @@ function applyProvider(provider) {
 
   // Save to localStorage
   localStorage.setItem("nai-provider", provider);
+
+  // Fetch Grok usage when switching to Grok
+  if (isGrok) fetchGrokUsage();
+}
+
+async function fetchGrokUsage() {
+  const badge = document.getElementById("grok-usage-badge");
+  if (!badge) return;
+  try {
+    const resp = await fetch("/api/grok/usage");
+    if (!resp.ok) { badge.textContent = "—"; return; }
+    const data = await resp.json();
+    const remaining = (data.remaining_cents / 100).toFixed(2);
+    const used = (data.used_cents / 100).toFixed(2);
+    badge.textContent = `$${remaining} / $${(data.balance_cents / 100).toFixed(2)}`;
+    badge.title = `已用 $${used}\n` + data.items
+      .filter(i => i.count > 0)
+      .map(i => `${i.model} ${i.type}: ${i.count}x ($${(i.cost_cents / 100).toFixed(2)})`)
+      .join("\n");
+    badge.classList.remove("warning", "danger");
+    const pct = data.remaining_cents / data.balance_cents;
+    if (pct < 0.1) badge.classList.add("danger");
+    else if (pct < 0.3) badge.classList.add("warning");
+  } catch {
+    badge.textContent = "—";
+  }
 }
 
 async function init() {
@@ -245,6 +271,10 @@ async function init() {
       applyProvider(e.target.value);
     });
   }
+
+  // Grok usage badge — click to refresh
+  const usageField = document.getElementById("grok-usage-field");
+  if (usageField) usageField.addEventListener("click", fetchGrokUsage);
 
   // ── Grok: Output type toggle ──────────────────────────────
   document.querySelectorAll(".output-type-btn").forEach((btn) => {
@@ -1823,6 +1853,7 @@ async function generateGrokImage() {
     if (infoSeed) infoSeed.textContent = "Grok";
 
     loadGallery();
+    fetchGrokUsage();
   } catch (e) {
     clearTimeout(stopTimeout);
     if (e.name === "AbortError") {
@@ -1925,6 +1956,7 @@ async function generateGrokVideo() {
     if (infoSeed) infoSeed.textContent = "Grok Video";
 
     loadGallery();
+    fetchGrokUsage();
   } catch (e) {
     clearTimeout(stopTimeout);
     if (e.name === "AbortError") {

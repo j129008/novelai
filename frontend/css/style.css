@@ -2685,6 +2685,16 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   flex-shrink: 0;
 }
 
+.grok-usage-field { cursor: pointer; }
+.grok-usage-badge {
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.grok-usage-badge.warning { color: var(--warning, #f0ad4e); }
+.grok-usage-badge.danger  { color: var(--error, #e74c3c); }
+
 .output-type-toggle {
   display: flex;
   gap: 2px;
