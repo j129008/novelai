@@ -880,6 +880,23 @@ function confirmCrop() {
 
   closeCropOverlay();
   activateImg2ImgMode();
+
+  // In Grok mode (no img2img support), show the cropped image on canvas
+  // so the user gets visual feedback
+  const provider = document.getElementById("provider")?.value || "novelai";
+  if (provider === "grok") {
+    const output = $("#output");
+    if (output) {
+      const img = document.createElement("img");
+      img.src = dataUrl;
+      img.alt = "Cropped image";
+      output.innerHTML = "";
+      output.appendChild(img);
+    }
+    state.canvasImageBase64 = state.img2img;
+    state.canvasImageWidth = crop.targetW;
+    state.canvasImageHeight = crop.targetH;
+  }
 }
 
 function activateImg2ImgMode() {
