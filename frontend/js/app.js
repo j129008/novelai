@@ -105,6 +105,8 @@ function applyProvider(provider) {
     document.getElementById("auto-generate")?.closest(".toggle-switch"),
     document.querySelector(".auto-toggles-divider"),
     document.getElementById("gen-settings-btn"),
+    document.getElementById("strength-group"),
+    document.getElementById("noise-group"),
   ];
 
   // Config bar NovelAI-specific fields (Canvas + its separator, Seed + its separator)
