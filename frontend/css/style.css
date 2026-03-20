@@ -2697,11 +2697,11 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 /* Grok source image overlay on canvas */
 .grok-source-wrap {
   position: relative;
-  display: inline-block;
-  width: 100%;
+  display: inline-flex;
 }
 .grok-source-wrap img {
-  width: 100%;
+  max-width: 100%;
+  max-height: calc(100vh - 200px);
   display: block;
   border-radius: var(--radius-md);
 }
