@@ -167,6 +167,7 @@ class GrokImageRequest(BaseModel):
     prompt: str = Field(min_length=1)
     aspect_ratio: VALID_GROK_ASPECT_RATIOS = "1:1"
     resolution: VALID_GROK_IMAGE_RESOLUTIONS = "1k"
+    image: Optional[str] = None  # base64 source image for editing
 
 
 class GrokVideoRequest(BaseModel):

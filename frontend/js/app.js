@@ -101,7 +101,6 @@ function applyProvider(provider) {
     document.querySelector('[data-target="negative-prompt"]'), // Undesired tab button
     document.getElementById("quality-tags-pill"),
     document.getElementById("characters-accordion"),
-    document.getElementById("img2img-accordion"),
     document.getElementById("auto-iterate")?.closest(".toggle-switch"),
     document.getElementById("auto-generate")?.closest(".toggle-switch"),
     document.querySelector(".auto-toggles-divider"),
@@ -1768,6 +1767,11 @@ async function generateGrokImage() {
     aspect_ratio: document.getElementById("grok-aspect-ratio")?.value || "1:1",
     resolution: document.getElementById("grok-resolution")?.value || "1k",
   };
+
+  // Include img2img source if set
+  if (state.img2img) {
+    body.image = state.img2img;
+  }
 
   btn.disabled = true;
   btn.classList.add("loading");

@@ -11,6 +11,7 @@ import base64
 import httpx
 
 IMAGE_URL = "https://api.x.ai/v1/images/generations"
+IMAGE_EDIT_URL = "https://api.x.ai/v1/images/edits"
 VIDEO_SUBMIT_URL = "https://api.x.ai/v1/videos/generations"
 VIDEO_STATUS_URL = "https://api.x.ai/v1/videos/{request_id}"
 
@@ -23,21 +24,40 @@ async def generate_image(
     prompt: str,
     aspect_ratio: str = "1:1",
     resolution: str = "1k",
+    image: str | None = None,
 ) -> bytes:
-    payload = {
-        "model": "grok-imagine-image",
-        "prompt": prompt,
-        "aspect_ratio": aspect_ratio,
-        "resolution": resolution,
-        "response_format": "b64_json",
-        "n": 1,
-    }
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
+
+    if image:
+        # Image editing mode — use /v1/images/edits
+        payload = {
+            "model": "grok-imagine-image",
+            "prompt": prompt,
+            "image": {
+                "url": f"data:image/png;base64,{image}",
+                "type": "image_url",
+            },
+            "response_format": "b64_json",
+            "n": 1,
+        }
+        url = IMAGE_EDIT_URL
+    else:
+        # Text-to-image generation
+        payload = {
+            "model": "grok-imagine-image",
+            "prompt": prompt,
+            "aspect_ratio": aspect_ratio,
+            "resolution": resolution,
+            "response_format": "b64_json",
+            "n": 1,
+        }
+        url = IMAGE_URL
+
     async with httpx.AsyncClient(timeout=120.0) as client:
-        resp = await client.post(IMAGE_URL, json=payload, headers=headers)
+        resp = await client.post(url, json=payload, headers=headers)
         if resp.status_code != 200:
             raise RuntimeError(f"{resp.status_code}: {resp.text[:500]}")
         b64 = resp.json()["data"][0]["b64_json"]
