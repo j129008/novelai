@@ -670,41 +670,38 @@ async def suggest_tags(req: SuggestTagsRequest):
             count=tag_meta.get("count", 0),
         )
 
-    # Boosters: high co-occurrence (> 0.5) with multiple input tags, high count
-    booster_candidates = [
-        (name, score_tally[name])
-        for name in score_tally
-        if vote_count[name] >= max(1, len(input_set) // 2) and score_tally[name] > 0.5
-    ]
-    booster_candidates.sort(key=lambda x: (vote_count[x[0]], x[1], meta.get(x[0], {}).get("count", 0)), reverse=True)
-    boosters = [_make_suggestion(name, score) for name, score in booster_candidates[:6]]
+    # Sort all candidates by score descending
+    all_candidates = sorted(score_tally.items(), key=lambda x: -x[1])
 
-    # Contrasts: different category from dominant, moderate co-occurrence (0.2–0.5)
-    already_used = input_set | {b.name for b in boosters}
-    contrast_candidates = [
-        (name, score_tally[name])
-        for name in score_tally
-        if name not in already_used
-        and 0.2 <= score_tally[name] <= 0.5
-        and (dominant_category is None or meta.get(name, {}).get("category") != dominant_category)
-    ]
-    contrast_candidates.sort(key=lambda x: x[1], reverse=True)
-    contrasts = [_make_suggestion(name, score) for name, score in contrast_candidates[:4]]
+    # Boosters: highest scoring tags, voted by multiple input tags
+    boosters = []
+    already_used = set(input_set)
+    for name, score in all_candidates:
+        if name in already_used:
+            continue
+        if vote_count[name] >= max(1, len(input_set) // 3):
+            boosters.append(_make_suggestion(name, score))
+            already_used.add(name)
+        if len(boosters) >= 6:
+            break
 
-    # Wildcards: lower co-occurrence (0.05–0.2), moderate count, some randomness
-    already_used |= {c.name for c in contrasts}
-    wildcard_pool = [
-        (name, score_tally[name])
-        for name in score_tally
-        if name not in already_used
-        and 0.05 <= score_tally[name] <= 0.2
-        and 10_000 <= meta.get(name, {}).get("count", 0) <= 1_000_000
-    ]
-    # Pick randomly from top candidates for variety
-    wildcard_pool.sort(key=lambda x: x[1], reverse=True)
-    top_wildcards = wildcard_pool[:20]
-    random.shuffle(top_wildcards)
-    wildcards = [_make_suggestion(name, score) for name, score in top_wildcards[:4]]
+    # Contrasts: different category from dominant, skip top boosters
+    contrasts = []
+    for name, score in all_candidates:
+        if name in already_used:
+            continue
+        tag_cat = meta.get(name, {}).get("category")
+        if dominant_category and tag_cat == dominant_category:
+            continue
+        contrasts.append(_make_suggestion(name, score))
+        already_used.add(name)
+        if len(contrasts) >= 4:
+            break
+
+    # Wildcards: random picks from remaining candidates
+    remaining = [(n, s) for n, s in all_candidates if n not in already_used]
+    random.shuffle(remaining)
+    wildcards = [_make_suggestion(name, score) for name, score in remaining[:4]]
 
     return SuggestTagsResponse(boosters=boosters, contrasts=contrasts, wildcards=wildcards)
 
