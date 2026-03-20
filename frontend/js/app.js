@@ -565,11 +565,27 @@ function openCropOverlay(imgEl) {
   const overlay = $("#crop-overlay");
   if (!overlay) return;
 
-  // Read target resolution from the resolution select
-  const resVal = $("#resolution").value || "832x1216";
-  const [tw, th] = resVal.split("x").map(Number);
-  crop.targetW = tw || 832;
-  crop.targetH = th || 1216;
+  // Read target resolution based on current provider
+  const provider = document.getElementById("provider")?.value || "novelai";
+  if (provider === "grok") {
+    // Grok uses aspect ratios — convert to pixel dimensions for crop frame
+    const ar = document.getElementById("grok-aspect-ratio")?.value || "1:1";
+    const [aw, ah] = ar.split(":").map(Number);
+    // Use 1024 as base dimension to get reasonable crop frame proportions
+    const base = 1024;
+    if (aw >= ah) {
+      crop.targetW = base;
+      crop.targetH = Math.round(base * ah / aw);
+    } else {
+      crop.targetH = base;
+      crop.targetW = Math.round(base * aw / ah);
+    }
+  } else {
+    const resVal = $("#resolution").value || "832x1216";
+    const [tw, th] = resVal.split("x").map(Number);
+    crop.targetW = tw || 832;
+    crop.targetH = th || 1216;
+  }
 
   crop.img = imgEl;
 
@@ -1912,8 +1928,16 @@ function setCanvasImageAsSource() {
   }
 
   // Check if resolution matches — if so, skip crop overlay
-  const resVal = $("#resolution").value || "832x1216";
-  const [tw, th] = resVal.split("x").map(Number);
+  const provider = document.getElementById("provider")?.value || "novelai";
+  let tw, th;
+  if (provider === "grok") {
+    // Grok has no fixed pixel resolution — always go to crop or direct
+    tw = null;
+    th = null;
+  } else {
+    const resVal = $("#resolution").value || "832x1216";
+    [tw, th] = resVal.split("x").map(Number);
+  }
   const iw = state.canvasImageWidth;
   const ih = state.canvasImageHeight;
 
