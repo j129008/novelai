@@ -1,6 +1,10 @@
 from pydantic import BaseModel, Field
 from typing import Annotated, Literal, Optional
 
+VALID_GROK_ASPECT_RATIOS = Literal["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "2:1", "1:2"]
+VALID_GROK_IMAGE_RESOLUTIONS = Literal["1k", "2k"]
+VALID_GROK_VIDEO_RESOLUTIONS = Literal["480p", "720p"]
+
 VALID_NOISE_SCHEDULES = Literal["karras", "exponential", "polyexponential"]
 
 VALID_MODELS = Literal[
@@ -153,5 +157,30 @@ class AnalyzeImageResponse(BaseModel):
     status: Literal["complete", "downloading"]
     tags: list[AnalyzedTag] = Field(default_factory=list)
     progress: Optional[int] = None  # set when status == "downloading"
+
+
+# ---------------------------------------------------------------------------
+# Grok (xAI) — image and video generation
+# ---------------------------------------------------------------------------
+
+class GrokImageRequest(BaseModel):
+    prompt: str = Field(min_length=1)
+    aspect_ratio: VALID_GROK_ASPECT_RATIOS = "1:1"
+    resolution: VALID_GROK_IMAGE_RESOLUTIONS = "1k"
+
+
+class GrokVideoRequest(BaseModel):
+    prompt: str = Field(min_length=1)
+    aspect_ratio: VALID_GROK_ASPECT_RATIOS = "1:1"
+    resolution: VALID_GROK_VIDEO_RESOLUTIONS = "720p"
+    duration: int = Field(default=5, ge=1, le=15)
+
+
+class GrokImageResponse(BaseModel):
+    image: str  # base64
+
+
+class GrokVideoResponse(BaseModel):
+    video: str  # base64 MP4
 
 

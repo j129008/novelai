@@ -23,6 +23,10 @@ from models.schemas import (
     GalleryListResponse,
     GenerateRequest,
     GenerateResponse,
+    GrokImageRequest,
+    GrokImageResponse,
+    GrokVideoRequest,
+    GrokVideoResponse,
     RecordCharactersRequest,
     StoryCreateRequest,
     StoryListItem,
@@ -37,6 +41,7 @@ from api.novelai import generate_image
 router = APIRouter(prefix="/api")
 
 TOKEN = os.getenv("NOVELAI_TOKEN", "")
+XAI_API_KEY = os.getenv("XAI_API_KEY", "")
 
 # Settings file for persistent config
 _settings_file = Path(__file__).resolve().parent.parent.parent / ".app-settings.json"
@@ -151,6 +156,11 @@ async def get_options():
     return {
         "samplers": SAMPLERS,
         "resolutions": RESOLUTIONS,
+        "grok": {
+            "aspect_ratios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "2:1", "1:2"],
+            "image_resolutions": ["1k", "2k"],
+            "video_resolutions": ["480p", "720p"],
+        },
     }
 
 
@@ -238,6 +248,53 @@ async def generate(req: GenerateRequest):
         image=base64.b64encode(image_data).decode(),
         seed=seed,
     )
+
+
+@router.post("/grok/generate-image", response_model=GrokImageResponse)
+async def grok_generate_image(req: GrokImageRequest):
+    if not XAI_API_KEY:
+        raise HTTPException(status_code=503, detail="XAI_API_KEY not configured")
+    try:
+        from api.grok import generate_image as grok_gen_image
+        image_data = await grok_gen_image(
+            api_key=XAI_API_KEY,
+            prompt=req.prompt,
+            aspect_ratio=req.aspect_ratio,
+            resolution=req.resolution,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Grok API error: {e}")
+
+    timestamp = int(time.time())
+    filename = f"{timestamp}-grok.png"
+    filepath = _get_output_dir() / filename
+    filepath.write_bytes(image_data)
+
+    return GrokImageResponse(image=base64.b64encode(image_data).decode())
+
+
+@router.post("/grok/generate-video", response_model=GrokVideoResponse)
+async def grok_generate_video(req: GrokVideoRequest):
+    if not XAI_API_KEY:
+        raise HTTPException(status_code=503, detail="XAI_API_KEY not configured")
+    try:
+        from api.grok import generate_video as grok_gen_video
+        video_data = await grok_gen_video(
+            api_key=XAI_API_KEY,
+            prompt=req.prompt,
+            aspect_ratio=req.aspect_ratio,
+            resolution=req.resolution,
+            duration=req.duration,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Grok API error: {e}")
+
+    timestamp = int(time.time())
+    filename = f"{timestamp}-grok.mp4"
+    filepath = _get_output_dir() / filename
+    filepath.write_bytes(video_data)
+
+    return GrokVideoResponse(video=base64.b64encode(video_data).decode())
 
 
 class ImageMetaRequest(BaseModel):

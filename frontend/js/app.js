@@ -24,10 +24,12 @@ const state = {
   img2imgThumbDataUrl: null, // small data URL just for the thumbnail preview
   lastSeed: null,
   lastImageBase64: null,
+  lastVideoBase64: null,  // base64 MP4 from Grok video generation
   // canvas-displayed image (may be a gallery preview, not necessarily last generated)
   canvasImageBase64: null,
   canvasImageWidth: null,
   canvasImageHeight: null,
+  grokOutputType: "image", // "image" | "video" — Grok output mode
 };
 
 // ── VIBES ─────────────────────────────────────────────────
@@ -86,6 +88,81 @@ const crop = {
   lastPointerX: 0,
   lastPointerY: 0,
 };
+
+/* ═══════════════════════════════════════════════════════════
+   PROVIDER SWITCHING — NovelAI vs Grok
+   ═══════════════════════════════════════════════════════════ */
+
+function applyProvider(provider) {
+  const isGrok = provider === "grok";
+
+  // NovelAI-only sidebar elements to hide when Grok is active
+  const novelaiOnly = [
+    document.querySelector('[data-target="negative-prompt"]'), // Undesired tab button
+    document.getElementById("quality-tags-pill"),
+    document.getElementById("characters-accordion"),
+    document.getElementById("img2img-accordion"),
+    document.getElementById("auto-iterate")?.closest(".toggle-switch"),
+    document.getElementById("auto-generate")?.closest(".toggle-switch"),
+    document.querySelector(".auto-toggles-divider"),
+    document.getElementById("gen-settings-btn"),
+  ];
+
+  // Config bar NovelAI-specific fields (Canvas + its separator, Seed + its separator)
+  const canvasField = document.getElementById("canvas-field");
+  const canvasSep   = document.getElementById("canvas-sep");
+  const seedField   = document.getElementById("seed-field");
+  // The separator after seed-field is the first .config-bar-sep that follows it
+  const seedSep = seedField ? seedField.nextElementSibling : null;
+
+  novelaiOnly.forEach((el) => {
+    if (el) el.style.display = isGrok ? "none" : "";
+  });
+
+  if (canvasField) canvasField.style.display = isGrok ? "none" : "";
+  if (canvasSep)   canvasSep.style.display   = isGrok ? "none" : "";
+  if (seedField)   seedField.style.display   = isGrok ? "none" : "";
+  if (seedSep && seedSep.classList.contains("config-bar-sep")) {
+    seedSep.style.display = isGrok ? "none" : "";
+  }
+
+  // Show/hide Grok-only elements
+  // Note: grok-video-controls visibility is managed by the output-type toggle,
+  // not by provider switching — it stays hidden until video mode is selected.
+  document.querySelectorAll(".grok-only").forEach((el) => {
+    if (el.id === "grok-video-controls") {
+      // Only show if we're in Grok video mode
+      el.style.display = (isGrok && state.grokOutputType === "video") ? "" : "none";
+    } else {
+      el.style.display = isGrok ? "" : "none";
+    }
+  });
+
+  // When switching to Grok, ensure we're on the Prompt tab (not Undesired)
+  if (isGrok) {
+    const promptTab = document.querySelector('[data-target="prompt"]');
+    const negativeTab = document.querySelector('[data-target="negative-prompt"]');
+    if (negativeTab && negativeTab.classList.contains("active")) {
+      if (promptTab) promptTab.click();
+    }
+  }
+
+  // Update Generate button label
+  const generateBtn = document.getElementById("generate-btn");
+  if (generateBtn) {
+    const labelEl = generateBtn.querySelector(".btn-generate-label");
+    const hintEl  = generateBtn.querySelector(".btn-generate-hint");
+    if (labelEl) {
+      labelEl.textContent = (isGrok && state.grokOutputType === "video") ? "Generate Video" : "Generate";
+    }
+    if (hintEl) {
+      hintEl.textContent = "Enter";
+    }
+  }
+
+  // Save to localStorage
+  localStorage.setItem("nai-provider", provider);
+}
 
 async function init() {
   try {
@@ -158,6 +235,45 @@ async function init() {
   // Load recent characters at startup so autocomplete is populated immediately
   loadRecentCharacters();
 
+  // ── Provider switching ────────────────────────────────────
+  const providerEl = document.getElementById("provider");
+  if (providerEl) {
+    const savedProvider = localStorage.getItem("nai-provider") || "novelai";
+    providerEl.value = savedProvider;
+    applyProvider(savedProvider);
+
+    providerEl.addEventListener("change", (e) => {
+      applyProvider(e.target.value);
+    });
+  }
+
+  // ── Grok: Output type toggle ──────────────────────────────
+  document.querySelectorAll(".output-type-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".output-type-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      state.grokOutputType = btn.dataset.type;
+
+      const videoControls = document.getElementById("grok-video-controls");
+      if (videoControls) videoControls.style.display = btn.dataset.type === "video" ? "" : "none";
+
+      const generateBtn = document.getElementById("generate-btn");
+      if (generateBtn) {
+        const labelEl = generateBtn.querySelector(".btn-generate-label");
+        if (labelEl) labelEl.textContent = btn.dataset.type === "video" ? "Generate Video" : "Generate";
+      }
+    });
+  });
+
+  // ── Grok: Duration slider display ────────────────────────
+  const durationSlider = document.getElementById("grok-duration");
+  const durationVal    = document.getElementById("grok-duration-val");
+  if (durationSlider && durationVal) {
+    durationSlider.addEventListener("input", () => {
+      durationVal.textContent = durationSlider.value + "s";
+    });
+  }
+
   $("#btn-set-as-source").addEventListener("click", setCanvasImageAsSource);
 
   // "To Story" — insert canvas image into Story at cursor
@@ -178,6 +294,7 @@ async function init() {
       clearImg2Img();
       state.canvasImageBase64 = null;
       state.lastImageBase64 = null;
+      state.lastVideoBase64 = null;
       const output = $("#output");
       if (output) output.innerHTML = '<div class="placeholder"><div class="placeholder-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><p class="placeholder-title">Your creation awaits</p><p class="placeholder-sub">Press Generate or Enter</p></div>';
       const actions = $("#image-actions");
@@ -1403,12 +1520,21 @@ function resetGenerateButton() {
   const btn = $("#generate-btn");
   btn.classList.remove("loading", "stopping");
   btn.disabled = false;
-  btn.querySelector(".btn-generate-label").textContent = "Generate";
+  const provider = document.getElementById("provider")?.value || "novelai";
+  const isVideo = provider === "grok" && state.grokOutputType === "video";
+  btn.querySelector(".btn-generate-label").textContent = isVideo ? "Generate Video" : "Generate";
   btn.querySelector(".btn-generate-hint").textContent = "Enter";
   _generateAbortController = null;
 }
 
 async function generate() {
+  // Route to provider-specific handler
+  const provider = document.getElementById("provider")?.value || "novelai";
+  if (provider === "grok") {
+    if (state.grokOutputType === "video") return generateGrokVideo();
+    return generateGrokImage();
+  }
+
   const btn = $("#generate-btn");
 
   // If we're in stopping state, trigger abort
@@ -1571,6 +1697,15 @@ function reuseSeed() {
 }
 
 function downloadImage() {
+  if (state.lastVideoBase64) {
+    const a = document.createElement("a");
+    a.href = `data:video/mp4;base64,${state.lastVideoBase64}`;
+    a.download = "grok-video.mp4";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return;
+  }
   if (!state.lastImageBase64) return;
   const a = document.createElement("a");
   a.href = `data:image/png;base64,${state.lastImageBase64}`;
@@ -1578,6 +1713,187 @@ function downloadImage() {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GROK — Image generation
+   ═══════════════════════════════════════════════════════════ */
+
+async function generateGrokImage() {
+  const btn = $("#generate-btn");
+  if (btn.classList.contains("stopping")) {
+    if (_generateAbortController) _generateAbortController.abort();
+    return;
+  }
+  if (btn.disabled) return;
+
+  const prompt = $("#prompt").value.trim();
+  if (!prompt) { showError("Please enter a prompt."); return; }
+
+  const body = {
+    prompt: prompt,
+    aspect_ratio: document.getElementById("grok-aspect-ratio")?.value || "1:1",
+    resolution: document.getElementById("grok-resolution")?.value || "1k",
+  };
+
+  btn.disabled = true;
+  btn.classList.add("loading");
+  clearError();
+  state.lastVideoBase64 = null;
+  _generateAbortController = new AbortController();
+
+  const stopTimeout = setTimeout(() => {
+    if (_generateAbortController) setGenerateButtonStop();
+  }, 400);
+
+  try {
+    const resp = await fetch("/api/grok/generate-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: _generateAbortController.signal,
+    });
+
+    clearTimeout(stopTimeout);
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      throw new Error(err.detail || "Generation failed");
+    }
+
+    const data = await resp.json();
+    state.lastSeed = null;
+    state.lastImageBase64 = data.image;
+    state.canvasImageBase64 = data.image;
+    state.canvasImageWidth = null;
+    state.canvasImageHeight = null;
+
+    const output = $("#output");
+    const img = document.createElement("img");
+    img.src = `data:image/png;base64,${data.image}`;
+    img.alt = "Generated image";
+    output.innerHTML = "";
+    output.appendChild(img);
+
+    const actions = $("#image-actions");
+    if (actions) actions.style.display = "flex";
+    const infoSeed = $("#info-seed");
+    if (infoSeed) infoSeed.textContent = "Grok";
+
+    loadGallery();
+  } catch (e) {
+    clearTimeout(stopTimeout);
+    if (e.name === "AbortError") {
+      showStatus("Cancelled");
+    } else {
+      console.error("Grok generate error:", e);
+      showError(e.message);
+    }
+  } finally {
+    resetGenerateButton();
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GROK — Video generation
+   ═══════════════════════════════════════════════════════════ */
+
+async function generateGrokVideo() {
+  const btn = $("#generate-btn");
+  if (btn.classList.contains("stopping")) {
+    if (_generateAbortController) _generateAbortController.abort();
+    return;
+  }
+  if (btn.disabled) return;
+
+  const prompt = $("#prompt").value.trim();
+  if (!prompt) { showError("Please enter a prompt."); return; }
+
+  const body = {
+    prompt: prompt,
+    aspect_ratio: document.getElementById("grok-aspect-ratio")?.value || "1:1",
+    resolution: document.getElementById("grok-video-resolution")?.value || "720p",
+    duration: parseInt(document.getElementById("grok-duration")?.value) || 5,
+  };
+
+  btn.disabled = true;
+  btn.classList.add("loading");
+  clearError();
+  state.lastVideoBase64 = null;
+  _generateAbortController = new AbortController();
+
+  const stopTimeout = setTimeout(() => {
+    if (_generateAbortController) setGenerateButtonStop();
+  }, 400);
+
+  // Show progress indicator in the canvas output area
+  const output = $("#output");
+  if (output) {
+    const progressEl = document.createElement("div");
+    progressEl.className = "video-progress";
+
+    const spinnerEl = document.createElement("div");
+    spinnerEl.className = "spinner";
+
+    const msgEl = document.createElement("p");
+    msgEl.textContent = "Generating video… this may take a few minutes";
+
+    progressEl.appendChild(spinnerEl);
+    progressEl.appendChild(msgEl);
+    output.innerHTML = "";
+    output.appendChild(progressEl);
+  }
+
+  try {
+    const resp = await fetch("/api/grok/generate-video", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: _generateAbortController.signal,
+    });
+
+    clearTimeout(stopTimeout);
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      throw new Error(err.detail || "Video generation failed");
+    }
+
+    const data = await resp.json();
+    state.lastSeed = null;
+    state.lastImageBase64 = null;
+    state.lastVideoBase64 = data.video;
+
+    if (output) {
+      output.innerHTML = "";
+      const video = document.createElement("video");
+      video.src = `data:video/mp4;base64,${data.video}`;
+      video.autoplay = true;
+      video.loop = true;
+      video.muted = true;
+      video.controls = true;
+      video.style.width = "100%";
+      video.style.borderRadius = "var(--radius-md)";
+      output.appendChild(video);
+    }
+
+    const actions = $("#image-actions");
+    if (actions) actions.style.display = "flex";
+    const infoSeed = $("#info-seed");
+    if (infoSeed) infoSeed.textContent = "Grok Video";
+
+    loadGallery();
+  } catch (e) {
+    clearTimeout(stopTimeout);
+    if (e.name === "AbortError") {
+      showStatus("Cancelled");
+    } else {
+      console.error("Grok video error:", e);
+      showError(e.message);
+    }
+  } finally {
+    resetGenerateButton();
+  }
 }
 
 function setCanvasImageAsSource() {
@@ -1788,29 +2104,43 @@ function setupCraftPanel() {
     });
 
     // Generate all 4 in parallel
+    const currentProvider = document.getElementById("provider")?.value || "novelai";
+
     const promises = cards.map(async ({ card, variant }) => {
       const variantPrompt = buildVariantPrompt(prompt, variant.tags);
-      const body = {
-        prompt: variantPrompt,
-        negative_prompt: ($("#negative-prompt") || {}).value || "",
-        width: width || 832,
-        height: height || 1216,
-        steps: parseInt(($("#steps") || {}).value || "23"),
-        scale: parseFloat(($("#scale") || {}).value || "5"),
-        sampler: ($("#sampler") || {}).value || "k_euler",
-        seed: 0,
-        sm: false,
-        sm_dyn: false,
-        strength: parseFloat(($("#strength") || {}).value || "0.7"),
-        noise: parseFloat(($("#noise") || {}).value || "0"),
-        cfg_rescale: parseFloat(($("#cfg-rescale") || {}).value || "0"),
-        noise_schedule: ($("#noise-schedule") || {}).value || "karras",
-        char_captions: collectCharacterPayload(),
-        use_coords: characters.some((c) => !c.positionAuto),
-      };
+
+      let fetchUrl, body;
+      if (currentProvider === "grok") {
+        fetchUrl = "/api/grok/generate-image";
+        body = {
+          prompt: variantPrompt,
+          aspect_ratio: document.getElementById("grok-aspect-ratio")?.value || "1:1",
+          resolution: document.getElementById("grok-resolution")?.value || "1k",
+        };
+      } else {
+        fetchUrl = "/api/generate";
+        body = {
+          prompt: variantPrompt,
+          negative_prompt: ($("#negative-prompt") || {}).value || "",
+          width: width || 832,
+          height: height || 1216,
+          steps: parseInt(($("#steps") || {}).value || "23"),
+          scale: parseFloat(($("#scale") || {}).value || "5"),
+          sampler: ($("#sampler") || {}).value || "k_euler",
+          seed: 0,
+          sm: false,
+          sm_dyn: false,
+          strength: parseFloat(($("#strength") || {}).value || "0.7"),
+          noise: parseFloat(($("#noise") || {}).value || "0"),
+          cfg_rescale: parseFloat(($("#cfg-rescale") || {}).value || "0"),
+          noise_schedule: ($("#noise-schedule") || {}).value || "karras",
+          char_captions: collectCharacterPayload(),
+          use_coords: characters.some((c) => !c.positionAuto),
+        };
+      }
 
       try {
-        const resp = await fetch("/api/generate", {
+        const resp = await fetch(fetchUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),

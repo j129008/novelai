@@ -2675,3 +2675,111 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   padding: 8px 0;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   GROK — Provider-specific controls
+   ═══════════════════════════════════════════════════════════ */
+
+/* Output type toggle (Image / Video) */
+#grok-output-type {
+  padding: 10px 18px 0;
+  flex-shrink: 0;
+}
+
+.output-type-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-deep);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+}
+
+.output-type-btn {
+  flex: 1;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-family: inherit;
+  font-weight: 500;
+  border-radius: calc(var(--radius-sm) - 2px);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  min-height: 32px;
+}
+
+.output-type-btn.active {
+  background: var(--accent-dim);
+  color: var(--accent-bright);
+}
+
+.output-type-btn:hover:not(.active) {
+  color: var(--text-primary);
+}
+
+.output-type-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+/* Grok video controls */
+#grok-video-controls {
+  padding: 10px 18px 0;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* field-range-row: slider + value label inline */
+.field-range-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.field-range-row .field-range {
+  flex: 1;
+}
+
+.field-range-value {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent-bright);
+  font-variant-numeric: tabular-nums;
+  min-width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* field-group used in Grok video controls */
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field-group.compact {
+  gap: 6px;
+}
+
+/* Video progress indicator in canvas output area */
+.video-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 48px 24px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.video-progress .spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-muted);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
