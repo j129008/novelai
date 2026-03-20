@@ -271,6 +271,7 @@ async def grok_generate_image(req: GrokImageRequest):
             prompt=req.prompt,
             aspect_ratio=req.aspect_ratio,
             resolution=req.resolution,
+            model=req.model,
             image=req.image,
         )
     except Exception as e:

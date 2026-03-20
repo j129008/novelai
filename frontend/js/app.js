@@ -1935,10 +1935,12 @@ async function generateGrokImage() {
   const prompt = $("#prompt").value.trim();
   if (!prompt) { showError("Please enter a prompt."); return; }
 
+  const quality = document.getElementById("grok-quality")?.value || "standard";
   const body = {
     prompt: prompt,
     aspect_ratio: document.getElementById("grok-aspect-ratio")?.value || "1:1",
     resolution: document.getElementById("grok-resolution")?.value || "1k",
+    model: quality === "pro" ? "grok-imagine-image-pro" : "grok-imagine-image",
   };
 
   // Include img2img source if explicitly set (paste/drag/explore)
@@ -2388,10 +2390,12 @@ function setupCraftPanel() {
       let fetchUrl, body;
       if (currentProvider === "grok") {
         fetchUrl = "/api/grok/generate-image";
+        const vq = document.getElementById("grok-quality")?.value || "standard";
         body = {
           prompt: variantPrompt,
           aspect_ratio: document.getElementById("grok-aspect-ratio")?.value || "1:1",
           resolution: document.getElementById("grok-resolution")?.value || "1k",
+          model: vq === "pro" ? "grok-imagine-image-pro" : "grok-imagine-image",
         };
       } else {
         fetchUrl = "/api/generate";

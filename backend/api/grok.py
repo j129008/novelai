@@ -24,6 +24,7 @@ async def generate_image(
     prompt: str,
     aspect_ratio: str = "1:1",
     resolution: str = "1k",
+    model: str = "grok-imagine-image",
     image: str | None = None,
 ) -> bytes:
     headers = {
@@ -34,7 +35,7 @@ async def generate_image(
     if image:
         # Image editing mode — use /v1/images/edits
         payload = {
-            "model": "grok-imagine-image",
+            "model": model,
             "prompt": prompt,
             "image": {
                 "url": f"data:image/png;base64,{image}",
@@ -47,7 +48,7 @@ async def generate_image(
     else:
         # Text-to-image generation — "auto" is not valid for generation
         payload = {
-            "model": "grok-imagine-image",
+            "model": model,
             "prompt": prompt,
             "resolution": resolution,
             "response_format": "b64_json",
