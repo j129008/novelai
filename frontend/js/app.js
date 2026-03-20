@@ -450,54 +450,38 @@ function setupImg2ImgControls() {
 }
 
 // Paste image from clipboard → img2img
-function handlePastedImage(e) {
+document.addEventListener("paste", (e) => {
+  // Try clipboardData.files first (works reliably even in textareas)
+  const files = e.clipboardData && e.clipboardData.files;
+  if (files && files.length > 0 && files[0].type.startsWith("image/")) {
+    e.preventDefault();
+    const file = files[0];
+    const provider = document.getElementById("provider")?.value || "novelai";
+    if (provider === "grok") {
+      loadImageFile(file);
+    } else {
+      showPasteActionPopup(file);
+    }
+    return;
+  }
+
+  // Fallback: try clipboardData.items
   const items = e.clipboardData && e.clipboardData.items;
-  if (!items) return false;
+  if (!items) return;
   for (const item of items) {
     if (item.type.startsWith("image/")) {
-      e.preventDefault();
       const file = item.getAsFile();
-      if (!file || file.size === 0) return false;
+      if (!file || file.size === 0) return;
+      e.preventDefault();
       const provider = document.getElementById("provider")?.value || "novelai";
       if (provider === "grok") {
         loadImageFile(file);
       } else {
         showPasteActionPopup(file);
       }
-      return true;
+      return;
     }
   }
-  return false;
-}
-
-// Listen on document for paste when NOT in a text field
-document.addEventListener("paste", (e) => {
-  const active = document.activeElement;
-  if (active && (active.tagName === "TEXTAREA" || active.tagName === "INPUT" || active.isContentEditable)) return;
-  handlePastedImage(e);
-});
-
-// Also listen on prompt/negative textareas specifically — image paste should
-// still be intercepted even when typing, but text paste must pass through
-["#prompt", "#negative-prompt"].forEach(sel => {
-  const el = document.querySelector(sel);
-  if (!el) return;
-  el.addEventListener("paste", (e) => {
-    console.log("[paste-textarea] event on", sel);
-    const items = e.clipboardData && e.clipboardData.items;
-    if (!items) { console.log("[paste-textarea] no items"); return; }
-    let hasImage = false;
-    let hasText = false;
-    for (const item of items) {
-      console.log("[paste-textarea] item:", item.type, item.kind);
-      if (item.type.startsWith("image/")) hasImage = true;
-      if (item.type.startsWith("text/")) hasText = true;
-    }
-    console.log("[paste-textarea] hasImage:", hasImage, "hasText:", hasText);
-    if (hasImage && !hasText) {
-      handlePastedImage(e);
-    }
-  });
 });
 
 function showPasteActionPopup(file) {
