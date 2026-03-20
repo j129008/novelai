@@ -86,10 +86,14 @@ async def generate_video(
     if aspect_ratio and aspect_ratio != "auto":
         submit_payload["aspect_ratio"] = aspect_ratio
     if image:
-        submit_payload["image_url"] = f"data:image/png;base64,{image}"
+        submit_payload["image"] = {"url": f"data:image/png;base64,{image}"}
+    import logging
+    logger = logging.getLogger("grok")
+    logger.info(f"[grok video] payload keys: {list(submit_payload.keys())}, has image_url: {'image_url' in submit_payload}")
     async with httpx.AsyncClient(timeout=120.0) as client:
         # Step 1: submit the generation job
         resp = await client.post(VIDEO_SUBMIT_URL, json=submit_payload, headers=headers)
+        logger.info(f"[grok video] submit response: {resp.status_code} {resp.text[:300]}")
         if resp.status_code not in (200, 201, 202):
             raise RuntimeError(f"{resp.status_code}: {resp.text[:500]}")
         request_id = resp.json()["request_id"]
