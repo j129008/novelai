@@ -14,6 +14,9 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from models.schemas import (
+    AnalyzeImageRequest,
+    AnalyzeImageResponse,
+    AnalyzedTag,
     CharacterUsage,
     CharacterUsageList,
     GalleryFileItem,
@@ -25,6 +28,9 @@ from models.schemas import (
     StoryListItem,
     StoryRecord,
     StoryUpdateRequest,
+    SuggestTagsRequest,
+    SuggestTagsResponse,
+    TagSuggestion,
 )
 from api.novelai import generate_image
 
@@ -108,6 +114,15 @@ _tag_cat_file = Path(__file__).resolve().parent.parent / "data" / "tag_categorie
 if _tag_cat_file.exists():
     try:
         _tag_categories = json.loads(_tag_cat_file.read_text())
+    except (json.JSONDecodeError, OSError):
+        pass
+
+# Load co-occurrence database once at startup
+_cooc_data: dict = {"cooccurrence": {}, "metadata": {}}
+_cooc_file = Path(__file__).resolve().parent.parent / "data" / "tag_cooccurrence.json"
+if _cooc_file.exists():
+    try:
+        _cooc_data = json.loads(_cooc_file.read_text())
     except (json.JSONDecodeError, OSError):
         pass
 
@@ -437,6 +452,115 @@ async def delete_recent_character(tag_name: str):
     characters = [c for c in _load_characters() if c.tag != tag_name]
     _save_characters(characters)
     return CharacterUsageList(characters=characters)
+
+
+# ---------------------------------------------------------------------------
+# Prompt DNA — tag suggestions based on co-occurrence
+# ---------------------------------------------------------------------------
+
+@router.post("/suggest-tags", response_model=SuggestTagsResponse)
+async def suggest_tags(req: SuggestTagsRequest):
+    import random
+
+    cooc: dict[str, dict[str, float]] = _cooc_data.get("cooccurrence", {})
+    meta: dict[str, dict] = _cooc_data.get("metadata", {})
+
+    input_set = {t.lower().replace(" ", "_") for t in req.tags}
+
+    # Tally co-occurrence scores across all input tags
+    score_tally: dict[str, float] = {}
+    vote_count: dict[str, int] = {}  # how many input tags co-occur with each candidate
+    for input_tag in input_set:
+        relations = cooc.get(input_tag, {})
+        for candidate, score in relations.items():
+            if candidate in input_set:
+                continue
+            score_tally[candidate] = score_tally.get(candidate, 0.0) + score
+            vote_count[candidate] = vote_count.get(candidate, 0) + 1
+
+    # Determine dominant category of input tags
+    input_categories = [meta[t]["category"] for t in input_set if t in meta]
+    dominant_category: str | None = None
+    if input_categories:
+        from collections import Counter
+        dominant_category = Counter(input_categories).most_common(1)[0][0]
+
+    def _make_suggestion(name: str, score: float) -> TagSuggestion:
+        tag_meta = meta.get(name, {})
+        return TagSuggestion(
+            name=name,
+            score=round(min(score, 1.0), 3),
+            category=tag_meta.get("category", "subject"),
+            count=tag_meta.get("count", 0),
+        )
+
+    # Boosters: high co-occurrence (> 0.5) with multiple input tags, high count
+    booster_candidates = [
+        (name, score_tally[name])
+        for name in score_tally
+        if vote_count[name] >= max(1, len(input_set) // 2) and score_tally[name] > 0.5
+    ]
+    booster_candidates.sort(key=lambda x: (vote_count[x[0]], x[1], meta.get(x[0], {}).get("count", 0)), reverse=True)
+    boosters = [_make_suggestion(name, score) for name, score in booster_candidates[:6]]
+
+    # Contrasts: different category from dominant, moderate co-occurrence (0.2–0.5)
+    already_used = input_set | {b.name for b in boosters}
+    contrast_candidates = [
+        (name, score_tally[name])
+        for name in score_tally
+        if name not in already_used
+        and 0.2 <= score_tally[name] <= 0.5
+        and (dominant_category is None or meta.get(name, {}).get("category") != dominant_category)
+    ]
+    contrast_candidates.sort(key=lambda x: x[1], reverse=True)
+    contrasts = [_make_suggestion(name, score) for name, score in contrast_candidates[:4]]
+
+    # Wildcards: lower co-occurrence (0.05–0.2), moderate count, some randomness
+    already_used |= {c.name for c in contrasts}
+    wildcard_pool = [
+        (name, score_tally[name])
+        for name in score_tally
+        if name not in already_used
+        and 0.05 <= score_tally[name] <= 0.2
+        and 10_000 <= meta.get(name, {}).get("count", 0) <= 1_000_000
+    ]
+    # Pick randomly from top candidates for variety
+    wildcard_pool.sort(key=lambda x: x[1], reverse=True)
+    top_wildcards = wildcard_pool[:20]
+    random.shuffle(top_wildcards)
+    wildcards = [_make_suggestion(name, score) for name, score in top_wildcards[:4]]
+
+    return SuggestTagsResponse(boosters=boosters, contrasts=contrasts, wildcards=wildcards)
+
+
+# ---------------------------------------------------------------------------
+# Prompt Autopsy — image tag analysis via WD Tagger
+# ---------------------------------------------------------------------------
+
+@router.post("/analyze-image", response_model=AnalyzeImageResponse)
+async def analyze_image(req: AnalyzeImageRequest):
+    from api.tagger import ensure_model_loaded, get_model_status, run_inference
+
+    status = ensure_model_loaded()
+
+    if status in ("not_started", "downloading"):
+        _, progress = get_model_status()
+        return AnalyzeImageResponse(status="downloading", progress=progress)
+
+    if status == "failed":
+        raise HTTPException(status_code=503, detail="Tagger model failed to load; check server logs")
+
+    # status == "ready"
+    try:
+        raw_tags = run_inference(req.image)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=f"Inference error: {exc}")
+
+    tags = [
+        AnalyzedTag(name=t["name"], score=t["score"], category=t["category"])
+        for t in raw_tags
+    ]
+    return AnalyzeImageResponse(status="complete", tags=tags)
 
 
 # ---------------------------------------------------------------------------

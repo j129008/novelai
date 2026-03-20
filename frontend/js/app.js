@@ -153,7 +153,7 @@ async function init() {
   setupCharacters();
   setupLightbox();
   setupStoryEditor();
-  setupInspirePanel();
+  setupCraftPanel();
 
   // Load recent characters at startup so autocomplete is populated immediately
   loadRecentCharacters();
@@ -1625,155 +1625,609 @@ function setCanvasImageAsSource() {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   INSPIRE PANEL
+   CRAFT PANEL — Variation Dial, Prompt Autopsy, Prompt DNA
    ═══════════════════════════════════════════════════════════ */
 
-function setupInspirePanel() {
-  const categoriesEl = $("#inspire-categories");
-  const grid = $("#inspire-grid");
-  if (!categoriesEl || !grid) return;
+const VARIATION_DIMENSIONS = {
+  lighting: {
+    label: "Lighting",
+    hint: "改變光線來源、時段、氛圍光",
+    variants: [
+      { label: "暖光",  tags: "soft natural lighting, golden hour" },
+      { label: "戲劇光", tags: "dramatic rim lighting, dark atmosphere" },
+      { label: "霓虹",  tags: "neon light, cyberpunk lighting" },
+      { label: "月光",  tags: "moonlight, ethereal glow, night" },
+    ],
+  },
+  artStyle: {
+    label: "Art Style",
+    hint: "改變繪畫媒材、線條風格",
+    variants: [
+      { label: "水彩",  tags: "watercolor, painterly, loose brushstrokes" },
+      { label: "賽璐珞", tags: "detailed lineart, clean lines, cel shaded" },
+      { label: "油畫",  tags: "oil painting, impasto texture, rich colors" },
+      { label: "素描",  tags: "sketch style, pencil, rough lines" },
+    ],
+  },
+  composition: {
+    label: "Composition",
+    hint: "改變鏡頭距離、角度",
+    variants: [
+      { label: "特寫",  tags: "close-up, portrait, face focus" },
+      { label: "全身",  tags: "full body, wide shot, establishing" },
+      { label: "俯角",  tags: "from above, bird's eye view, overhead angle" },
+      { label: "動態",  tags: "dynamic angle, dutch angle, cinematic" },
+    ],
+  },
+  mood: {
+    label: "Mood",
+    hint: "改變情緒基調、色調",
+    variants: [
+      { label: "憂鬱",  tags: "melancholic, somber, wistful atmosphere" },
+      { label: "活躍",  tags: "vibrant, energetic, lively" },
+      { label: "神秘",  tags: "mysterious, eerie, tension" },
+      { label: "平靜",  tags: "peaceful, serene, calm" },
+    ],
+  },
+};
 
-  let activeCategory = "all";
+function insertTagIntoPrompt(tag) {
+  const el = $("#prompt");
+  if (!el) return;
+  const current = el.value.trim();
+  el.value = current ? current + ", " + tag : tag;
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
 
-  // Build category filter buttons
-  const allBtn = document.createElement("button");
-  allBtn.className = "inspire-cat-btn active";
-  allBtn.type = "button";
-  allBtn.textContent = "All";
-  allBtn.addEventListener("click", () => setCategory("all"));
-  categoriesEl.appendChild(allBtn);
+function removeTagFromPrompt(tag) {
+  const el = $("#prompt");
+  if (!el) return;
+  const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let val = el.value;
+  val = val.replace(new RegExp(",\\s*" + escaped + "(?=,|$)", "g"), "");
+  val = val.replace(new RegExp("^" + escaped + ",\\s*", "g"), "");
+  val = val.replace(new RegExp("^" + escaped + "$", "g"), "");
+  val = val.trim().replace(/,\s*$/, "");
+  el.value = val;
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
 
-  for (const cat of PROMPT_RECIPE_CATEGORIES) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "inspire-cat-btn";
-    btn.textContent = cat.label;
-    btn.addEventListener("click", () => setCategory(cat.id));
-    categoriesEl.appendChild(btn);
+function setupCraftPanel() {
+  // ── Variation Dial ────────────────────────────────────────
+  const dimsEl = $("#variation-dims");
+  const runBtn = $("#btn-run-variations");
+  const variationGrid = $("#variation-grid");
+  const promptEl = $("#prompt");
+
+  let selectedDimension = null;
+
+  function updateRunBtn() {
+    if (!runBtn) return;
+    const hasPrompt = promptEl && promptEl.value.trim().length > 0;
+    runBtn.disabled = !selectedDimension || !hasPrompt;
   }
 
-  function setCategory(catId) {
-    activeCategory = catId;
-    categoriesEl.querySelectorAll(".inspire-cat-btn").forEach((b) => {
-      const isActive = catId === "all"
-        ? b.textContent === "All"
-        : b.textContent === (PROMPT_RECIPE_CATEGORIES.find((c) => c.id === catId) || {}).label;
-      b.classList.toggle("active", isActive);
-    });
-    renderRecipes();
+  if (dimsEl) {
+    for (const [key, dim] of Object.entries(VARIATION_DIMENSIONS)) {
+      const pill = document.createElement("button");
+      pill.type = "button";
+      pill.className = "variation-dim-pill";
+      pill.dataset.dim = key;
+      const labelEl = document.createElement("span");
+      labelEl.className = "variation-dim-label";
+      labelEl.textContent = dim.label;
+      const hintEl = document.createElement("span");
+      hintEl.className = "variation-dim-hint";
+      hintEl.textContent = dim.hint;
+      pill.appendChild(labelEl);
+      pill.appendChild(hintEl);
+      pill.addEventListener("click", () => {
+        dimsEl.querySelectorAll(".variation-dim-pill").forEach((p) => p.classList.remove("active"));
+        pill.classList.add("active");
+        selectedDimension = key;
+        updateRunBtn();
+      });
+      dimsEl.appendChild(pill);
+    }
   }
 
-  function renderRecipes() {
-    grid.innerHTML = "";
-    const recipes = activeCategory === "all"
-      ? PROMPT_RECIPES
-      : PROMPT_RECIPES.filter((r) => r.category === activeCategory);
+  if (promptEl) {
+    promptEl.addEventListener("input", updateRunBtn);
+  }
 
-    for (const recipe of recipes) {
-      const card = document.createElement("div");
-      card.className = "recipe-card";
+  if (runBtn) {
+    runBtn.addEventListener("click", runVariations);
+  }
 
-      // Title
-      const title = document.createElement("div");
-      title.className = "recipe-card-title";
-      title.textContent = recipe.title;
+  async function runVariations() {
+    if (!selectedDimension) return;
+    const prompt = promptEl ? promptEl.value.trim() : "";
+    if (!prompt) return;
 
-      // Mood
-      const mood = document.createElement("div");
-      mood.className = "recipe-card-mood";
-      mood.textContent = recipe.mood;
+    const dim = VARIATION_DIMENSIONS[selectedDimension];
+    if (!variationGrid) return;
 
-      // Template preview
-      const tmpl = document.createElement("div");
-      tmpl.className = "recipe-card-template";
-      tmpl.textContent = recipe.template;
+    variationGrid.style.display = "grid";
+    variationGrid.innerHTML = "";
 
-      // Character pills (from _recentCharacters)
-      const pillsWrap = document.createElement("div");
-      pillsWrap.className = "recipe-card-pills";
-      const placeholders = recipe.template.match(/\{character\d?\}/g) || [];
-      const selectedChars = {};
+    // Disable run button during generation
+    runBtn.disabled = true;
+    runBtn.classList.add("loading");
 
-      if (placeholders.length > 0 && _recentCharacters.length > 0) {
-        for (const ph of [...new Set(placeholders)]) {
-          const label = document.createElement("span");
-          label.className = "recipe-pill-label";
-          label.textContent = ph + ":";
-          pillsWrap.appendChild(label);
+    // Build the shared base request body from current settings
+    const resVal = ($("#resolution") || {}).value || "832x1216";
+    const [width, height] = resVal.split("x").map(Number);
+    const qualityTags = ", very aesthetic, masterpiece, no text";
+    const useQuality = $("#quality-tags") && $("#quality-tags").checked;
 
-          for (const rc of _recentCharacters.slice(0, 6)) {
-            const pill = document.createElement("button");
-            pill.type = "button";
-            pill.className = "recipe-pill";
-            pill.textContent = rc.tag.replace(/_/g, " ");
-            pill.dataset.ph = ph;
-            pill.addEventListener("click", () => {
-              selectedChars[ph] = rc.tag.replace(/_/g, " ");
-              pillsWrap.querySelectorAll(`.recipe-pill[data-ph="${ph}"]`).forEach((p) => p.classList.remove("active"));
-              pill.classList.add("active");
-            });
-            pillsWrap.appendChild(pill);
-          }
+    function buildVariantPrompt(basePrompt, extraTags) {
+      let p = basePrompt + ", " + extraTags;
+      if (useQuality) {
+        const pipeMatch = p.match(/^([\s\S]*?\S)([\s\n]*\|[\s\S]*)$/);
+        if (pipeMatch) {
+          p = pipeMatch[1] + qualityTags + pipeMatch[2];
+        } else {
+          p = p.replace(/\s+$/, "") + qualityTags;
         }
       }
+      return p;
+    }
 
-      // Use Recipe button
-      const useBtn = document.createElement("button");
-      useBtn.type = "button";
-      useBtn.className = "btn-action btn-action--primary recipe-card-use";
-      useBtn.textContent = "Use Recipe";
-      useBtn.addEventListener("click", () => applyRecipe(recipe, selectedChars));
+    // Create placeholder cards
+    const cards = dim.variants.map((variant, i) => {
+      const card = document.createElement("div");
+      card.className = "variation-card";
 
-      card.appendChild(title);
-      card.appendChild(mood);
-      card.appendChild(tmpl);
-      if (pillsWrap.children.length > 0) card.appendChild(pillsWrap);
-      card.appendChild(useBtn);
-      grid.appendChild(card);
+      const loadingEl = document.createElement("div");
+      loadingEl.className = "variation-card-loading";
+      loadingEl.textContent = variant.label;
+
+      card.appendChild(loadingEl);
+      variationGrid.appendChild(card);
+      return { card, variant };
+    });
+
+    // Generate all 4 in parallel
+    const promises = cards.map(async ({ card, variant }) => {
+      const variantPrompt = buildVariantPrompt(prompt, variant.tags);
+      const body = {
+        prompt: variantPrompt,
+        negative_prompt: ($("#negative-prompt") || {}).value || "",
+        width: width || 832,
+        height: height || 1216,
+        steps: parseInt(($("#steps") || {}).value || "23"),
+        scale: parseFloat(($("#scale") || {}).value || "5"),
+        sampler: ($("#sampler") || {}).value || "k_euler",
+        seed: 0,
+        sm: false,
+        sm_dyn: false,
+        strength: parseFloat(($("#strength") || {}).value || "0.7"),
+        noise: parseFloat(($("#noise") || {}).value || "0"),
+        cfg_rescale: parseFloat(($("#cfg-rescale") || {}).value || "0"),
+        noise_schedule: ($("#noise-schedule") || {}).value || "karras",
+        char_captions: collectCharacterPayload(),
+        use_coords: characters.some((c) => !c.positionAuto),
+      };
+
+      try {
+        const resp = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!resp.ok) throw new Error("Generation failed");
+        const data = await resp.json();
+
+        // Build the result card
+        card.innerHTML = "";
+        card.className = "variation-card";
+
+        const img = document.createElement("img");
+        img.src = `data:image/png;base64,${data.image}`;
+        img.alt = variant.label;
+
+        const meta = document.createElement("div");
+        meta.className = "variation-card-meta";
+
+        const varLabel = document.createElement("span");
+        varLabel.className = "variation-card-varlabel";
+        varLabel.textContent = variant.label;
+
+        const tagsHint = document.createElement("span");
+        tagsHint.className = "variation-card-tags";
+        tagsHint.textContent = variant.tags;
+
+        meta.appendChild(varLabel);
+        meta.appendChild(tagsHint);
+
+        const overlay = document.createElement("div");
+        overlay.className = "variation-card-overlay";
+
+        const useBtn = document.createElement("button");
+        useBtn.type = "button";
+        useBtn.className = "btn-action btn-action--primary variation-overlay-btn";
+        useBtn.textContent = "Use This";
+        useBtn.addEventListener("click", () => {
+          insertTagIntoPrompt(variant.tags);
+          $("#tab-canvas").click();
+        });
+
+        const iterateBtn = document.createElement("button");
+        iterateBtn.type = "button";
+        iterateBtn.className = "btn-action btn-action--iterate variation-overlay-btn";
+        iterateBtn.textContent = "Iterate";
+        iterateBtn.addEventListener("click", () => {
+          // Set as img2img source at strength 0.55
+          state.img2img = data.image;
+          // Build small thumbnail for sidebar preview
+          const thumbCanvas = document.createElement("canvas");
+          thumbCanvas.width = 128; thumbCanvas.height = 128;
+          thumbCanvas.getContext("2d").drawImage(img, 0, 0, 128, 128);
+          state.img2imgThumbDataUrl = thumbCanvas.toDataURL("image/jpeg", 0.8);
+          const strengthEl = $("#strength");
+          if (strengthEl) {
+            strengthEl.value = "0.55";
+            strengthEl.dispatchEvent(new Event("input"));
+          }
+          activateImg2ImgMode();
+          const accordion = $("#img2img-accordion");
+          if (accordion && !accordion.open) accordion.open = true;
+          insertTagIntoPrompt(variant.tags);
+          $("#tab-canvas").click();
+        });
+
+        overlay.appendChild(useBtn);
+        overlay.appendChild(iterateBtn);
+
+        card.appendChild(img);
+        card.appendChild(meta);
+        card.appendChild(overlay);
+      } catch (err) {
+        card.innerHTML = "";
+        const errEl = document.createElement("div");
+        errEl.className = "variation-card-error";
+        errEl.textContent = "生成失敗";
+        card.appendChild(errEl);
+      }
+    });
+
+    await Promise.allSettled(promises);
+    runBtn.disabled = false;
+    runBtn.classList.remove("loading");
+    updateRunBtn();
+  }
+
+  // ── Prompt Autopsy ────────────────────────────────────────
+  const autopsyDrop = $("#autopsy-drop");
+  const autopsyFileInput = $("#autopsy-file-input");
+  const autopsyResults = $("#autopsy-results");
+  const autopsyThumb = $("#autopsy-thumb");
+  const autopsyStatus = $("#autopsy-status");
+  const autopsyProgressWrap = $("#autopsy-progress-wrap");
+  const autopsyProgressFill = $("#autopsy-progress-fill");
+  const autopsyTagsEl = $("#autopsy-tags");
+  const insertAllBtn = $("#btn-autopsy-insert-all");
+
+  // Track which tags are currently inserted
+  const autopsyInserted = new Set();
+  let autopsyGeneration = 0; // Cancel stale polling loops
+
+  function handleAutopsyFile(file) {
+    if (!file || !file.type.startsWith("image/")) return;
+    autopsyGeneration++;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      if (autopsyThumb) autopsyThumb.src = dataUrl;
+      if (autopsyResults) autopsyResults.style.display = "block";
+      if (autopsyTagsEl) autopsyTagsEl.innerHTML = "";
+      if (insertAllBtn) insertAllBtn.style.display = "none";
+      if (autopsyStatus) autopsyStatus.textContent = "正在分析…";
+      if (autopsyProgressWrap) autopsyProgressWrap.style.display = "none";
+      autopsyInserted.clear();
+
+      // Strip data:image/...;base64, prefix to get raw base64
+      const base64 = dataUrl.split(",")[1];
+      runAutopsyAnalysis(base64, autopsyGeneration);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function runAutopsyAnalysis(base64, generation) {
+    try {
+      const resp = await fetch("/api/analyze-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: base64 }),
+      });
+      if (!resp.ok) throw new Error("Analysis failed");
+      const data = await resp.json();
+
+      if (data.status === "downloading") {
+        if (autopsyStatus) autopsyStatus.textContent = "首次使用，正在下載分析模型（約 350MB）…";
+        if (autopsyProgressWrap) autopsyProgressWrap.style.display = "block";
+        if (autopsyProgressFill) autopsyProgressFill.style.width = (data.progress || 0) + "%";
+        // Poll until complete (bail if a newer file was dropped)
+        if (generation !== autopsyGeneration) return;
+        setTimeout(() => runAutopsyAnalysis(base64, generation), 2000);
+        return;
+      }
+
+      if (autopsyProgressWrap) autopsyProgressWrap.style.display = "none";
+
+      if (data.status === "complete" && data.tags) {
+        if (autopsyStatus) autopsyStatus.textContent = "分析完成";
+        renderAutopsyTags(data.tags);
+      } else {
+        if (autopsyStatus) autopsyStatus.textContent = "分析失敗";
+      }
+    } catch (err) {
+      if (autopsyStatus) autopsyStatus.textContent = "分析失敗：" + err.message;
     }
   }
 
-  function applyRecipe(recipe, selectedChars) {
-    let prompt = recipe.template;
-    for (const [ph, val] of Object.entries(selectedChars)) {
-      prompt = prompt.replace(new RegExp(ph.replace(/[{}]/g, "\\$&"), "g"), val);
+  function renderAutopsyTags(flatTags) {
+    if (!autopsyTagsEl) return;
+    autopsyTagsEl.innerHTML = "";
+    const highConfidenceTags = [];
+
+    // Group flat array by category
+    const grouped = {};
+    for (const t of flatTags) {
+      const cat = t.category || "subject";
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(t);
     }
 
-    const promptEl = $("#prompt");
-    if (promptEl) {
-      if (promptEl.value.trim().length > 30) {
-        if (!confirm("Replace current prompt with this recipe?")) return;
+    const categoryLabels = { subject: "主體", scene: "場景", style: "風格", lighting: "光線", character: "角色" };
+
+    for (const [category, tags] of Object.entries(grouped)) {
+      if (!tags || tags.length === 0) continue;
+
+      const groupEl = document.createElement("div");
+      groupEl.className = "craft-tag-group";
+
+      const header = document.createElement("div");
+      header.className = "craft-tag-group-header";
+      header.textContent = categoryLabels[category] || category;
+      groupEl.appendChild(header);
+
+      const pillsEl = document.createElement("div");
+      pillsEl.className = "craft-tag-pills-row";
+
+      for (const { name: tag, score } of tags) {
+        if (score < 0.35) continue;
+
+        const displayTag = tag.replace(/_/g, " ");
+        const pill = document.createElement("button");
+        pill.type = "button";
+        pill.className = "craft-tag-pill";
+        if (score >= 0.7) {
+          pill.classList.add("high-confidence");
+          highConfidenceTags.push(tag);
+        } else if (score < 0.5) {
+          pill.classList.add("low-confidence");
+        }
+        pill.dataset.tag = tag;
+
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = displayTag;
+
+        const scoreSpan = document.createElement("span");
+        scoreSpan.className = "pill-score";
+        scoreSpan.textContent = Math.round(score * 100) + "%";
+
+        pill.appendChild(nameSpan);
+        pill.appendChild(scoreSpan);
+
+        pill.addEventListener("click", () => {
+          if (autopsyInserted.has(tag)) {
+            removeTagFromPrompt(tag);
+            autopsyInserted.delete(tag);
+            pill.classList.remove("selected");
+          } else {
+            insertTagIntoPrompt(tag);
+            autopsyInserted.add(tag);
+            pill.classList.add("selected");
+          }
+        });
+
+        pillsEl.appendChild(pill);
       }
-      promptEl.value = prompt;
-      localStorage.setItem("nai-prompt", prompt);
+
+      groupEl.appendChild(pillsEl);
+      autopsyTagsEl.appendChild(groupEl);
     }
 
-    if (recipe.negative_hint) {
-      const negEl = $("#negative-prompt");
-      if (negEl && !negEl.value.includes(recipe.negative_hint)) {
-        negEl.value = negEl.value ? negEl.value + ", " + recipe.negative_hint : recipe.negative_hint;
-      }
+    // Show "Insert All High-Confidence" button if there are high-confidence tags
+    if (insertAllBtn && highConfidenceTags.length > 0) {
+      insertAllBtn.style.display = "flex";
+      insertAllBtn.onclick = () => {
+        for (const tag of highConfidenceTags) {
+          if (!autopsyInserted.has(tag)) {
+            insertTagIntoPrompt(tag);
+            autopsyInserted.add(tag);
+          }
+        }
+        // Update pill selected states
+        if (autopsyTagsEl) {
+          autopsyTagsEl.querySelectorAll(".craft-tag-pill[data-tag]").forEach((pill) => {
+            if (autopsyInserted.has(pill.dataset.tag)) {
+              pill.classList.add("selected");
+            }
+          });
+        }
+      };
     }
-
-    $("#tab-canvas").click();
   }
 
-  // Shuffle button — Fisher-Yates shuffle of displayed cards
-  const shuffleBtn = $("#inspire-shuffle");
-  if (shuffleBtn) {
-    shuffleBtn.addEventListener("click", () => {
-      const cards = Array.from(grid.children);
-      for (let i = cards.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [cards[i], cards[j]] = [cards[j], cards[i]];
+  if (autopsyDrop) {
+    autopsyDrop.addEventListener("click", () => autopsyFileInput && autopsyFileInput.click());
+    autopsyDrop.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        autopsyFileInput && autopsyFileInput.click();
       }
-      for (const card of cards) {
-        grid.appendChild(card);
-      }
+    });
+    autopsyDrop.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      autopsyDrop.classList.add("drag-over");
+    });
+    autopsyDrop.addEventListener("dragleave", () => autopsyDrop.classList.remove("drag-over"));
+    autopsyDrop.addEventListener("drop", (e) => {
+      e.preventDefault();
+      autopsyDrop.classList.remove("drag-over");
+      const file = e.dataTransfer.files[0];
+      if (file) handleAutopsyFile(file);
     });
   }
 
-  renderRecipes();
+  if (autopsyFileInput) {
+    autopsyFileInput.addEventListener("change", () => {
+      if (autopsyFileInput.files[0]) handleAutopsyFile(autopsyFileInput.files[0]);
+    });
+  }
+
+  // ── Prompt DNA ────────────────────────────────────────────
+  const analyzeBtn = $("#btn-analyze-prompt");
+  const dnaResults = $("#dna-results");
+  const refreshBtn = $("#btn-dna-refresh");
+
+  // Track which DNA tags are inserted
+  const dnaInserted = new Set();
+
+  function updateAnalyzeBtn() {
+    if (!analyzeBtn) return;
+    analyzeBtn.disabled = !promptEl || promptEl.value.trim().length === 0;
+  }
+
+  if (promptEl) {
+    promptEl.addEventListener("input", updateAnalyzeBtn);
+  }
+  updateAnalyzeBtn();
+
+  async function runDNAAnalysis() {
+    if (!promptEl) return;
+    const prompt = promptEl.value.trim();
+    if (!prompt) return;
+
+    const tags = prompt.split(/[,|]/).map((t) => t.trim().replace(/ /g, "_")).filter(Boolean);
+
+    if (analyzeBtn) {
+      analyzeBtn.disabled = true;
+      analyzeBtn.textContent = "分析中…";
+    }
+    if (dnaResults) dnaResults.style.display = "none";
+    if (refreshBtn) refreshBtn.style.display = "none";
+    dnaInserted.clear();
+
+    try {
+      const resp = await fetch("/api/suggest-tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tags }),
+      });
+      if (!resp.ok) throw new Error("Analysis failed");
+      const data = await resp.json();
+      renderDNAResults(data);
+      if (refreshBtn) refreshBtn.style.display = "flex";
+    } catch (err) {
+      if (dnaResults) {
+        dnaResults.style.display = "block";
+        dnaResults.innerHTML = "";
+        const errEl = document.createElement("p");
+        errEl.className = "craft-dna-error";
+        errEl.textContent = "分析失敗：" + err.message;
+        dnaResults.appendChild(errEl);
+      }
+    } finally {
+      if (analyzeBtn) {
+        analyzeBtn.disabled = false;
+        analyzeBtn.textContent = "分析 Prompt";
+      }
+    }
+  }
+
+  const DNA_GROUPS = [
+    { key: "boosters",  label: "提升者 (Boosters)",  desc: "這些 tag 常與你的 prompt 一起出現" },
+    { key: "contrasts", label: "對比者 (Contrasts)",  desc: "換個方向試試" },
+    { key: "wildcards", label: "外星人 (Wildcards)",  desc: "意外的靈感" },
+  ];
+
+  function formatCount(n) {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+    if (n >= 1_000) return (n / 1_000).toFixed(0) + "k";
+    return String(n);
+  }
+
+  function renderDNAResults(data) {
+    if (!dnaResults) return;
+    dnaResults.innerHTML = "";
+    dnaResults.style.display = "block";
+
+    for (const group of DNA_GROUPS) {
+      const tags = data[group.key];
+      if (!tags || tags.length === 0) continue;
+
+      const groupEl = document.createElement("div");
+      groupEl.className = "craft-tag-group";
+
+      const header = document.createElement("div");
+      header.className = "craft-tag-group-header";
+      header.textContent = group.label;
+
+      const desc = document.createElement("div");
+      desc.className = "craft-tag-group-desc";
+      desc.textContent = group.desc;
+
+      const pillsEl = document.createElement("div");
+      pillsEl.className = "craft-tag-pills-row";
+
+      for (const item of tags) {
+        const tag = typeof item === "string" ? item : item.name;
+        const count = typeof item === "object" ? item.count : null;
+        const displayTag = tag.replace(/_/g, " ");
+
+        const pill = document.createElement("button");
+        pill.type = "button";
+        pill.className = "craft-tag-pill";
+        pill.dataset.tag = tag;
+
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = displayTag;
+        pill.appendChild(nameSpan);
+
+        if (count != null) {
+          const countSpan = document.createElement("span");
+          countSpan.className = "pill-score";
+          countSpan.textContent = formatCount(count);
+          pill.appendChild(countSpan);
+        }
+
+        pill.addEventListener("click", () => {
+          if (dnaInserted.has(tag)) {
+            removeTagFromPrompt(tag);
+            dnaInserted.delete(tag);
+            pill.classList.remove("selected");
+          } else {
+            insertTagIntoPrompt(tag);
+            dnaInserted.add(tag);
+            pill.classList.add("selected");
+          }
+        });
+
+        pillsEl.appendChild(pill);
+      }
+
+      groupEl.appendChild(header);
+      groupEl.appendChild(desc);
+      groupEl.appendChild(pillsEl);
+      dnaResults.appendChild(groupEl);
+    }
+  }
+
+  if (analyzeBtn) analyzeBtn.addEventListener("click", runDNAAnalysis);
+  if (refreshBtn) refreshBtn.addEventListener("click", runDNAAnalysis);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -2158,11 +2612,11 @@ function setupHistoryTabs() {
   const tabCanvas = $("#tab-canvas");
   const tabHistory = $("#tab-history");
   const tabStory = $("#tab-story");
-  const tabInspire = $("#tab-inspire");
+  const tabCraft = $("#tab-craft");
   const panelCanvas = $("#panel-canvas");
   const panelHistory = $("#panel-history");
   const panelStory = $("#panel-story");
-  const panelInspire = $("#panel-inspire");
+  const panelCraft = $("#panel-craft");
   const searchWrap = $("#history-search-wrap");
   const searchInput = $("#gallery-search");
 
@@ -2175,14 +2629,14 @@ function setupHistoryTabs() {
     tabCanvas.classList.remove("canvas-tab--active");
     tabHistory.classList.remove("canvas-tab--active");
     if (tabStory) tabStory.classList.remove("canvas-tab--active");
-    if (tabInspire) tabInspire.classList.remove("canvas-tab--active");
+    if (tabCraft) tabCraft.classList.remove("canvas-tab--active");
   }
 
   function hideAllPanels() {
     panelCanvas.style.display = "none";
     panelHistory.style.display = "none";
     if (panelStory) panelStory.style.display = "none";
-    if (panelInspire) panelInspire.style.display = "none";
+    if (panelCraft) panelCraft.style.display = "none";
     searchWrap.style.display = "none";
   }
 
@@ -2213,25 +2667,27 @@ function setupHistoryTabs() {
     localStorage.setItem("nai-active-tab", "story");
   }
 
-  function showInspire() {
-    if (!tabInspire || !panelInspire) return;
+  function showCraft() {
+    if (!tabCraft || !panelCraft) return;
     clearAllTabs();
     hideAllPanels();
-    tabInspire.classList.add("canvas-tab--active");
-    panelInspire.style.display = "flex";
-    localStorage.setItem("nai-active-tab", "inspire");
+    tabCraft.classList.add("canvas-tab--active");
+    panelCraft.style.display = "flex";
+    localStorage.setItem("nai-active-tab", "craft");
   }
 
   tabCanvas.addEventListener("click", showCanvas);
   tabHistory.addEventListener("click", showHistory);
   if (tabStory) tabStory.addEventListener("click", showStory);
-  if (tabInspire) tabInspire.addEventListener("click", showInspire);
+  if (tabCraft) tabCraft.addEventListener("click", showCraft);
 
   // Restore last active tab (default: story)
-  const savedTab = localStorage.getItem("nai-active-tab") || "story";
+  // Migrate old "inspire" value to "craft"
+  let savedTab = localStorage.getItem("nai-active-tab") || "story";
+  if (savedTab === "inspire") savedTab = "craft";
   if (savedTab === "story") showStory();
   else if (savedTab === "history") showHistory();
-  else if (savedTab === "inspire") showInspire();
+  else if (savedTab === "craft") showCraft();
   // else canvas is already active by default
 
   if (searchInput) {

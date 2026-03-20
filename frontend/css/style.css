@@ -2370,105 +2370,308 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 }
 
 /* ═══════════════════════════════════════════════════════════
-   INSPIRE PANEL — Prompt Recipe Cards
+   CRAFT PANEL
    ═══════════════════════════════════════════════════════════ */
 
-#panel-inspire {
+.craft-panel {
+  display: flex;
+  flex: 1;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--border-muted) transparent;
   flex-direction: column;
-}
-#panel-inspire::-webkit-scrollbar { width: 4px; }
-#panel-inspire::-webkit-scrollbar-thumb { background: var(--border-muted); border-radius: 4px; }
-
-.inspire-panel {
   padding: 16px;
-  height: 100%;
+  gap: 12px;
+}
+.craft-panel::-webkit-scrollbar { width: 4px; }
+.craft-panel::-webkit-scrollbar-thumb { background: var(--border-muted); border-radius: 4px; }
+
+/* Accordion hint inline in summary */
+.accordion-hint {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-tertiary);
+  text-transform: none;
+  letter-spacing: normal;
+  margin-left: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
 }
 
-.inspire-header {
+/* ── Variation Dial ──────────────────────────────────────── */
+
+.variation-dims {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.variation-dim-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+  min-height: 44px;
+}
+.variation-dim-pill:hover { background: var(--bg-float); border-color: var(--border-strong); }
+.variation-dim-pill.active { background: var(--accent-dim); border-color: rgba(124,92,252,0.4); }
+.variation-dim-pill:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+
+.variation-dim-label {
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.variation-dim-pill.active .variation-dim-label { color: var(--accent-bright); }
+
+.variation-dim-hint {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}
+
+.variation-run-btn {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  padding: 12px 20px;
+}
+
+.variation-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.variation-card {
+  position: relative;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-muted);
+  min-height: 80px;
+}
+.variation-card img {
+  width: 100%;
+  display: block;
+}
+
+.variation-card-loading {
   display: flex;
   align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  position: relative;
+}
+.variation-card-loading::after {
+  content: "";
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  margin-left: -9px;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-muted);
+  border-top-color: var(--accent-bright);
+  border-radius: 50%;
+  animation: spin 0.55s linear infinite;
+}
+
+.variation-card-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+.variation-card-meta {
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg-raised);
+}
+.variation-card-varlabel {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.variation-card-tags {
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variation-card-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(8,8,16,0.75);
+  backdrop-filter: blur(3px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.variation-card:hover .variation-card-overlay { opacity: 1; }
+
+.variation-overlay-btn {
+  font-size: 0.75rem;
+  padding: 6px 14px;
+  width: 80%;
+  justify-content: center;
+}
+
+/* ── Prompt Autopsy ──────────────────────────────────────── */
+
+.autopsy-dropzone {
+  border: 1.5px dashed var(--border-muted);
+  border-radius: var(--radius-md);
+  background: var(--bg-deep);
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  padding: 16px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 0.83rem;
+}
+.autopsy-dropzone:hover,
+.autopsy-dropzone.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent-bright);
+}
+.autopsy-dropzone:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.autopsy-formats {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}
+
+.autopsy-thumb-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.autopsy-thumb-img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-muted);
   flex-shrink: 0;
 }
-
-.inspire-categories {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-  flex: 1;
-}
-
-.inspire-cat-btn {
-  padding: 5px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--border-muted);
-  background: transparent;
+.autopsy-status {
+  font-size: 0.8rem;
   color: var(--text-secondary);
-  font-size: 0.75rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-  font-family: inherit;
-}
-.inspire-cat-btn:hover { border-color: var(--border-strong); color: var(--text-primary); }
-.inspire-cat-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-bright); }
-.inspire-cat-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
-
-.inspire-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
-  align-content: start;
 }
 
-.recipe-card {
-  background: var(--bg-float);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 14px;
+.autopsy-progress-bar {
+  height: 4px;
+  background: var(--bg-overlay);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.autopsy-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.4s;
+  width: 0%;
+}
+
+.autopsy-tags {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  transition: border-color 0.15s, transform 0.1s;
 }
-.recipe-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
 
-.recipe-card-title { font-size: 0.92rem; font-weight: 700; color: var(--text-primary); }
-.recipe-card-mood { font-size: 0.78rem; color: var(--text-secondary); font-style: italic; line-height: 1.4; }
-.recipe-card-template {
+/* ── Shared Craft tag pills ──────────────────────────────── */
+
+.craft-tag-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.craft-tag-group-header {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--accent-bright);
+}
+.craft-tag-group-desc {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin-top: -2px;
+}
+.craft-tag-pills-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.craft-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-muted);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-family: inherit;
+  padding: 4px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  min-height: 28px;
+}
+.craft-tag-pill:hover { border-color: var(--border-strong); background: var(--bg-float); }
+.craft-tag-pill.selected {
+  background: var(--accent-dim);
+  border-color: rgba(124,92,252,0.4);
+  color: var(--accent-bright);
+}
+.craft-tag-pill.high-confidence { border-color: rgba(124,92,252,0.25); }
+.craft-tag-pill.low-confidence { opacity: 0.65; }
+.craft-tag-pill:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+
+.pill-score {
   font-size: 0.72rem;
   color: var(--text-tertiary);
-  background: var(--bg-deep);
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
-  line-height: 1.5;
-  max-height: 60px;
-  overflow: hidden;
+  margin-left: 2px;
 }
+.craft-tag-pill.selected .pill-score { color: var(--accent-bright); opacity: 0.75; }
 
-.recipe-card-pills { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-.recipe-pill-label { font-size: 0.68rem; color: var(--text-tertiary); font-weight: 600; }
-.recipe-pill {
-  padding: 2px 8px;
-  border-radius: 10px;
-  border: 1px solid var(--border-muted);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.68rem;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.12s;
-  min-height: 24px;
+.craft-dna-error {
+  font-size: 0.82rem;
+  color: var(--danger);
+  padding: 8px 0;
 }
-.recipe-pill:hover { border-color: var(--accent); color: var(--accent-bright); }
-.recipe-pill.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-bright); }
-.recipe-pill:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
-
-.recipe-card-use { align-self: flex-end; font-size: 0.75rem; padding: 6px 14px; }
 

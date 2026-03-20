@@ -8,5 +8,11 @@ python-dotenv==1.0.1
 # HTTP client for NovelAI API calls
 httpx==0.28.1
 
-# Image processing (PNG metadata reading, gallery thumbnails)
+# Image processing (PNG metadata reading, gallery thumbnails, tagger preprocessing)
 Pillow==12.1.0
+numpy==2.2.3
+
+# WD Tagger v3 — image analysis (Prompt Autopsy)
+huggingface_hub==0.29.3
+onnxruntime==1.21.0
+pandas==2.2.3

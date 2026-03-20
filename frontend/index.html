@@ -436,7 +436,7 @@
             <button class="canvas-tab canvas-tab--active" id="tab-story" type="button">Story</button>
             <button class="canvas-tab" id="tab-canvas" type="button">Canvas</button>
             <button class="canvas-tab" id="tab-history" type="button">History <span id="gallery-count" class="gallery-count-badge"></span></button>
-            <button class="canvas-tab" id="tab-inspire" type="button">Inspire</button>
+            <button class="canvas-tab" id="tab-craft" type="button">Craft</button>
             <button class="canvas-tab" id="btn-tag-browser" type="button" title="Browse tags by category" aria-expanded="false">Tags</button>
           </div>
           <div id="history-search-wrap" class="history-search-wrap" style="display:none">
@@ -525,12 +525,72 @@
           <p id="gallery-empty" class="gallery-empty" style="display:none">No saved images yet</p>
         </div>
 
-        <div id="panel-inspire" class="inspire-panel" style="display:none">
-          <div class="inspire-header">
-            <div class="inspire-categories" id="inspire-categories"></div>
-            <button id="inspire-shuffle" class="btn-action" type="button" title="Shuffle recipes">&#x1F500;</button>
-          </div>
-          <div id="inspire-grid" class="inspire-grid"></div>
+        <div id="panel-craft" class="craft-panel" style="display:none">
+
+          <!-- Variation Dial -->
+          <details class="accordion" id="craft-variation">
+            <summary class="accordion-header">
+              <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
+              Variation Dial
+              <span class="accordion-hint">選一個維度，生成 4 張系統化變化</span>
+            </summary>
+            <div class="accordion-body">
+              <div class="variation-dims" id="variation-dims" role="group" aria-label="Variation dimension"></div>
+              <button id="btn-run-variations" class="btn-generate variation-run-btn" type="button" disabled>
+                <span class="btn-generate-label">Run Variations</span>
+              </button>
+              <div class="variation-grid" id="variation-grid" style="display:none"></div>
+            </div>
+          </details>
+
+          <!-- Prompt Autopsy -->
+          <details class="accordion" id="craft-autopsy">
+            <summary class="accordion-header">
+              <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
+              Prompt Autopsy
+              <span class="accordion-hint">上傳圖片，解剖它的 tag 組成</span>
+            </summary>
+            <div class="accordion-body">
+              <div class="autopsy-dropzone" id="autopsy-drop" role="button" tabindex="0" aria-label="Upload image for analysis">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                <span>拖放圖片，或點此上傳</span>
+                <span class="autopsy-formats">PNG / JPG / WebP</span>
+                <input type="file" accept="image/*" id="autopsy-file-input" hidden>
+              </div>
+              <div id="autopsy-results" style="display:none">
+                <div class="autopsy-thumb-row">
+                  <img id="autopsy-thumb" src="" alt="Uploaded image" class="autopsy-thumb-img">
+                  <div class="autopsy-status" id="autopsy-status">正在分析…</div>
+                </div>
+                <div id="autopsy-progress-wrap" style="display:none">
+                  <div class="autopsy-progress-bar"><div class="autopsy-progress-fill" id="autopsy-progress-fill"></div></div>
+                </div>
+                <div id="autopsy-tags" class="autopsy-tags"></div>
+                <button id="btn-autopsy-insert-all" class="btn-action btn-action--primary" type="button" style="width:100%;justify-content:center;display:none">
+                  Insert All High-Confidence
+                </button>
+              </div>
+            </div>
+          </details>
+
+          <!-- Prompt DNA -->
+          <details class="accordion" id="craft-dna">
+            <summary class="accordion-header">
+              <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
+              Prompt DNA
+              <span class="accordion-hint">分析 prompt，推薦你沒用過的好 tag</span>
+            </summary>
+            <div class="accordion-body">
+              <button id="btn-analyze-prompt" class="btn-action btn-action--primary" type="button" style="width:100%;justify-content:center" disabled>
+                分析 Prompt
+              </button>
+              <div id="dna-results" style="display:none"></div>
+              <button id="btn-dna-refresh" class="btn-action" type="button" style="width:100%;justify-content:center;display:none">
+                Refresh
+              </button>
+            </div>
+          </details>
+
         </div>
 
         <div id="panel-story" class="story-panel" style="display:none">
@@ -560,7 +620,6 @@
   </div>
   <!-- Shared tag autocomplete dropdown — positioned via JS using getBoundingClientRect() -->
   <div id="tag-dropdown" class="tag-dropdown"></div>
-  <script src="/js/prompt-recipes.js"></script>
   <script src="js/app.js?v=99"></script>
 </body>
 </html>
