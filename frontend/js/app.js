@@ -167,25 +167,35 @@ function applyProvider(provider) {
 }
 
 async function fetchGrokUsage() {
-  const badge = document.getElementById("grok-usage-badge");
-  if (!badge) return;
+  const fill = document.getElementById("grok-quota-fill");
+  const label = document.getElementById("grok-quota-label");
+  if (!fill || !label) return;
   try {
     const resp = await fetch("/api/grok/usage");
-    if (!resp.ok) { badge.textContent = "—"; return; }
+    if (!resp.ok) { label.textContent = "—"; return; }
     const data = await resp.json();
-    const remaining = (data.remaining_cents / 100).toFixed(2);
-    const used = (data.used_cents / 100).toFixed(2);
-    badge.textContent = `$${remaining} / $${(data.balance_cents / 100).toFixed(2)}`;
-    badge.title = `已用 $${used}\n` + data.items
-      .filter(i => i.count > 0)
-      .map(i => `${i.model} ${i.type}: ${i.count}x ($${(i.cost_cents / 100).toFixed(2)})`)
-      .join("\n");
-    badge.classList.remove("warning", "danger");
-    const pct = data.remaining_cents / data.balance_cents;
-    if (pct < 0.1) badge.classList.add("danger");
-    else if (pct < 0.3) badge.classList.add("warning");
+    const remaining = data.remaining_cents / 100;
+    const total = data.balance_cents / 100;
+    const used = data.used_cents / 100;
+    const pct = data.balance_cents > 0 ? data.remaining_cents / data.balance_cents : 0;
+
+    fill.style.width = (pct * 100).toFixed(1) + "%";
+    label.textContent = `$${remaining.toFixed(2)} / $${total.toFixed(2)}`;
+
+    // Tooltip with breakdown
+    const bar = document.getElementById("grok-quota-bar");
+    if (bar) {
+      bar.title = `已用 $${used.toFixed(2)}\n` + data.items
+        .filter(i => i.count > 0)
+        .map(i => `${i.model} ${i.type}: ${i.count}x ($${(i.cost_cents / 100).toFixed(2)})`)
+        .join("\n");
+    }
+
+    fill.classList.remove("warning", "danger");
+    if (pct < 0.1) fill.classList.add("danger");
+    else if (pct < 0.3) fill.classList.add("warning");
   } catch {
-    badge.textContent = "—";
+    label.textContent = "—";
   }
 }
 
@@ -272,9 +282,9 @@ async function init() {
     });
   }
 
-  // Grok usage badge — click to refresh
-  const usageField = document.getElementById("grok-usage-field");
-  if (usageField) usageField.addEventListener("click", fetchGrokUsage);
+  // Grok quota bar — click to refresh
+  const quotaBar = document.getElementById("grok-quota-bar");
+  if (quotaBar) quotaBar.addEventListener("click", fetchGrokUsage);
 
   // ── Grok: Output type toggle ──────────────────────────────
   document.querySelectorAll(".output-type-btn").forEach((btn) => {

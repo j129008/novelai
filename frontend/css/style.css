@@ -2685,15 +2685,43 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   flex-shrink: 0;
 }
 
-.grok-usage-field { cursor: pointer; }
-.grok-usage-badge {
-  font-size: 0.78rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-secondary);
-  white-space: nowrap;
+/* Grok quota HP bar */
+.grok-quota-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  cursor: pointer;
+  flex-shrink: 0;
 }
-.grok-usage-badge.warning { color: var(--warning, #f0ad4e); }
-.grok-usage-badge.danger  { color: var(--error, #e74c3c); }
+.grok-quota-track {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-deep);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.grok-quota-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent) 0%, #6ee7b7 100%);
+  transition: width 0.4s ease, background 0.4s ease;
+}
+.grok-quota-fill.warning {
+  background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+}
+.grok-quota-fill.danger {
+  background: linear-gradient(90deg, #ef4444 0%, #f87171 100%);
+}
+.grok-quota-label {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  min-width: 90px;
+  text-align: right;
+}
 
 .output-type-toggle {
   display: flex;

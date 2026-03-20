@@ -210,6 +210,14 @@
 
       <aside class="controls" role="form" aria-label="Generation controls">
 
+        <!-- Grok quota HP bar -->
+        <div class="grok-quota-bar grok-only" id="grok-quota-bar" style="display:none" title="點擊刷新">
+          <div class="grok-quota-track">
+            <div class="grok-quota-fill" id="grok-quota-fill"></div>
+          </div>
+          <span class="grok-quota-label" id="grok-quota-label">—</span>
+        </div>
+
         <div class="controls-prompt">
           <div class="prompt-box">
             <div class="prompt-tabs">
@@ -363,11 +371,6 @@
               <option value="1k">1K</option>
               <option value="2k">2K</option>
             </select>
-          </div>
-          <div class="config-bar-sep grok-only" style="display:none"></div>
-          <div class="config-bar-field grok-only grok-usage-field" id="grok-usage-field" style="display:none" title="點擊刷新">
-            <span class="config-bar-label">Quota</span>
-            <span id="grok-usage-badge" class="grok-usage-badge">—</span>
           </div>
           <button id="gen-settings-btn" class="config-bar-gear" type="button" title="Generation Settings">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.55.26.94.77 1 1.34V11a2 2 0 0 1 0 4h-.09c-.57.06-1.08.45-1.34 1z"/></svg>
