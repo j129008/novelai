@@ -96,7 +96,7 @@ async def generate_video(
         for _ in range(_POLL_MAX):
             await asyncio.sleep(_POLL_INTERVAL)
             poll = await client.get(status_url, headers=headers)
-            if poll.status_code != 200:
+            if poll.status_code not in (200, 202):
                 raise RuntimeError(f"{poll.status_code}: {poll.text[:500]}")
             data = poll.json()
             status = data.get("status")
