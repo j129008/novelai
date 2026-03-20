@@ -569,15 +569,20 @@ function openCropOverlay(imgEl) {
   if (provider === "grok") {
     // Grok uses aspect ratios — convert to pixel dimensions for crop frame
     const ar = document.getElementById("grok-aspect-ratio")?.value || "1:1";
-    const [aw, ah] = ar.split(":").map(Number);
-    // Use 1024 as base dimension to get reasonable crop frame proportions
-    const base = 1024;
-    if (aw >= ah) {
-      crop.targetW = base;
-      crop.targetH = Math.round(base * ah / aw);
+    if (ar === "auto") {
+      // Auto: use the source image's native aspect ratio (no forced crop ratio)
+      crop.targetW = imgEl.naturalWidth || 1024;
+      crop.targetH = imgEl.naturalHeight || 1024;
     } else {
-      crop.targetH = base;
-      crop.targetW = Math.round(base * aw / ah);
+      const [aw, ah] = ar.split(":").map(Number);
+      const base = 1024;
+      if (aw >= ah) {
+        crop.targetW = base;
+        crop.targetH = Math.round(base * ah / aw);
+      } else {
+        crop.targetH = base;
+        crop.targetW = Math.round(base * aw / ah);
+      }
     }
   } else {
     const resVal = $("#resolution").value || "832x1216";
