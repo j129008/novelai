@@ -71,6 +71,7 @@ async def generate_video(
     aspect_ratio: str = "1:1",
     resolution: str = "720p",
     duration: int = 5,
+    image: str | None = None,
 ) -> bytes:
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -84,6 +85,8 @@ async def generate_video(
     }
     if aspect_ratio and aspect_ratio != "auto":
         submit_payload["aspect_ratio"] = aspect_ratio
+    if image:
+        submit_payload["image_url"] = f"data:image/png;base64,{image}"
     async with httpx.AsyncClient(timeout=120.0) as client:
         # Step 1: submit the generation job
         resp = await client.post(VIDEO_SUBMIT_URL, json=submit_payload, headers=headers)

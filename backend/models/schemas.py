@@ -175,6 +175,7 @@ class GrokVideoRequest(BaseModel):
     aspect_ratio: VALID_GROK_ASPECT_RATIOS = "1:1"
     resolution: VALID_GROK_VIDEO_RESOLUTIONS = "720p"
     duration: int = Field(default=5, ge=1, le=15)
+    image: Optional[str] = None  # base64 source image for img2vid
 
 
 class GrokImageResponse(BaseModel):

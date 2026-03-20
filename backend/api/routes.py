@@ -296,6 +296,7 @@ async def grok_generate_video(req: GrokVideoRequest):
             aspect_ratio=req.aspect_ratio,
             resolution=req.resolution,
             duration=req.duration,
+            image=req.image,
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Grok API error: {e}")
@@ -448,17 +449,18 @@ async def list_gallery(path: str = Query(default="")):
     directories = sorted(
         d.name for d in current_dir.iterdir() if d.is_dir()
     )
-    png_files = sorted(
-        (f for f in current_dir.glob("*.png") if not f.name.startswith("._")),
+    media_files = sorted(
+        (f for f in current_dir.iterdir()
+         if f.is_file() and f.suffix.lower() in (".png", ".mp4") and not f.name.startswith("._")),
         key=lambda f: f.stat().st_mtime, reverse=True,
     )
     files = [
         GalleryFileItem(
             name=f.name,
             size=f.stat().st_size,
-            meta=_read_png_meta(f),
+            meta=_read_png_meta(f) if f.suffix.lower() == ".png" else {},
         )
-        for f in png_files
+        for f in media_files
     ]
     return GalleryListResponse(path=path, directories=directories, files=files)
 
@@ -470,7 +472,8 @@ async def get_gallery_image(filename: str, path: str = Query(default="")):
     filepath = filepath.resolve()
     if not filepath.exists() or not filepath.is_relative_to(out.resolve()):
         raise HTTPException(status_code=404, detail="Image not found")
-    return FileResponse(filepath, media_type="image/png")
+    media_type = "video/mp4" if filepath.suffix.lower() == ".mp4" else "image/png"
+    return FileResponse(filepath, media_type=media_type)
 
 
 @router.delete("/gallery/{filename}")

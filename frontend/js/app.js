@@ -1977,6 +1977,11 @@ async function generateGrokVideo() {
     duration: parseInt(document.getElementById("grok-duration")?.value) || 5,
   };
 
+  // Include img2img source for image-to-video
+  if (state.img2img) {
+    body.image = state.img2img;
+  }
+
   btn.disabled = true;
   btn.classList.add("loading");
   clearError();
@@ -3366,12 +3371,24 @@ function renderGallery(files, directories, filter) {
     const imgWrap = document.createElement("div");
     imgWrap.className = "history-card-img-wrap";
 
-    const img = document.createElement("img");
-    img.className = "history-card-img";
-    img.src = galleryFileUrl(file.name);
-    img.alt = file.name;
-    img.loading = "lazy";
-    imgWrap.appendChild(img);
+    const isVideo = file.name.toLowerCase().endsWith(".mp4");
+    let mediaEl;
+    if (isVideo) {
+      mediaEl = document.createElement("video");
+      mediaEl.className = "history-card-img";
+      mediaEl.src = galleryFileUrl(file.name);
+      mediaEl.muted = true;
+      mediaEl.loop = true;
+      mediaEl.addEventListener("mouseenter", () => mediaEl.play());
+      mediaEl.addEventListener("mouseleave", () => { mediaEl.pause(); mediaEl.currentTime = 0; });
+    } else {
+      mediaEl = document.createElement("img");
+      mediaEl.className = "history-card-img";
+      mediaEl.src = galleryFileUrl(file.name);
+      mediaEl.alt = file.name;
+      mediaEl.loading = "lazy";
+    }
+    imgWrap.appendChild(mediaEl);
 
     // Hover overlay with prompt + meta text (for context, no buttons)
     const overlay = document.createElement("div");
