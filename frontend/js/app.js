@@ -483,17 +483,17 @@ document.addEventListener("paste", (e) => {
   const el = document.querySelector(sel);
   if (!el) return;
   el.addEventListener("paste", (e) => {
+    console.log("[paste-textarea] event on", sel);
     const items = e.clipboardData && e.clipboardData.items;
-    if (!items) return;
-    // Only intercept if clipboard has image AND no text (pure image copy)
+    if (!items) { console.log("[paste-textarea] no items"); return; }
     let hasImage = false;
     let hasText = false;
     for (const item of items) {
+      console.log("[paste-textarea] item:", item.type, item.kind);
       if (item.type.startsWith("image/")) hasImage = true;
       if (item.type.startsWith("text/")) hasText = true;
     }
-    // If it's a pure image paste (no text), intercept it
-    // If it has both text and image (e.g. copy from web page), let text paste through
+    console.log("[paste-textarea] hasImage:", hasImage, "hasText:", hasText);
     if (hasImage && !hasText) {
       handlePastedImage(e);
     }
