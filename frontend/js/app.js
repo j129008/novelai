@@ -2181,27 +2181,27 @@ function setCanvasImageAsSource() {
     state.img2imgThumbDataUrl = thumb.toDataURL("image/jpeg", 0.8);
   }
 
-  // Check if resolution matches — if so, skip crop overlay
   const provider = document.getElementById("provider")?.value || "novelai";
-  let tw, th;
+
   if (provider === "grok") {
-    // Grok has no fixed pixel resolution — always go to crop or direct
-    tw = null;
-    th = null;
-  } else {
-    const resVal = $("#resolution").value || "832x1216";
-    [tw, th] = resVal.split("x").map(Number);
+    // Grok: show source on canvas, no accordion needed
+    activateImg2ImgMode();
+    const dataUrl = `data:image/png;base64,${state.canvasImageBase64}`;
+    showGrokSourceOnCanvas(dataUrl);
+    return;
   }
+
+  // Check if resolution matches — if so, skip crop overlay
+  const resVal = $("#resolution").value || "832x1216";
+  const [tw, th] = resVal.split("x").map(Number);
   const iw = state.canvasImageWidth;
   const ih = state.canvasImageHeight;
 
   if (iw && ih && iw === tw && ih === th) {
-    // Resolution matches — activate directly
     activateImg2ImgMode();
     const accordion = $("#img2img-accordion");
     if (accordion && !accordion.open) accordion.open = true;
   } else if (iw && ih) {
-    // Resolution differs — show crop overlay
     const img = new Image();
     img.onload = () => {
       activateImg2ImgMode();
@@ -2211,7 +2211,6 @@ function setCanvasImageAsSource() {
     };
     img.src = `data:image/png;base64,${state.canvasImageBase64}`;
   } else {
-    // No size info — activate directly without crop
     activateImg2ImgMode();
     const accordion = $("#img2img-accordion");
     if (accordion && !accordion.open) accordion.open = true;
