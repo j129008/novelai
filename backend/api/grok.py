@@ -79,10 +79,11 @@ async def generate_video(
     submit_payload = {
         "model": "grok-imagine-video",
         "prompt": prompt,
-        "aspect_ratio": aspect_ratio,
         "resolution": resolution,
         "duration": duration,
     }
+    if aspect_ratio and aspect_ratio != "auto":
+        submit_payload["aspect_ratio"] = aspect_ratio
     async with httpx.AsyncClient(timeout=120.0) as client:
         # Step 1: submit the generation job
         resp = await client.post(VIDEO_SUBMIT_URL, json=submit_payload, headers=headers)
