@@ -1886,11 +1886,9 @@ async function generateGrokImage() {
     resolution: document.getElementById("grok-resolution")?.value || "1k",
   };
 
-  // Include source image: prefer explicit img2img source,
-  // fall back to whatever is currently on the canvas
-  const imgSource = state.img2img || state.canvasImageBase64;
-  if (imgSource) {
-    body.image = imgSource;
+  // Include img2img source if explicitly set (paste/drag/explore)
+  if (state.img2img) {
+    body.image = state.img2img;
   }
 
   btn.disabled = true;
