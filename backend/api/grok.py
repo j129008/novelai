@@ -87,7 +87,7 @@ async def generate_video(
     async with httpx.AsyncClient(timeout=120.0) as client:
         # Step 1: submit the generation job
         resp = await client.post(VIDEO_SUBMIT_URL, json=submit_payload, headers=headers)
-        if resp.status_code != 200:
+        if resp.status_code not in (200, 201, 202):
             raise RuntimeError(f"{resp.status_code}: {resp.text[:500]}")
         request_id = resp.json()["request_id"]
 
