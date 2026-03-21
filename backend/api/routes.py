@@ -513,7 +513,7 @@ async def list_gallery(path: str = Query(default="")):
         raise HTTPException(status_code=404, detail="Directory not found")
 
     directories = sorted(
-        d.name for d in current_dir.iterdir() if d.is_dir()
+        d.name for d in current_dir.iterdir() if d.is_dir() and not d.name.startswith(".")
     )
     media_files = sorted(
         (f for f in current_dir.iterdir()
