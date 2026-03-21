@@ -1860,12 +1860,6 @@ async function generate() {
       fig.dataset.seed = String(data.seed);
       state._storyRedrawFigure = null;
       storySaveContent();
-    } else {
-      // If Story tab is active, auto-insert image at cursor position
-      const storyTab = $("#tab-story");
-      if (storyTab && storyTab.classList.contains("canvas-tab--active")) {
-        insertImageAtCursor(data.image, prompt, data.seed);
-      }
     }
 
     // Auto Iterate: set output as img2img source for next generation
