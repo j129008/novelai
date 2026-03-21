@@ -1013,13 +1013,24 @@ function confirmCrop() {
   closeCropOverlay();
   activateImg2ImgMode();
 
-  // In Grok mode, show the cropped image on canvas with a remove button
+  // Show the cropped image on canvas
+  state.canvasImageBase64 = state.img2img;
+  state.canvasImageWidth = crop.targetW;
+  state.canvasImageHeight = crop.targetH;
+
   const provider = document.getElementById("provider")?.value || "novelai";
   if (provider === "grok") {
     showGrokSourceOnCanvas(dataUrl);
-    state.canvasImageBase64 = state.img2img;
-    state.canvasImageWidth = crop.targetW;
-    state.canvasImageHeight = crop.targetH;
+  } else {
+    // NovelAI: show source image on canvas and switch to Canvas tab
+    const output = $("#output");
+    const img = document.createElement("img");
+    img.src = dataUrl;
+    img.alt = "Source image";
+    output.innerHTML = "";
+    output.appendChild(img);
+    const canvasTab = $("#tab-canvas");
+    if (canvasTab) canvasTab.click();
   }
 }
 
