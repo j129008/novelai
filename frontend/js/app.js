@@ -2141,7 +2141,7 @@ async function generateGrokVideo() {
       video.src = `data:video/mp4;base64,${videoData}`;
       video.autoplay = true;
       video.loop = true;
-      video.muted = true;
+      video.muted = false;
       video.controls = true;
       output.appendChild(video);
     }
@@ -4346,7 +4346,7 @@ function renderLightboxFrame() {
     video.src = galleryFileUrl(file.name);
     video.autoplay = true;
     video.loop = true;
-    video.muted = true;
+    video.muted = false;
     video.controls = true;
     video.onloadeddata = () => {
       imgWrap.innerHTML = "";
