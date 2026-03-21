@@ -4,9 +4,11 @@
 >
 > This is the loop. Hundreds of times a day. And every single step has friction.
 
-This project exists because I got mass-generating AI illustrations and got tired of fighting the tools instead of making art.
+This project exists because I got into mass-generating AI illustrations and got tired of fighting the tools instead of making art.
 
-NovelAI has one of the best anime diffusion models on the market. But its web UI is built for casual users — not for someone who generates 50+ images a day and needs to iterate fast. So I built the interface I actually wanted.
+[NovelAI](https://novelai.net/) and [Grok](https://grok.com/) are, as far as I know, the most unrestricted AI image generation services available today — minimal content filtering, full creative freedom, and high-quality outputs. NovelAI has one of the best anime diffusion models on the market; Grok excels at photorealistic and stylized generation with fast turnaround.
+
+But their web UIs are built for casual users — not for someone who generates 50+ images a day and needs to iterate fast. So I built the interface I actually wanted.
 
 ## 30 Seconds to Running
 
