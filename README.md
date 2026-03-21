@@ -12,10 +12,21 @@ NovelAI has one of the best anime diffusion models on the market. But its web UI
 
 ```bash
 git clone https://github.com/j129008/novelai.git && cd novelai
-cp .env.example .env          # paste your NovelAI token
+cp .env.example .env
 pip install -r backend/requirements.txt
 python backend/main.py        # → http://localhost:8000
 ```
+
+Edit `.env` and add your API keys:
+
+```env
+NOVELAI_TOKEN=your_novelai_token    # Required — get it from NovelAI account settings
+XAI_API_KEY=your_xai_api_key       # Optional — enables Grok image/video generation
+```
+
+> **Where to get keys:**
+> - **NovelAI** — requires an active subscription (Opus/Tablet/Scroll). Go to [NovelAI](https://novelai.net) → Account Settings → Get Persistent API Token.
+> - **Grok** — sign up at [x.ai](https://console.x.ai) to get an API key. Only needed if you want Grok image/video features.
 
 That's it. No `npm install`. No webpack. No Docker. One Python process serves everything.
 
