@@ -259,7 +259,6 @@ async function init() {
   setupSettings();
   setupCharacters();
   setupLightbox();
-  setupStoryEditor();
   setupCraftPanel();
   setupExplorePanel();
 
@@ -311,16 +310,6 @@ async function init() {
 
   $("#btn-set-as-source").addEventListener("click", setCanvasImageAsSource);
 
-  // "To Story" — insert canvas image into Story at cursor
-  const addToStoryBtn = $("#btn-add-to-story");
-  if (addToStoryBtn) {
-    addToStoryBtn.addEventListener("click", () => {
-      if (!state.canvasImageBase64) return;
-      const prompt = ($("#prompt") || {}).value || "";
-      insertImageAtCursor(state.canvasImageBase64, prompt, state.lastSeed);
-      showStatus("Image added to Story");
-    });
-  }
 
   // "×" Clear canvas + img2img source
   const clearCanvasBtn = $("#btn-clear-canvas");
@@ -1852,16 +1841,6 @@ async function generate() {
     const allPromptText = [prompt, ...characters.map((c) => c.prompt)].join(", ");
     recordRecentCharacters(allPromptText);
 
-    // If redrawing a story image, replace it in-place
-    if (state._storyRedrawFigure && state._storyRedrawFigure.parentNode) {
-      const fig = state._storyRedrawFigure;
-      const imgEl = fig.querySelector("img");
-      if (imgEl) imgEl.src = `data:image/png;base64,${data.image}`;
-      fig.dataset.seed = String(data.seed);
-      state._storyRedrawFigure = null;
-      storySaveContent();
-    }
-
     // Auto Iterate: set output as img2img source for next generation
     if ($("#auto-iterate") && $("#auto-iterate").checked) {
       iterateOnResult();
@@ -3210,12 +3189,10 @@ let _settingsLoadedToast = null;
 function setupHistoryTabs() {
   const tabCanvas = $("#tab-canvas");
   const tabHistory = $("#tab-history");
-  const tabStory = $("#tab-story");
   const tabCraft = $("#tab-craft");
   const tabExplore = $("#tab-explore");
   const panelCanvas = $("#panel-canvas");
   const panelHistory = $("#panel-history");
-  const panelStory = $("#panel-story");
   const panelCraft = $("#panel-craft");
   const panelExplore = $("#panel-explore");
   const searchWrap = $("#history-search-wrap");
@@ -3229,7 +3206,6 @@ function setupHistoryTabs() {
   function clearAllTabs() {
     tabCanvas.classList.remove("canvas-tab--active");
     tabHistory.classList.remove("canvas-tab--active");
-    if (tabStory) tabStory.classList.remove("canvas-tab--active");
     if (tabCraft) tabCraft.classList.remove("canvas-tab--active");
     if (tabExplore) tabExplore.classList.remove("canvas-tab--active");
   }
@@ -3237,7 +3213,6 @@ function setupHistoryTabs() {
   function hideAllPanels() {
     panelCanvas.style.display = "none";
     panelHistory.style.display = "none";
-    if (panelStory) panelStory.style.display = "none";
     if (panelCraft) panelCraft.style.display = "none";
     if (panelExplore) panelExplore.style.display = "none";
     searchWrap.style.display = "none";
@@ -3261,15 +3236,6 @@ function setupHistoryTabs() {
     localStorage.setItem("nai-active-tab", "history");
   }
 
-  function showStory() {
-    if (!tabStory || !panelStory) return;
-    clearAllTabs();
-    hideAllPanels();
-    tabStory.classList.add("canvas-tab--active");
-    panelStory.style.display = "flex";
-    localStorage.setItem("nai-active-tab", "story");
-  }
-
   function showCraft() {
     if (!tabCraft || !panelCraft) return;
     clearAllTabs();
@@ -3290,16 +3256,14 @@ function setupHistoryTabs() {
 
   tabCanvas.addEventListener("click", showCanvas);
   tabHistory.addEventListener("click", showHistory);
-  if (tabStory) tabStory.addEventListener("click", showStory);
   if (tabCraft) tabCraft.addEventListener("click", showCraft);
   if (tabExplore) tabExplore.addEventListener("click", showExplore);
 
-  // Restore last active tab (default: story)
-  // Migrate old "inspire" value to "craft"
-  let savedTab = localStorage.getItem("nai-active-tab") || "story";
+  // Restore last active tab (default: canvas)
+  let savedTab = localStorage.getItem("nai-active-tab") || "canvas";
   if (savedTab === "inspire") savedTab = "craft";
-  if (savedTab === "story") showStory();
-  else if (savedTab === "history") showHistory();
+  if (savedTab === "story") savedTab = "canvas";
+  if (savedTab === "history") showHistory();
   else if (savedTab === "craft") showCraft();
   else if (savedTab === "explore") showExplore();
   // else canvas is already active by default
@@ -3816,484 +3780,6 @@ function navigateLightbox(delta) {
   renderLightboxFrame();
 }
 
-/* ═══════════════════════════════════════════════════════════
-   STORY EDITOR
-   ═══════════════════════════════════════════════════════════ */
-
-let _storySaveTimer = null;
-// Saved selection range so toolbar buttons don't lose cursor position
-let _storySavedRange = null;
-// ID of the currently open story
-let _activeStoryId = null;
-
-/* ── Story API helpers ── */
-async function storyApiList() {
-  const res = await fetch("/api/stories");
-  if (!res.ok) throw new Error("Failed to list stories");
-  return res.json();
-}
-
-async function storyApiGet(id) {
-  const res = await fetch(`/api/stories/${id}`);
-  if (!res.ok) throw new Error("Story not found");
-  return res.json();
-}
-
-async function storyApiCreate(title, content) {
-  const res = await fetch("/api/stories", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, content }),
-  });
-  if (!res.ok) throw new Error("Failed to create story");
-  return res.json();
-}
-
-async function storyApiUpdate(id, data) {
-  const res = await fetch(`/api/stories/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error("Failed to update story");
-  return res.json();
-}
-
-async function storyApiDelete(id) {
-  const res = await fetch(`/api/stories/${id}`, { method: "DELETE" });
-  if (!res.ok && res.status !== 204) throw new Error("Failed to delete story");
-}
-
-function storySaveContent() {
-  clearTimeout(_storySaveTimer);
-  _storySaveTimer = setTimeout(async () => {
-    if (!_activeStoryId) return;
-    const editor = $("#story-editor-content");
-    const titleInput = $("#story-title");
-    if (!editor) return;
-    const title = titleInput ? (titleInput.value.trim() || "Untitled Story") : "Untitled Story";
-    const content = editor.innerHTML;
-    try {
-      await storyApiUpdate(_activeStoryId, { title, content });
-    } catch (_) { /* ignore transient failures */ }
-  }, 500);
-}
-
-function storyUpdateWordCount() {
-  const editor = $("#story-editor-content");
-  const el = $("#story-word-count");
-  if (!editor || !el) return;
-  const text = editor.textContent.trim();
-  const w = text ? text.split(/\s+/).length : 0;
-  el.textContent = w > 0 ? `${w} word${w === 1 ? "" : "s"}` : "";
-}
-
-function storySaveSelection() {
-  const sel = window.getSelection();
-  const editor = $("#story-editor-content");
-  if (!editor || !sel || sel.rangeCount === 0) return;
-  const range = sel.getRangeAt(0);
-  if (editor.contains(range.commonAncestorContainer)) {
-    _storySavedRange = range.cloneRange();
-  }
-}
-
-function storyRestoreSelection() {
-  if (!_storySavedRange) return;
-  const sel = window.getSelection();
-  if (!sel) return;
-  sel.removeAllRanges();
-  sel.addRange(_storySavedRange);
-}
-
-function insertImageAtCursor(base64, prompt, seed) {
-  const editor = $("#story-editor-content");
-  if (!editor) return;
-
-  const figure = document.createElement("figure");
-  figure.className = "story-inline-img";
-  figure.contentEditable = "false";
-  figure.dataset.prompt = prompt || "";
-  figure.dataset.seed = seed != null ? String(seed) : "";
-
-  const img = document.createElement("img");
-  img.src = `data:image/png;base64,${base64}`;
-  img.alt = "AI generated illustration";
-
-  const caption = document.createElement("figcaption");
-  caption.textContent = prompt || "";
-
-  const redrawBtn = document.createElement("button");
-  redrawBtn.type = "button";
-  redrawBtn.className = "story-inline-img-redraw";
-  redrawBtn.setAttribute("aria-label", "Redraw with img2img");
-  redrawBtn.textContent = "Redraw";
-  // Click handled by event delegation in _attachEditorImageListeners
-
-  const delBtn = document.createElement("button");
-  delBtn.type = "button";
-  delBtn.className = "story-inline-img-delete";
-  delBtn.setAttribute("aria-label", "Remove image");
-  delBtn.textContent = "\u00d7";
-  // Click handled by event delegation in _attachEditorImageListeners
-
-  figure.appendChild(img);
-  if (prompt) figure.appendChild(caption);
-  figure.appendChild(redrawBtn);
-  figure.appendChild(delBtn);
-
-  storyRestoreSelection();
-  const sel = window.getSelection();
-  if (sel && sel.rangeCount > 0) {
-    const range = sel.getRangeAt(0);
-    if (editor.contains(range.commonAncestorContainer)) {
-      range.deleteContents();
-      range.insertNode(figure);
-      range.setStartAfter(figure);
-      range.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(range);
-      _storySavedRange = range.cloneRange();
-    } else {
-      editor.appendChild(figure);
-    }
-  } else {
-    editor.appendChild(figure);
-  }
-
-  storySaveContent();
-  storyUpdateWordCount();
-}
-
-/* Old block-based story code removed — replaced by contentEditable approach
-
-    } else if (block.type === "image") {
-      blockEl.className = "story-block story-block--image";
-
-      const figure = document.createElement("figure");
-
-      const img = document.createElement("img");
-      img.src = `data:image/png;base64,${block.base64}`;
-      img.alt = block.prompt || "Story image";
-      figure.appendChild(img);
-
-      if (block.prompt) {
-        const caption = document.createElement("figcaption");
-        caption.textContent = block.prompt;
-        figure.appendChild(caption);
-      }
-
-      if (block.seed != null) {
-        const seedBadge = document.createElement("div");
-        seedBadge.className = "story-img-seed-badge";
-        seedBadge.textContent = `Seed: ${Number(block.seed)}`;
-        figure.appendChild(seedBadge);
-      }
-
-      blockEl.appendChild(figure);
-
-      const delBtn = document.createElement("button");
-      delBtn.type = "button";
-      delBtn.className = "story-img-delete";
-      delBtn.textContent = "Remove";
-      delBtn.addEventListener("click", () => {
-        if (!confirm("Remove this image from the story?")) return;
-        _storyBlocks.splice(_storyBlocks.indexOf(block), 1);
-        storySave();
-        renderStoryBlocks();
-      });
-      blockEl.appendChild(delBtn);
-    }
-*/
-
-/* ── Relative time formatting ── */
-function relativeTime(isoStr) {
-  const diff = Date.now() - new Date(isoStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days === 1) return "Yesterday";
-  if (days < 30) return `${days}d ago`;
-  return new Date(isoStr).toLocaleDateString();
-}
-
-function _attachEditorImageListeners(editor) {
-  editor.addEventListener("click", (e) => {
-    // Delete button
-    const delBtn = e.target.closest(".story-inline-img-delete");
-    if (delBtn) {
-      e.preventDefault();
-      e.stopPropagation();
-      const figure = delBtn.closest(".story-inline-img");
-      if (figure) figure.remove();
-      storyUpdateWordCount();
-      storySaveContent();
-      return;
-    }
-
-    // Redraw button — set image as i2i source, load prompt, generate
-    const redrawBtn = e.target.closest(".story-inline-img-redraw");
-    if (redrawBtn) {
-      e.preventDefault();
-      e.stopPropagation();
-      const figure = redrawBtn.closest(".story-inline-img");
-      if (!figure) return;
-
-      // Get the image base64 from the <img> src
-      const imgEl = figure.querySelector("img");
-      if (!imgEl || !imgEl.src) return;
-      const base64 = imgEl.src.replace(/^data:image\/png;base64,/, "");
-
-      // Set as img2img source
-      state.img2img = base64;
-      state.canvasImageBase64 = base64;
-      activateImg2ImgMode();
-      const accordion = $("#img2img-accordion");
-      if (accordion && !accordion.open) accordion.open = true;
-
-      // Load the stored prompt
-      const storedPrompt = figure.dataset.prompt || "";
-      if (storedPrompt) {
-        const promptEl = $("#prompt");
-        if (promptEl) {
-          promptEl.value = storedPrompt;
-          localStorage.setItem("nai-prompt", storedPrompt);
-        }
-      }
-
-      // Store reference to the figure so we can replace the image after generation
-      state._storyRedrawFigure = figure;
-
-      // Trigger generation
-      generate();
-    }
-  });
-}
-
-function setupStoryEditor() {
-  const editor = $("#story-editor-content");
-  if (!editor) return;
-
-  const writingMode = $("#story-writing-mode");
-  const bookshelfMode = $("#story-bookshelf-mode");
-  const titleInput = $("#story-title");
-
-  /* ── Mode helpers ── */
-  function showWritingMode() {
-    writingMode.style.display = "";
-    bookshelfMode.style.display = "none";
-  }
-
-  async function showBookshelf() {
-    writingMode.style.display = "none";
-    bookshelfMode.style.display = "flex";
-    try {
-      const stories = await storyApiList();
-      renderBookshelfCards(stories);
-    } catch (_) {
-      renderBookshelfCards([]);
-    }
-  }
-
-  /* ── Open a story by ID ── */
-  async function openStory(id) {
-    try {
-      const story = await storyApiGet(id);
-      _activeStoryId = story.id;
-      editor.innerHTML = story.content || "";
-      titleInput.value = story.title || "Untitled Story";
-      // Re-enforce contentEditable=false on restored figures
-      editor.querySelectorAll(".story-inline-img").forEach((fig) => {
-        fig.contentEditable = "false";
-      });
-      showWritingMode();
-      storyUpdateWordCount();
-    } catch (_) {
-      // If story was deleted externally, fall back to bookshelf
-      showBookshelf();
-    }
-  }
-
-  /* ── Create a new story and open it ── */
-  async function createAndOpenStory() {
-    try {
-      const story = await storyApiCreate("Untitled Story", "");
-      await openStory(story.id);
-    } catch (_) { /* ignore */ }
-  }
-
-  /* ── Bookshelf rendering ── */
-  // Confirm-delete state: maps story id → timer handle
-  const _deleteConfirm = new Map();
-
-  function renderBookshelfCards(stories) {
-    const list = $("#bookshelf-list");
-    list.innerHTML = "";
-
-    if (!stories.length) {
-      const empty = document.createElement("div");
-      empty.className = "bookshelf-empty";
-      empty.textContent = "No stories yet. Start writing.";
-      list.appendChild(empty);
-      return;
-    }
-
-    // Sort by updated_at descending
-    const sorted = [...stories].sort((a, b) =>
-      new Date(b.updated_at) - new Date(a.updated_at)
-    );
-
-    for (const s of sorted) {
-      const card = document.createElement("div");
-      card.className = "bookshelf-card";
-      card.dataset.storyId = s.id;
-
-      const titleEl = document.createElement("div");
-      titleEl.className = "bookshelf-card-title";
-      titleEl.textContent = s.title || "Untitled Story";
-
-      const meta = document.createElement("div");
-      meta.className = "bookshelf-card-meta";
-
-      const info = document.createElement("span");
-      const wordCount = s.word_count != null ? `${s.word_count} word${s.word_count === 1 ? "" : "s"}` : "";
-      const time = relativeTime(s.updated_at);
-      info.textContent = wordCount ? `${wordCount} · ${time}` : time;
-
-      const delBtn = document.createElement("button");
-      delBtn.type = "button";
-      delBtn.className = "btn-action bookshelf-card-delete";
-      delBtn.dataset.deleteId = s.id;
-      delBtn.textContent = "Delete";
-
-      meta.appendChild(info);
-      meta.appendChild(delBtn);
-      card.appendChild(titleEl);
-      card.appendChild(meta);
-      list.appendChild(card);
-    }
-  }
-
-  /* ── Bookshelf event delegation ── */
-  const list = $("#bookshelf-list");
-  list.addEventListener("click", async (e) => {
-    // Delete button — two-click confirm
-    const delBtn = e.target.closest("[data-delete-id]");
-    if (delBtn) {
-      e.stopPropagation();
-      const id = delBtn.dataset.deleteId;
-      if (_deleteConfirm.has(id)) {
-        // Second click — confirmed
-        clearTimeout(_deleteConfirm.get(id));
-        _deleteConfirm.delete(id);
-        try {
-          await storyApiDelete(id);
-          // If we deleted the active story, clear it
-          if (_activeStoryId === id) {
-            _activeStoryId = null;
-          }
-        } catch (_) { /* ignore */ }
-        // Re-render bookshelf
-        try {
-          const stories = await storyApiList();
-          renderBookshelfCards(stories);
-        } catch (_) {
-          renderBookshelfCards([]);
-        }
-      } else {
-        // First click — arm the confirm
-        delBtn.textContent = "Confirm?";
-        delBtn.classList.add("bookshelf-card-delete--confirm");
-        const timer = setTimeout(() => {
-          _deleteConfirm.delete(id);
-          delBtn.textContent = "Delete";
-          delBtn.classList.remove("bookshelf-card-delete--confirm");
-        }, 3000);
-        _deleteConfirm.set(id, timer);
-      }
-      return;
-    }
-
-    // Card click — open story
-    const card = e.target.closest(".bookshelf-card[data-story-id]");
-    if (card) {
-      await openStory(card.dataset.storyId);
-    }
-  });
-
-  /* ── Header button wiring ── */
-  $("#story-btn-bookshelf").addEventListener("click", showBookshelf);
-  $("#story-btn-new").addEventListener("click", createAndOpenStory);
-  $("#bookshelf-btn-new").addEventListener("click", createAndOpenStory);
-
-  /* ── Title input saves ── */
-  titleInput.addEventListener("input", storySaveContent);
-
-  /* ── Editor event listeners ── */
-  _attachEditorImageListeners(editor);
-
-  // Protect images from contentEditable corruption:
-  // Re-enforce contentEditable=false on all figures after any mutation
-  const observer = new MutationObserver(() => {
-    editor.querySelectorAll(".story-inline-img").forEach((fig) => {
-      if (fig.contentEditable !== "false") fig.contentEditable = "false";
-    });
-  });
-  observer.observe(editor, { childList: true, subtree: true, attributes: true });
-
-  // Prevent contentEditable from resizing images (disable browser handles)
-  editor.addEventListener("mousedown", (e) => {
-    if (e.target.tagName === "IMG" && e.target.closest(".story-inline-img")) {
-      e.preventDefault();
-    }
-  });
-
-  // Live save & word count on content changes
-  editor.addEventListener("input", () => {
-    storyUpdateWordCount();
-    storySaveContent();
-  });
-
-  // Save selection on every cursor movement so toolbar buttons know where to insert
-  editor.addEventListener("keyup", storySaveSelection);
-  editor.addEventListener("mouseup", storySaveSelection);
-  editor.addEventListener("blur", storySaveSelection);
-
-  /* ── Init: migrate localStorage if present, then load stories ── */
-  (async () => {
-    // Migration: if there is old localStorage content, create a story from it
-    try {
-      const legacy = localStorage.getItem("nai-story-v2");
-      if (legacy && legacy.trim() && legacy.trim() !== "<br>") {
-        await storyApiCreate("Imported Story", legacy);
-        localStorage.removeItem("nai-story-v2");
-        // Will be opened as the most recent story below
-      }
-    } catch (_) { /* migration failure is non-fatal */ }
-
-    // Load story list and open most recent, or create a fresh one
-    try {
-      const stories = await storyApiList();
-      if (stories.length) {
-        const sorted = [...stories].sort((a, b) =>
-          new Date(b.updated_at) - new Date(a.updated_at)
-        );
-        await openStory(sorted[0].id);
-      } else {
-        await createAndOpenStory();
-      }
-    } catch (_) {
-      // If API is unavailable, show writing mode with no active story
-      showWritingMode();
-      storyUpdateWordCount();
-    }
-  })();
-}
-
-// ── end of story editor ──────────────────────────────────
 
 function renderLightboxFrame() {
   const overlay = _lightboxOverlay;

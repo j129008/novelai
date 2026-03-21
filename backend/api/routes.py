@@ -36,10 +36,6 @@ from models.schemas import (
     GrokVideoRequest,
     GrokVideoResponse,
     RecordCharactersRequest,
-    StoryCreateRequest,
-    StoryListItem,
-    StoryRecord,
-    StoryUpdateRequest,
     SuggestTagsRequest,
     SuggestTagsResponse,
     TagSuggestion,
@@ -768,116 +764,6 @@ async def analyze_image(req: AnalyzeImageRequest):
         for t in raw_tags
     ]
     return AnalyzeImageResponse(status="complete", tags=tags)
-
-
-# ---------------------------------------------------------------------------
-# Stories
-# ---------------------------------------------------------------------------
-
-def _get_stories_dir() -> Path:
-    settings = _load_settings()
-    output_dir = settings.get("output_dir")
-    if output_dir:
-        stories_dir = Path(output_dir) / "stories"
-    else:
-        stories_dir = Path(__file__).resolve().parent.parent.parent / "stories"
-    stories_dir.mkdir(parents=True, exist_ok=True)
-    return stories_dir
-
-
-def _validate_story_id(story_id: str) -> None:
-    if "/" in story_id or ".." in story_id:
-        raise HTTPException(status_code=400, detail="Invalid story id")
-
-
-def _story_path(story_id: str) -> Path:
-    _validate_story_id(story_id)
-    return _get_stories_dir() / f"{story_id}.json"
-
-
-def _word_count(content: str) -> int:
-    plain = re.sub(r"<[^>]+>", "", content)
-    return len(plain.split()) if plain.strip() else 0
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _load_story(story_id: str) -> StoryRecord:
-    path = _story_path(story_id)
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="Story not found")
-    try:
-        data = json.loads(path.read_text())
-        return StoryRecord(**data)
-    except (json.JSONDecodeError, TypeError, ValueError):
-        raise HTTPException(status_code=500, detail="Story data is corrupt")
-
-
-@router.get("/stories", response_model=list[StoryListItem])
-async def list_stories():
-    stories_dir = _get_stories_dir()
-    items = []
-    for p in stories_dir.glob("*.json"):
-        try:
-            data = json.loads(p.read_text())
-            items.append(
-                StoryListItem(
-                    id=data["id"],
-                    title=data["title"],
-                    word_count=_word_count(data.get("content", "")),
-                    created_at=data["created_at"],
-                    updated_at=data["updated_at"],
-                )
-            )
-        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
-            continue
-    items.sort(key=lambda s: s.updated_at, reverse=True)
-    return items
-
-
-@router.get("/stories/{story_id}", response_model=StoryRecord)
-async def get_story(story_id: str):
-    return _load_story(story_id)
-
-
-@router.post("/stories", response_model=StoryRecord, status_code=201)
-async def create_story(req: StoryCreateRequest):
-    story_id = str(int(time.time() * 1000))
-    now = _now_iso()
-    record = StoryRecord(
-        id=story_id,
-        title=req.title,
-        content=req.content,
-        created_at=now,
-        updated_at=now,
-    )
-    _story_path(story_id).write_text(json.dumps(record.model_dump(), indent=2))
-    return record
-
-
-@router.put("/stories/{story_id}", response_model=StoryRecord)
-async def update_story(story_id: str, req: StoryUpdateRequest):
-    record = _load_story(story_id)
-    updated = record.model_dump()
-    if req.title is not None:
-        updated["title"] = req.title
-    if req.content is not None:
-        updated["content"] = req.content
-    updated["updated_at"] = _now_iso()
-    new_record = StoryRecord(**updated)
-    _story_path(story_id).write_text(json.dumps(new_record.model_dump(), indent=2))
-    return new_record
-
-
-@router.delete("/stories/{story_id}", status_code=204)
-async def delete_story(story_id: str):
-    path = _story_path(story_id)
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="Story not found")
-    path.unlink()
-    return None
 
 
 # ---------------------------------------------------------------------------

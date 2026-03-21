@@ -501,8 +501,7 @@
 
         <div class="canvas-tabbar">
           <div class="canvas-tabs">
-            <button class="canvas-tab canvas-tab--active" id="tab-story" type="button">Story</button>
-            <button class="canvas-tab" id="tab-canvas" type="button">Canvas</button>
+            <button class="canvas-tab canvas-tab--active" id="tab-canvas" type="button">Canvas</button>
             <button class="canvas-tab" id="tab-history" type="button">History <span id="gallery-count" class="gallery-count-badge"></span></button>
             <button class="canvas-tab" id="tab-craft" type="button">Craft</button>
             <button class="canvas-tab" id="tab-explore" type="button">Explore</button>
@@ -582,10 +581,6 @@
               <button id="btn-download" class="btn-action btn-action--primary" type="button">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Download
-              </button>
-              <button id="btn-add-to-story" class="btn-action" type="button" title="Insert this image into the Story at cursor position">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-                To Story
               </button>
               <button id="btn-clear-canvas" class="btn-action btn-action--danger-subtle" type="button" title="Clear image and img2img source">×</button>
             </div>
@@ -688,26 +683,6 @@
           </div>
         </div>
 
-        <div id="panel-story" class="story-panel" style="display:none">
-          <!-- Writing mode -->
-          <div id="story-writing-mode">
-            <div class="story-header">
-              <input type="text" id="story-title" class="story-title-input" value="Untitled Story" placeholder="Story title…">
-              <button id="story-btn-bookshelf" class="btn-action" type="button">Bookshelf</button>
-              <button id="story-btn-new" class="btn-action btn-action--primary" type="button">+ New</button>
-            </div>
-            <div id="story-editor-content" class="story-editor-content" contenteditable="true" spellcheck="true" data-placeholder="Start writing your story…"></div>
-            <span id="story-word-count" class="story-word-count"></span>
-          </div>
-          <!-- Bookshelf mode -->
-          <div id="story-bookshelf-mode" style="display:none">
-            <div class="story-header">
-              <span class="bookshelf-title">Bookshelf</span>
-              <button id="bookshelf-btn-new" class="btn-action btn-action--primary" type="button">+ New Story</button>
-            </div>
-            <div id="bookshelf-list" class="bookshelf-list"></div>
-          </div>
-        </div>
 
       </section>
 
