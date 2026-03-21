@@ -12,3 +12,4 @@ node_modules/
 output/
 .app-settings.json
 .DS_Store
+.recent-characters.json
