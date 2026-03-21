@@ -47,13 +47,13 @@ body { font-family: -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-ser
 .guide-close:hover { color: var(--text-primary); }
 .guide-body { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
 .guide-section h3 { font-size: 0.82rem; font-weight: 700; color: var(--accent-bright); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
-.guide-section p { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 6px; }
-.guide-formula { font-size: 0.82rem !important; color: var(--text-primary) !important; background: var(--bg-deep); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px 12px; font-family: "SF Mono","Fira Code",monospace; }
+.guide-section p:not(.guide-formula):not(.guide-note) { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 6px; }
+.guide-formula { font-size: 0.82rem; color: var(--text-primary); background: var(--bg-deep); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px 12px; font-family: "SF Mono","Fira Code",monospace; }
 .guide-example { display: block; background: var(--bg-deep); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px 12px; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; word-break: break-word; margin-top: 4px; }
 .guide-table { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
 .guide-table td { padding: 5px 10px; border-bottom: 1px solid var(--border-subtle); color: var(--text-secondary); }
 .guide-table td:first-child { color: var(--accent-bright); font-family: "SF Mono","Fira Code",monospace; font-size: 0.8rem; white-space: nowrap; }
-.guide-note { font-size: 0.8rem !important; color: var(--text-tertiary) !important; margin-top: 6px; }
+.guide-note { font-size: 0.8rem; color: var(--text-tertiary); margin-top: 6px; }
 .guide-note code { color: var(--accent-bright); font-size: 0.78rem; }
 .guide-examples { display: flex; flex-direction: column; gap: 8px; }
 .guide-examples > div { display: flex; flex-direction: column; gap: 4px; }

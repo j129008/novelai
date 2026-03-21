@@ -180,7 +180,7 @@ async function fetchGrokUsage() {
     // Tooltip with breakdown
     const bar = document.getElementById("grok-quota-bar");
     if (bar) {
-      bar.title = `已用 $${used.toFixed(2)}\n` + data.items
+      bar.title = `Used $${used.toFixed(2)}\n` + data.items
         .filter(i => i.count > 0)
         .map(i => `${i.model} ${i.type}: ${i.count}x ($${(i.cost_cents / 100).toFixed(2)})`)
         .join("\n");
@@ -1041,7 +1041,7 @@ function showGrokSourceOnCanvas(dataUrl) {
   const removeBtn = document.createElement("button");
   removeBtn.type = "button";
   removeBtn.className = "grok-source-remove";
-  removeBtn.title = "移除來源圖片";
+  removeBtn.title = "Remove source image";
   removeBtn.innerHTML = "✕";
   removeBtn.addEventListener("click", () => {
     clearImg2Img();
@@ -2054,7 +2054,7 @@ async function generateGrokVideo() {
     spinnerEl.className = "spinner";
 
     progressMsg = document.createElement("p");
-    progressMsg.textContent = "影片生成中…";
+    progressMsg.textContent = "Generating video…";
 
     progressBar = document.createElement("div");
     progressBar.className = "video-progress-track";
@@ -2105,7 +2105,7 @@ async function generateGrokVideo() {
           const msg = JSON.parse(line.slice(6));
           if (msg.status === "pending" && msg.progress != null) {
             const pct = Math.round(msg.progress);
-            if (progressMsg) progressMsg.textContent = `影片生成中… ${pct}%`;
+            if (progressMsg) progressMsg.textContent = `Generating video… ${pct}%`;
             const fill = document.getElementById("video-progress-fill");
             if (fill) fill.style.width = pct + "%";
           } else if (msg.status === "done" && msg.video) {
@@ -2214,42 +2214,42 @@ function setCanvasImageAsSource() {
 const VARIATION_DIMENSIONS = {
   lighting: {
     label: "Lighting",
-    hint: "改變光線來源、時段、氛圍光",
+    hint: "Change light source, time of day, ambient light",
     variants: [
-      { label: "暖光",  tags: "soft natural lighting, golden hour" },
-      { label: "戲劇光", tags: "dramatic rim lighting, dark atmosphere" },
-      { label: "霓虹",  tags: "neon light, cyberpunk lighting" },
-      { label: "月光",  tags: "moonlight, ethereal glow, night" },
+      { label: "Warm",     tags: "soft natural lighting, golden hour" },
+      { label: "Dramatic", tags: "dramatic rim lighting, dark atmosphere" },
+      { label: "Neon",     tags: "neon light, cyberpunk lighting" },
+      { label: "Moonlit",  tags: "moonlight, ethereal glow, night" },
     ],
   },
   artStyle: {
     label: "Art Style",
-    hint: "改變繪畫媒材、線條風格",
+    hint: "Change art medium and line style",
     variants: [
-      { label: "水彩",  tags: "watercolor, painterly, loose brushstrokes" },
-      { label: "賽璐珞", tags: "detailed lineart, clean lines, cel shaded" },
-      { label: "油畫",  tags: "oil painting, impasto texture, rich colors" },
-      { label: "素描",  tags: "sketch style, pencil, rough lines" },
+      { label: "Watercolor", tags: "watercolor, painterly, loose brushstrokes" },
+      { label: "Cel",        tags: "detailed lineart, clean lines, cel shaded" },
+      { label: "Oil",        tags: "oil painting, impasto texture, rich colors" },
+      { label: "Sketch",     tags: "sketch style, pencil, rough lines" },
     ],
   },
   composition: {
     label: "Composition",
-    hint: "改變鏡頭距離、角度",
+    hint: "Change camera distance and angle",
     variants: [
-      { label: "特寫",  tags: "close-up, portrait, face focus" },
-      { label: "全身",  tags: "full body, wide shot, establishing" },
-      { label: "俯角",  tags: "from above, bird's eye view, overhead angle" },
-      { label: "動態",  tags: "dynamic angle, dutch angle, cinematic" },
+      { label: "Close-up",  tags: "close-up, portrait, face focus" },
+      { label: "Full Body", tags: "full body, wide shot, establishing" },
+      { label: "Top Down",  tags: "from above, bird's eye view, overhead angle" },
+      { label: "Dynamic",   tags: "dynamic angle, dutch angle, cinematic" },
     ],
   },
   mood: {
     label: "Mood",
-    hint: "改變情緒基調、色調",
+    hint: "Change mood and color tone",
     variants: [
-      { label: "憂鬱",  tags: "melancholic, somber, wistful atmosphere" },
-      { label: "活躍",  tags: "vibrant, energetic, lively" },
-      { label: "神秘",  tags: "mysterious, eerie, tension" },
-      { label: "平靜",  tags: "peaceful, serene, calm" },
+      { label: "Melancholy", tags: "melancholic, somber, wistful atmosphere" },
+      { label: "Vibrant",    tags: "vibrant, energetic, lively" },
+      { label: "Mysterious", tags: "mysterious, eerie, tension" },
+      { label: "Serene",     tags: "peaceful, serene, calm" },
     ],
   },
 };
@@ -2485,7 +2485,7 @@ function setupCraftPanel() {
         card.innerHTML = "";
         const errEl = document.createElement("div");
         errEl.className = "variation-card-error";
-        errEl.textContent = "生成失敗";
+        errEl.textContent = "Generation failed";
         card.appendChild(errEl);
       }
     } // end sequential for loop
@@ -2520,7 +2520,7 @@ function setupCraftPanel() {
       if (autopsyResults) autopsyResults.style.display = "block";
       if (autopsyTagsEl) autopsyTagsEl.innerHTML = "";
       if (insertAllBtn) insertAllBtn.style.display = "none";
-      if (autopsyStatus) autopsyStatus.textContent = "正在分析…";
+      if (autopsyStatus) autopsyStatus.textContent = "Analyzing…";
       if (autopsyProgressWrap) autopsyProgressWrap.style.display = "none";
       autopsyInserted.clear();
 
@@ -2542,7 +2542,7 @@ function setupCraftPanel() {
       const data = await resp.json();
 
       if (data.status === "downloading") {
-        if (autopsyStatus) autopsyStatus.textContent = "首次使用，正在下載分析模型（約 350MB）…";
+        if (autopsyStatus) autopsyStatus.textContent = "First use — downloading analysis model (~350MB)…";
         if (autopsyProgressWrap) autopsyProgressWrap.style.display = "block";
         if (autopsyProgressFill) autopsyProgressFill.style.width = (data.progress || 0) + "%";
         // Poll until complete (bail if a newer file was dropped)
@@ -2554,13 +2554,13 @@ function setupCraftPanel() {
       if (autopsyProgressWrap) autopsyProgressWrap.style.display = "none";
 
       if (data.status === "complete" && data.tags) {
-        if (autopsyStatus) autopsyStatus.textContent = "分析完成";
+        if (autopsyStatus) autopsyStatus.textContent = "Analysis complete";
         renderAutopsyTags(data.tags);
       } else {
-        if (autopsyStatus) autopsyStatus.textContent = "分析失敗";
+        if (autopsyStatus) autopsyStatus.textContent = "Analysis failed";
       }
     } catch (err) {
-      if (autopsyStatus) autopsyStatus.textContent = "分析失敗：" + err.message;
+      if (autopsyStatus) autopsyStatus.textContent = "Analysis failed: " + err.message;
     }
   }
 
@@ -2577,7 +2577,7 @@ function setupCraftPanel() {
       grouped[cat].push(t);
     }
 
-    const categoryLabels = { subject: "主體", scene: "場景", style: "風格", lighting: "光線", character: "角色" };
+    const categoryLabels = { subject: "Subject", scene: "Scene", style: "Style", lighting: "Lighting", character: "Character" };
 
     for (const [category, tags] of Object.entries(grouped)) {
       if (!tags || tags.length === 0) continue;
@@ -2713,7 +2713,7 @@ function setupCraftPanel() {
 
     if (analyzeBtn) {
       analyzeBtn.disabled = true;
-      analyzeBtn.textContent = "分析中…";
+      analyzeBtn.textContent = "Analyzing…";
     }
     if (dnaResults) dnaResults.style.display = "none";
     if (refreshBtn) refreshBtn.style.display = "none";
@@ -2735,21 +2735,21 @@ function setupCraftPanel() {
         dnaResults.innerHTML = "";
         const errEl = document.createElement("p");
         errEl.className = "craft-dna-error";
-        errEl.textContent = "分析失敗：" + err.message;
+        errEl.textContent = "Analysis failed: " + err.message;
         dnaResults.appendChild(errEl);
       }
     } finally {
       if (analyzeBtn) {
         analyzeBtn.disabled = false;
-        analyzeBtn.textContent = "分析 Prompt";
+        analyzeBtn.textContent = "Analyze Prompt";
       }
     }
   }
 
   const DNA_GROUPS = [
-    { key: "boosters",  label: "提升者 (Boosters)",  desc: "這些 tag 常與你的 prompt 一起出現" },
-    { key: "contrasts", label: "對比者 (Contrasts)",  desc: "換個方向試試" },
-    { key: "wildcards", label: "外星人 (Wildcards)",  desc: "意外的靈感" },
+    { key: "boosters",  label: "Boosters",  desc: "Tags commonly paired with your prompt" },
+    { key: "contrasts", label: "Contrasts", desc: "Try a different direction" },
+    { key: "wildcards", label: "Wildcards", desc: "Unexpected inspiration" },
   ];
 
   function formatCount(n) {
@@ -3343,13 +3343,13 @@ async function showMoveDialog(filename) {
   dialog.className = "move-dialog";
 
   dialog.innerHTML = `
-    <div class="move-dialog-title">移動「${filename}」到…</div>
+    <div class="move-dialog-title">Move "${filename}" to…</div>
     <div class="move-dialog-folders"></div>
     <div class="move-dialog-new">
-      <input type="text" class="move-dialog-input" placeholder="新資料夾名稱…" spellcheck="false">
-      <button type="button" class="btn-action btn-action--primary move-dialog-create">建立並移動</button>
+      <input type="text" class="move-dialog-input" placeholder="New folder name…" spellcheck="false">
+      <button type="button" class="btn-action btn-action--primary move-dialog-create">Create & Move</button>
     </div>
-    <button type="button" class="btn-action move-dialog-cancel">取消</button>
+    <button type="button" class="btn-action move-dialog-cancel">Cancel</button>
   `;
 
   const foldersEl = dialog.querySelector(".move-dialog-folders");
@@ -3399,13 +3399,13 @@ async function doMove(filename, destFolder) {
     });
     if (resp.ok) {
       loadGallery();
-      showStatus(`已移動到 ${destFolder}`);
+      showStatus(`Moved to ${destFolder}`);
     } else {
       const err = await resp.json().catch(() => ({}));
-      showError(err.detail || "移動失敗");
+      showError(err.detail || "Move failed");
     }
   } catch {
-    showError("移動失敗");
+    showError("Move failed");
   }
 }
 
@@ -4637,7 +4637,7 @@ function setupExplorePanel() {
     grid.innerHTML = "";
     if (linksSection) linksSection.style.display = "none";
     status.style.display = "block";
-    status.textContent = "載入中…";
+    status.textContent = "Loading…";
     goBtn.disabled = true;
 
     try {
@@ -4653,7 +4653,7 @@ function setupExplorePanel() {
 
       if (data.images.length === 0) {
         status.style.display = "block";
-        status.textContent = "找不到圖片";
+        status.textContent = "No images found";
         return;
       }
 
@@ -4694,7 +4694,7 @@ function setupExplorePanel() {
       }
     } catch (err) {
       status.style.display = "block";
-      status.textContent = "載入失敗：" + err.message;
+      status.textContent = "Failed to load: " + err.message;
     } finally {
       goBtn.disabled = false;
     }
@@ -4727,11 +4727,11 @@ function setupExplorePanel() {
         const canvasTab = $("#tab-canvas");
         if (canvasTab) canvasTab.click();
 
-        showStatus("圖片已載入");
+        showStatus("Image loaded");
       };
       reader.readAsDataURL(blob);
     } catch (err) {
-      showError("圖片載入失敗：" + err.message);
+      showError("Failed to load image: " + err.message);
     }
   }
 
@@ -4758,7 +4758,7 @@ function setupExplorePanel() {
 
       if (status) {
         status.style.display = "block";
-        status.textContent = "正在分析人物… (0/" + cards.length + ")";
+        status.textContent = "Analyzing for people… (0/" + cards.length + ")";
       }
 
       let done = 0;
@@ -4792,7 +4792,7 @@ function setupExplorePanel() {
 
             if (result.status === "downloading") {
               // Model still downloading — show status and retry after delay
-              if (status) status.textContent = "正在下載分析模型（首次使用）… " + (result.progress || 0) + "%";
+              if (status) status.textContent = "Downloading analysis model (first use)… " + (result.progress || 0) + "%";
               await new Promise(r => setTimeout(r, 3000));
               // Don't hide, leave for next pass
               return;
@@ -4804,15 +4804,15 @@ function setupExplorePanel() {
           }
           done++;
           if (status && filterActive) {
-            status.textContent = "正在分析人物… (" + done + "/" + cards.length + ")";
+            status.textContent = "Analyzing for people… (" + done + "/" + cards.length + ")";
           }
         }));
       }
 
       if (status && filterActive) {
         const visible = grid.querySelectorAll(".explore-card:not([style*='display: none'])").length;
-        status.textContent = "篩選完成：" + visible + " 張人物圖片";
-        if (visible === 0) status.textContent = "沒有找到人物圖片";
+        status.textContent = "Filter complete: " + visible + " images with people";
+        if (visible === 0) status.textContent = "No images with people found";
       }
     });
   }

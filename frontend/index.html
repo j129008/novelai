@@ -211,7 +211,7 @@
       <aside class="controls" role="form" aria-label="Generation controls">
 
         <!-- Grok quota HP bar -->
-        <div class="grok-quota-bar grok-only" id="grok-quota-bar" style="display:none" title="點擊刷新">
+        <div class="grok-quota-bar grok-only" id="grok-quota-bar" style="display:none" title="Click to refresh">
           <div class="grok-quota-track">
             <div class="grok-quota-fill" id="grok-quota-fill"></div>
           </div>
@@ -613,7 +613,7 @@
             <summary class="accordion-header">
               <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
               Variation Dial
-              <span class="accordion-hint">選一個維度，生成 4 張系統化變化</span>
+              <span class="accordion-hint">Pick a dimension, generate 4 systematic variations</span>
             </summary>
             <div class="accordion-body">
               <div class="variation-dims" id="variation-dims" role="group" aria-label="Variation dimension"></div>
@@ -629,19 +629,19 @@
             <summary class="accordion-header">
               <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
               Prompt Autopsy
-              <span class="accordion-hint">上傳圖片，解剖它的 tag 組成</span>
+              <span class="accordion-hint">Upload an image, dissect its tag composition</span>
             </summary>
             <div class="accordion-body">
               <div class="autopsy-dropzone" id="autopsy-drop" role="button" tabindex="0" aria-label="Upload image for analysis">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                <span>拖放圖片，或點此上傳</span>
+                <span>Drop image here, or click to upload</span>
                 <span class="autopsy-formats">PNG / JPG / WebP</span>
                 <input type="file" accept="image/*" id="autopsy-file-input" hidden>
               </div>
               <div id="autopsy-results" style="display:none">
                 <div class="autopsy-thumb-row">
                   <img id="autopsy-thumb" src="" alt="Uploaded image" class="autopsy-thumb-img">
-                  <div class="autopsy-status" id="autopsy-status">正在分析…</div>
+                  <div class="autopsy-status" id="autopsy-status">Analyzing…</div>
                 </div>
                 <div id="autopsy-progress-wrap" style="display:none">
                   <div class="autopsy-progress-bar"><div class="autopsy-progress-fill" id="autopsy-progress-fill"></div></div>
@@ -659,11 +659,11 @@
             <summary class="accordion-header">
               <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
               Prompt DNA
-              <span class="accordion-hint">分析 prompt，推薦你沒用過的好 tag</span>
+              <span class="accordion-hint">Analyze your prompt, recommend tags you haven't used</span>
             </summary>
             <div class="accordion-body">
               <button id="btn-analyze-prompt" class="btn-action btn-action--primary" type="button" style="width:100%;justify-content:center" disabled>
-                分析 Prompt
+                Analyze Prompt
               </button>
               <div id="dna-results" style="display:none"></div>
               <button id="btn-dna-refresh" class="btn-action" type="button" style="width:100%;justify-content:center;display:none">
@@ -676,14 +676,14 @@
 
         <div id="panel-explore" class="tab-panel explore-panel" style="display:none">
           <div class="explore-url-bar">
-            <input type="text" id="explore-url" class="explore-url-input" placeholder="輸入網址，瀏覽任意網頁的圖片…" spellcheck="false">
+            <input type="text" id="explore-url" class="explore-url-input" placeholder="Enter a URL to browse images from any page…" spellcheck="false">
             <button id="explore-go" class="btn-action btn-action--primary" type="button">Go</button>
-            <button id="explore-filter-people" class="btn-action explore-filter-btn" type="button" title="只顯示有人物的圖片（本地 AI 分析，免費）">👤</button>
+            <button id="explore-filter-people" class="btn-action explore-filter-btn" type="button" title="Show only images with people (local AI analysis)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
           </div>
           <div id="explore-status" class="explore-status" style="display:none"></div>
           <div id="explore-grid" class="explore-grid"></div>
           <div id="explore-links" class="explore-links" style="display:none">
-            <div class="explore-links-header">相關連結</div>
+            <div class="explore-links-header">Related Links</div>
             <div id="explore-links-list" class="explore-links-list"></div>
           </div>
         </div>
