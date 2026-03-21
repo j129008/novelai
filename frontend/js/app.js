@@ -3522,9 +3522,9 @@ function renderGallery(files, directories, filter) {
   } else if (_galleryTypeFilter === "video") {
     typeFiltered = files.filter(f => f.name.toLowerCase().endsWith(".mp4"));
   } else if (_galleryTypeFilter === "grok") {
-    typeFiltered = files.filter(f => f.name.includes("-grok"));
+    typeFiltered = files.filter(f => f.name.includes("-grok") || f.name.startsWith("grok-"));
   } else if (_galleryTypeFilter === "novelai") {
-    typeFiltered = files.filter(f => !f.name.includes("-grok") && !f.name.toLowerCase().endsWith(".mp4"));
+    typeFiltered = files.filter(f => !f.name.includes("-grok") && !f.name.startsWith("grok-") && !f.name.toLowerCase().endsWith(".mp4"));
   }
 
   const filtered = filter
