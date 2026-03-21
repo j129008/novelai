@@ -45,7 +45,7 @@ These are bugs you missed before — actively look for them this time.
 ### 1. Backend Testing
 Start the server:
 ```bash
-cd /Users/david/novelai/backend && python -m uvicorn main:app --host 0.0.0.0 --port 8000 &
+cd backend && python -m uvicorn main:app --host 0.0.0.0 --port 8000 &
 ```
 
 Test endpoints:

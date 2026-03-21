@@ -74,7 +74,7 @@ These are mistakes you've made before — don't repeat them.
 ## Testing
 Run the server:
 ```bash
-cd /Users/david/novelai/backend && python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+cd backend && python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 Test endpoints:
 ```bash
