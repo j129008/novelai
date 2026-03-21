@@ -3800,6 +3800,9 @@ function openLightbox(data, index) {
 
 function closeLightbox() {
   if (!_lightboxOverlay) return;
+  // Stop any playing video
+  const video = _lightboxOverlay.querySelector("video");
+  if (video) { video.pause(); video.src = ""; }
   _lightboxOverlay.style.display = "none";
   if (_lightboxKeyHandler) {
     document.removeEventListener("keydown", _lightboxKeyHandler);
