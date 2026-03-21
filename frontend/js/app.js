@@ -1000,6 +1000,7 @@ function confirmCrop() {
   // Export as PNG base64
   const dataUrl = exportCanvas.toDataURL("image/png");
   state.img2img = dataUrl.split(",")[1]; // strip "data:image/png;base64,"
+  console.log("[cropConfirm] exported:", crop.targetW, "x", crop.targetH, "b64 length:", state.img2img.length);
 
   // Generate a small thumbnail for the controls bar
   const thumbCanvas = document.createElement("canvas");
@@ -1031,6 +1032,9 @@ function confirmCrop() {
     output.appendChild(img);
     const canvasTab = $("#tab-canvas");
     if (canvasTab) canvasTab.click();
+    const actions = $("#image-actions");
+    if (actions) actions.style.display = "flex";
+    syncInpaintButtonVisibility();
   }
 }
 
@@ -2041,6 +2045,11 @@ async function generate() {
     // Inpaint mode: supply both the source image and the binary mask
     body.image = state.canvasImageBase64;
     body.mask  = state.inpaintMask;
+    // Use source image dimensions (not resolution dropdown) for inpaint
+    if (state.canvasImageWidth && state.canvasImageHeight) {
+      body.width = state.canvasImageWidth;
+      body.height = state.canvasImageHeight;
+    }
   } else if (state.img2img) {
     body.image = state.img2img;
   }
@@ -2195,6 +2204,7 @@ function setupInpaint() {
     img.onload = () => {
       const imgW = img.naturalWidth;
       const imgH = img.naturalHeight;
+      console.log("[inpaint] source image:", imgW, "x", imgH, "canvasImageWidth:", state.canvasImageWidth, "canvasImageHeight:", state.canvasImageHeight);
 
       // Show overlay first so stageWrap has layout dimensions.
       // Force animation replay (per learnings 2026-03-22).
@@ -3840,6 +3850,8 @@ function setupHistoryTabs() {
     if (panelCraft) panelCraft.style.display = "none";
     if (panelExplore) panelExplore.style.display = "none";
     searchWrap.style.display = "none";
+    const bc = $("#gallery-breadcrumb");
+    if (bc) bc.style.display = "none";
   }
 
   function showCanvas() {
@@ -3855,6 +3867,8 @@ function setupHistoryTabs() {
     hideAllPanels();
     tabHistory.classList.add("canvas-tab--active");
     panelHistory.style.display = "flex";
+    const bc = $("#gallery-breadcrumb");
+    if (bc) bc.style.display = "flex";
     searchWrap.style.display = "flex";
     searchInput.focus();
     localStorage.setItem("nai-active-tab", "history");
