@@ -3524,7 +3524,7 @@ function renderGallery(files, directories, filter) {
   } else if (_galleryTypeFilter === "grok") {
     typeFiltered = files.filter(f => f.name.includes("-grok"));
   } else if (_galleryTypeFilter === "novelai") {
-    typeFiltered = files.filter(f => !f.name.includes("-grok"));
+    typeFiltered = files.filter(f => !f.name.includes("-grok") && !f.name.toLowerCase().endsWith(".mp4"));
   }
 
   const filtered = filter
