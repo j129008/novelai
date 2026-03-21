@@ -108,23 +108,17 @@ function applyProvider(provider) {
     document.getElementById("img2img-accordion"),
   ];
 
-  // Config bar NovelAI-specific fields (Canvas + its separator, Seed + its separator)
+  // Config bar NovelAI-specific fields (Canvas resolution select)
   const canvasField = document.getElementById("canvas-field");
-  const canvasSep   = document.getElementById("canvas-sep");
-  const seedField   = document.getElementById("seed-field");
-  // The separator after seed-field is the first .config-bar-sep that follows it
-  const seedSep = seedField ? seedField.nextElementSibling : null;
+  // Seed footer row — shown for NovelAI only (Grok has no seed)
+  const seedFooterRow = document.getElementById("seed-footer-row");
 
   novelaiOnly.forEach((el) => {
     if (el) el.style.display = isGrok ? "none" : "";
   });
 
-  if (canvasField) canvasField.style.display = isGrok ? "none" : "";
-  if (canvasSep)   canvasSep.style.display   = isGrok ? "none" : "";
-  if (seedField)   seedField.style.display   = isGrok ? "none" : "";
-  if (seedSep && seedSep.classList.contains("config-bar-sep")) {
-    seedSep.style.display = isGrok ? "none" : "";
-  }
+  if (canvasField)    canvasField.style.display    = isGrok ? "none" : "";
+  if (seedFooterRow)  seedFooterRow.style.display  = isGrok ? "none" : "";
 
   // Show/hide Grok-only elements
   // Note: grok-video-controls visibility is managed by the output-type toggle,
@@ -337,7 +331,7 @@ async function init() {
       state.lastImageBase64 = null;
       state.lastVideoBase64 = null;
       const output = $("#output");
-      if (output) output.innerHTML = '<div class="placeholder"><div class="placeholder-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><p class="placeholder-title">Your creation awaits</p><p class="placeholder-sub">Press Generate or Enter</p></div>';
+      if (output) output.innerHTML = '<div class="placeholder"><div class="placeholder-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><p class="placeholder-title">Your creation awaits</p><p class="placeholder-sub">Press Generate or Enter</p><p class="placeholder-drop-hint">or drop / paste an image as source</p></div>';
       const actions = $("#image-actions");
       if (actions) actions.style.display = "none";
     });
@@ -677,11 +671,15 @@ function clearImg2Img() {
   const sourceActive = $("#img2img-source-active");
   const thumb        = $("#img2img-source-thumb");
   const badge        = $("#img2img-sidebar-badge");
+  const refChip      = $("#ref-source-chip");
+  const refChipImg   = $("#ref-source-thumb-chip");
 
   if (sourceEmpty)  sourceEmpty.style.display  = "flex";
   if (sourceActive) sourceActive.style.display = "none";
   if (thumb)        thumb.src = "";
   if (badge)        badge.style.display        = "none";
+  if (refChip)      refChip.style.display      = "none";
+  if (refChipImg)   refChipImg.src             = "";
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -697,19 +695,20 @@ function openCropOverlay(imgEl) {
   if (provider === "grok") {
     // Grok uses aspect ratios — convert to pixel dimensions for crop frame
     const ar = document.getElementById("grok-aspect-ratio")?.value || "1:1";
+    const res = document.getElementById("grok-resolution")?.value || "1k";
+    const baseSize = res === "2k" ? 2048 : 1024;
     if (ar === "auto") {
       // Auto: use the source image's native aspect ratio (no forced crop ratio)
-      crop.targetW = imgEl.naturalWidth || 1024;
-      crop.targetH = imgEl.naturalHeight || 1024;
+      crop.targetW = imgEl.naturalWidth || baseSize;
+      crop.targetH = imgEl.naturalHeight || baseSize;
     } else {
       const [aw, ah] = ar.split(":").map(Number);
-      const base = 1024;
       if (aw >= ah) {
-        crop.targetW = base;
-        crop.targetH = Math.round(base * ah / aw);
+        crop.targetW = baseSize;
+        crop.targetH = Math.round(baseSize * ah / aw);
       } else {
-        crop.targetH = base;
-        crop.targetW = Math.round(base * aw / ah);
+        crop.targetH = baseSize;
+        crop.targetW = Math.round(baseSize * aw / ah);
       }
     }
   } else {
@@ -1036,8 +1035,8 @@ function showGrokSourceOnCanvas(dataUrl) {
   img.alt = "Source image";
 
   const badge = document.createElement("div");
-  badge.className = "grok-source-badge";
-  badge.textContent = "Source";
+  badge.className = "grok-source-banner";
+  badge.textContent = "Source Image";
 
   const removeBtn = document.createElement("button");
   removeBtn.type = "button";
@@ -1059,16 +1058,13 @@ function showGrokSourceOnCanvas(dataUrl) {
 }
 
 function showSourceRefThumb(outputEl, thumbDataUrl) {
-  const thumb = document.createElement("img");
-  thumb.src = thumbDataUrl;
-  thumb.alt = "Reference";
-  thumb.className = "grok-ref-thumb";
-  thumb.title = "來源圖片（點擊移除）";
-  thumb.addEventListener("click", () => {
-    clearImg2Img();
-    thumb.remove();
-  });
-  outputEl.appendChild(thumb);
+  // Populate the ref-source-chip in the image-actions bar
+  const chip = document.getElementById("ref-source-chip");
+  const chipImg = document.getElementById("ref-source-thumb-chip");
+  if (chip && chipImg) {
+    chipImg.src = thumbDataUrl;
+    chip.style.display = "inline-flex";
+  }
 }
 
 function activateImg2ImgMode() {
@@ -3604,6 +3600,14 @@ function renderGallery(files, directories, filter) {
     }
     imgWrap.appendChild(mediaEl);
 
+    // Play icon badge for video cards
+    if (isVideo) {
+      const badge = document.createElement("div");
+      badge.className = "history-card-video-badge";
+      badge.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19" fill="currentColor"/></svg>';
+      imgWrap.appendChild(badge);
+    }
+
     // Hover overlay with prompt + meta text (for context, no buttons)
     const overlay = document.createElement("div");
     overlay.className = "history-card-overlay";
@@ -3800,9 +3804,9 @@ function openLightbox(data, index) {
 
 function closeLightbox() {
   if (!_lightboxOverlay) return;
-  // Stop any playing video
+  // Stop any playing video and release media resources
   const video = _lightboxOverlay.querySelector("video");
-  if (video) { video.pause(); video.src = ""; }
+  if (video) { video.pause(); video.src = ""; video.load(); }
   _lightboxOverlay.style.display = "none";
   if (_lightboxKeyHandler) {
     document.removeEventListener("keydown", _lightboxKeyHandler);
