@@ -31,17 +31,9 @@ NovelAI's model understands ~400k tags. The official UI gives you a blank text b
 
 This app gives you **autocomplete against the full tag database** — with aliases, categories, and usage counts. You also get a **Tag Browser** that lets you explore tags by category (hair, eyes, clothing, poses, expressions...) instead of guessing vocabulary from memory.
 
-<details>
-<summary>Tag autocomplete with category badges and usage counts</summary>
-
 ![Autocomplete dropdown showing tag suggestions with GENERAL/SERIES badges and usage frequency](docs/screenshots/autocomplete.png)
-</details>
-
-<details>
-<summary>Tag Browser — explore by curated categories</summary>
 
 ![Tag Browser panel with categorized tag chips for hair, eyes, expressions, clothing, and more](docs/screenshots/tag-browser.png)
-</details>
 
 ### "I like this image. What made it work?"
 
@@ -58,11 +50,7 @@ You generated something great, but you're not sure which tags actually mattered.
 
 **Variation Dial** — pick a dimension (lighting / art style / composition / mood), hit one button, get 4 systematic variants side by side. Instead of "hmm, would neon lighting look good?" you just *see* warm vs dramatic vs neon vs moonlit in one grid.
 
-<details>
-<summary>Craft panel — Variation Dial, Prompt Autopsy, and Prompt DNA</summary>
-
 ![Craft panel showing Variation Dial with lighting/style/composition/mood dimensions, Prompt Autopsy dropzone, and Prompt DNA analysis](docs/screenshots/craft-panel.png)
-</details>
 
 ### "Positioning two characters is impossible"
 
@@ -70,21 +58,13 @@ The NovelAI API supports multi-character composition with per-character prompts 
 
 Here you get a **visual 2D canvas** — click where each character goes, write individual prompts, define their interaction ("holding hands", "back to back"). Up to 5 characters. Recently used characters are remembered across sessions.
 
-<details>
-<summary>Multi-character composer with per-character prompts</summary>
-
 ![Two character slots with individual prompt fields, interaction controls, and scene composition](docs/screenshots/multi-character.png)
-</details>
 
 ### "I generated 200 images today. Where did that good one go?"
 
 Every generation auto-saves with **full metadata baked into the PNG** — prompt, negative prompt, seed, sampler, steps, all of it. The built-in gallery lets you browse, organize into folders, and — critically — **click any image to reload its exact parameters**. See something from 3 days ago you want to iterate on? One click.
 
-<details>
-<summary>Gallery with search, filters, and metadata</summary>
-
 ![Gallery view with search bar, type filters (All/Image/Video/NovelAI/Grok), and folder navigation](docs/screenshots/gallery.png)
-</details>
 
 ### "I want to use this web image as a reference, but..."
 
