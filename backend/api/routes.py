@@ -240,6 +240,7 @@ async def generate(req: GenerateRequest):
             reference_images=req.reference_images,
             char_captions=req.char_captions,
             use_coords=req.use_coords,
+            mask=req.mask,
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"NovelAI API error: {e}")
@@ -268,7 +269,7 @@ async def grok_generate_image(req: GrokImageRequest):
             aspect_ratio=req.aspect_ratio,
             resolution=req.resolution,
             model=req.model,
-            image=req.image,
+            images=req.images,
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Grok API error: {e}")

@@ -52,6 +52,27 @@
       </div>
     </div>
 
+    <!-- Prompt Focus Mode Overlay -->
+    <div id="prompt-focus-overlay" class="prompt-focus-overlay" style="display:none" role="dialog" aria-modal="true" aria-label="Prompt Editor">
+      <div class="prompt-focus-shell">
+        <div class="prompt-focus-header">
+          <h2>Prompt Editor</h2>
+          <button id="prompt-focus-close" class="guide-close" type="button" aria-label="Close">&times;</button>
+        </div>
+        <div class="prompt-focus-body">
+          <div class="prompt-focus-tabs">
+            <button class="prompt-focus-tab active" data-focus-target="prompt" type="button">Prompt</button>
+            <button class="prompt-focus-tab" data-focus-target="negative-prompt" type="button">Undesired</button>
+          </div>
+          <textarea id="prompt-focus-textarea" class="prompt-focus-textarea" spellcheck="false" placeholder="Describe your vision…"></textarea>
+        </div>
+        <div class="prompt-focus-footer">
+          <span class="prompt-focus-token-count" id="prompt-focus-token-count">~0 tokens</span>
+          <button id="prompt-focus-done" class="btn-action btn-action--confirm" type="button">Done</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Prompt Guide Overlay -->
     <div id="guide-overlay" class="guide-overlay" style="display:none">
       <div class="guide-panel">
@@ -203,8 +224,69 @@
       </div>
     </div>
 
+    <!-- ═══════════════════════════════════════════════════════════
+         INPAINT OVERLAY — full-screen modal for mask painting
+         ═══════════════════════════════════════════════════════════ -->
+    <div id="inpaint-overlay" class="inpaint-overlay" style="display:none" aria-modal="true" role="dialog" aria-label="Paint inpaint mask">
+      <div class="inpaint-shell">
+
+        <div class="inpaint-header">
+          <div class="inpaint-header-left">
+            <div class="inpaint-mode-badge">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              Inpaint
+            </div>
+            <span class="inpaint-hint">Paint over what you want to change</span>
+          </div>
+          <div class="inpaint-header-right">
+            <button id="inpaint-mode-toggle" class="btn-action inpaint-mode-btn" type="button" data-mode="paint" title="Switch between Paint and Erase">
+              <svg class="inpaint-icon-paint" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              <svg class="inpaint-icon-erase" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none"><path d="M20 20H7L3 16l9-9 8 8"/><path d="m6.5 17.5 8-8"/></svg>
+              <span class="inpaint-mode-label">Paint</span>
+            </button>
+            <button id="inpaint-cancel" class="crop-cancel-btn" type="button">Cancel</button>
+          </div>
+        </div>
+
+        <div class="inpaint-stage-wrap">
+          <!-- Source image layer — read-only display -->
+          <canvas id="inpaint-source" class="inpaint-canvas inpaint-canvas--source"></canvas>
+          <!-- Mask layer — receives all pointer events -->
+          <canvas id="inpaint-mask" class="inpaint-canvas inpaint-canvas--mask"></canvas>
+          <!-- Cursor preview circle -->
+          <div id="inpaint-cursor" class="inpaint-cursor" aria-hidden="true"></div>
+        </div>
+
+        <div class="inpaint-footer">
+          <button id="inpaint-clear" class="btn-action btn-action--danger" type="button">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+            Clear Mask
+          </button>
+          <div class="inpaint-brush-control">
+            <label class="field-label" for="inpaint-brush-size">Brush</label>
+            <input type="range" id="inpaint-brush-size" class="field-range inpaint-brush-range" min="4" max="120" step="2" value="32">
+            <span class="slider-value inpaint-brush-val" id="inpaint-brush-val">32</span>
+          </div>
+          <div class="inpaint-footer-actions">
+            <button id="inpaint-undo" class="btn-action" type="button" title="Undo (Cmd+Z / Ctrl+Z)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+              Undo
+            </button>
+            <button id="inpaint-confirm" class="btn-action btn-action--confirm" type="button">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              Generate Inpaint
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
     <!-- Hidden file input for img2img — triggered programmatically -->
     <input type="file" id="img2img-file-input" accept="image/*" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" aria-hidden="true" tabindex="-1">
+
+    <!-- Hidden file input for Grok reference images — triggered programmatically -->
+    <input type="file" id="grok-ref-file-input" accept="image/*" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" aria-hidden="true" tabindex="-1">
 
     <main class="workspace">
 
@@ -224,6 +306,9 @@
               <button class="prompt-tab active" data-target="prompt" type="button">Prompt<span id="scene-label" class="scene-label" style="display:none"> (Scene)</span></button>
               <button class="prompt-tab" data-target="negative-prompt" type="button">Undesired</button>
               <div class="prompt-tab-actions">
+                <button id="prompt-expand-btn" class="btn-expand-prompt" type="button" title="Open in Focus Mode (Cmd+E)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                </button>
                 <label class="pill-toggle" id="quality-tags-pill" title="Auto-prepend quality boost tags">
                   <input type="checkbox" id="quality-tags" checked>
                   <span class="pill-label">Quality</span>
@@ -278,7 +363,23 @@
           </div>
         </details>
 
-        <!-- 2. Image to Image accordion -->
+        <!-- 2. Grok Reference Images accordion (Grok only) -->
+        <details class="accordion grok-only" id="grok-refs-accordion" style="display:none">
+          <summary class="accordion-header">
+            <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
+            Reference Images
+            <span id="grok-refs-badge" class="accordion-badge" style="display:none">0</span>
+          </summary>
+          <div class="accordion-body">
+            <div id="grok-ref-list" class="grok-ref-list"></div>
+            <button id="btn-add-grok-ref" class="btn-action btn-action--primary" type="button" style="width:100%; justify-content:center; margin-top:4px">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Image
+            </button>
+          </div>
+        </details>
+
+        <!-- 3. Image to Image accordion -->
         <details class="accordion" id="img2img-accordion">
           <summary class="accordion-header">
             <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
@@ -577,6 +678,10 @@
               <button id="btn-iterate" class="btn-action btn-action--iterate" type="button">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
                 Iterate
+              </button>
+              <button id="btn-inpaint" class="btn-action btn-action--iterate novelai-only" type="button" style="display:none">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                Inpaint
               </button>
               <button id="btn-download" class="btn-action btn-action--primary" type="button">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>

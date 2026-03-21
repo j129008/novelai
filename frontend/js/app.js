@@ -30,11 +30,17 @@ const state = {
   canvasImageWidth: null,
   canvasImageHeight: null,
   grokOutputType: "image", // "image" | "video" — Grok output mode
+  inpaintMask: null,      // base64 PNG black/white mask for inpainting (NovelAI only)
 };
 
 // ── VIBES ─────────────────────────────────────────────────
 // Each entry: { base64, infoExtracted, strength }
 const vibes = [];
+
+// ── GROK REFERENCE IMAGES ─────────────────────────────────
+// Each entry: { base64 }  — ordered list, up to 5
+const grokRefs = [];
+const MAX_GROK_REFS = 5;
 
 // ── CHARACTER SLOTS ──────────────────────────────────────────
 const characters = [];  // array of { prompt, x, y, positionAuto, interactions } — managed by setupCharacters()
@@ -157,6 +163,9 @@ function applyProvider(provider) {
   // Save to localStorage
   localStorage.setItem("nai-provider", provider);
 
+  // Sync inpaint button visibility (NovelAI + has image)
+  syncInpaintButtonVisibility();
+
   // Fetch Grok usage when switching to Grok
   if (isGrok) fetchGrokUsage();
 }
@@ -238,6 +247,7 @@ async function init() {
   }
 
   setupVibes();
+  setupGrokRefs();
 
   setupImg2ImgControls();
 
@@ -257,10 +267,12 @@ async function init() {
   setupTagBrowser();
   setupGuide();
   setupSettings();
+  setupPromptFocus();
   setupCharacters();
   setupLightbox();
   setupCraftPanel();
   setupExplorePanel();
+  setupInpaint();
 
   // Load recent characters at startup so autocomplete is populated immediately
   loadRecentCharacters();
@@ -1155,6 +1167,149 @@ function setupGuide() {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   PROMPT FOCUS MODE
+   ═══════════════════════════════════════════════════════════ */
+
+function setupPromptFocus() {
+  const overlay     = $("#prompt-focus-overlay");
+  const expandBtn   = $("#prompt-expand-btn");
+  const closeBtn    = $("#prompt-focus-close");
+  const doneBtn     = $("#prompt-focus-done");
+  const focusTa     = $("#prompt-focus-textarea");
+  const tokenCount  = $("#prompt-focus-token-count");
+  const focusTabs   = overlay ? overlay.querySelectorAll(".prompt-focus-tab") : [];
+
+  if (!overlay || !expandBtn || !focusTa) return;
+
+  const sidebarPrompt   = $("#prompt");
+  const sidebarNegative = $("#negative-prompt");
+
+  // The sidebar textarea currently synced with the modal
+  let _activeSidebarTa = sidebarPrompt;
+  let _syncing = false;
+
+  // ── Cleanup ref for the input listener we add on open ───
+  let _modalInputHandler = null;
+
+  function updateTokenCount() {
+    const len = focusTa.value.length;
+    tokenCount.textContent = "~" + Math.ceil(len / 4) + " tokens";
+  }
+
+  function openPromptFocus() {
+    // Determine which sidebar tab is active
+    const activeTab = document.querySelector(".prompt-tab.active");
+    const isNegative = activeTab && activeTab.dataset.target === "negative-prompt";
+    _activeSidebarTa = isNegative ? sidebarNegative : sidebarPrompt;
+
+    // Mirror modal tabs
+    focusTabs.forEach((t) => {
+      t.classList.toggle("active", t.dataset.focusTarget === (isNegative ? "negative-prompt" : "prompt"));
+    });
+
+    // Copy sidebar value into modal
+    focusTa.value = _activeSidebarTa ? _activeSidebarTa.value : "";
+    updateTokenCount();
+
+    // Reset animation and show overlay
+    const shell = overlay.querySelector(".prompt-focus-shell");
+    if (shell) { shell.style.animation = "none"; void shell.offsetWidth; shell.style.animation = ""; }
+    overlay.style.display = "flex";
+
+    // Attach bidirectional sync
+    _modalInputHandler = () => {
+      if (_syncing) return;
+      _syncing = true;
+      if (_activeSidebarTa) {
+        _activeSidebarTa.value = focusTa.value;
+        _activeSidebarTa.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      updateTokenCount();
+      _syncing = false;
+    };
+    focusTa.addEventListener("input", _modalInputHandler);
+
+    // Focus textarea at end
+    focusTa.focus();
+    focusTa.setSelectionRange(focusTa.value.length, focusTa.value.length);
+  }
+
+  function closePromptFocus() {
+    overlay.style.display = "none";
+    _tagAC.hide();
+
+    // Remove input listener
+    if (_modalInputHandler) {
+      focusTa.removeEventListener("input", _modalInputHandler);
+      _modalInputHandler = null;
+    }
+
+    // Return focus to whichever sidebar textarea was active
+    if (_activeSidebarTa) _activeSidebarTa.focus();
+  }
+
+  // ── Tab switching inside modal ───────────────────────────
+  focusTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      focusTabs.forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+
+      const isNeg = tab.dataset.focusTarget === "negative-prompt";
+      const nextTa = isNeg ? sidebarNegative : sidebarPrompt;
+
+      // Flush current modal value to old sidebar ta before switching
+      if (_activeSidebarTa && !_syncing) {
+        _activeSidebarTa.value = focusTa.value;
+        _activeSidebarTa.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+
+      _activeSidebarTa = nextTa;
+
+      // Copy new sidebar ta value into modal
+      focusTa.value = _activeSidebarTa ? _activeSidebarTa.value : "";
+      updateTokenCount();
+      focusTa.focus();
+
+      // Also switch the sidebar tab so they stay in sync
+      const sidebarTab = document.querySelector(`.prompt-tab[data-target="${tab.dataset.focusTarget}"]`);
+      if (sidebarTab) sidebarTab.click();
+    });
+  });
+
+  // ── Event bindings ───────────────────────────────────────
+  expandBtn.addEventListener("click", openPromptFocus);
+  closeBtn.addEventListener("click", closePromptFocus);
+  doneBtn.addEventListener("click", closePromptFocus);
+
+  // Backdrop click (but not shell click)
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closePromptFocus();
+  });
+
+  // Escape key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && overlay.style.display !== "none") {
+      closePromptFocus();
+    }
+  });
+
+  // Cmd+E / Ctrl+E — open from either sidebar textarea
+  [sidebarPrompt, sidebarNegative].forEach((ta) => {
+    if (!ta) return;
+    ta.addEventListener("keydown", (e) => {
+      const trigger = e.metaKey || e.ctrlKey;
+      if (trigger && e.key === "e") {
+        e.preventDefault();
+        openPromptFocus();
+      }
+    });
+  });
+
+  // Attach tag autocomplete to focus textarea once (not on every open)
+  _tagAC.attach(focusTa);
+}
+
+/* ═══════════════════════════════════════════════════════════
    PROMPT TABS
    ═══════════════════════════════════════════════════════════ */
 
@@ -1458,6 +1613,7 @@ const _tagAC = (() => {
         insert(name.replace(/ /g, "_"));
       }
     } else if (e.key === "Escape") {
+      e.stopPropagation();
       hide();
     }
   }
@@ -1694,6 +1850,101 @@ function buildVibeEntry(vibe, idx) {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   GROK REFERENCE IMAGES
+   ═══════════════════════════════════════════════════════════ */
+
+function setupGrokRefs() {
+  const addBtn = $("#btn-add-grok-ref");
+  const fileInput = $("#grok-ref-file-input");
+  if (!addBtn || !fileInput) return;
+
+  addBtn.addEventListener("click", () => {
+    if (grokRefs.length >= MAX_GROK_REFS) return;
+    fileInput.value = "";
+    fileInput.click();
+  });
+
+  fileInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target.result.split(",")[1];
+      grokRefs.push({ base64 });
+      renderGrokRefList();
+    };
+    reader.readAsDataURL(file);
+    fileInput.value = "";
+  });
+
+  renderGrokRefList();
+}
+
+function renderGrokRefList() {
+  const list = $("#grok-ref-list");
+  const addBtn = $("#btn-add-grok-ref");
+  const badge = $("#grok-refs-badge");
+  if (!list) return;
+
+  list.innerHTML = "";
+
+  if (grokRefs.length === 0) {
+    const hint = document.createElement("p");
+    hint.className = "grok-ref-empty-hint";
+    hint.textContent = 'Add reference images. Mention them in your prompt: \'in the style of the second image\'';
+    list.appendChild(hint);
+  } else {
+    grokRefs.forEach((ref, idx) => {
+      list.appendChild(buildGrokRefSlot(ref, idx));
+    });
+  }
+
+  if (addBtn) addBtn.disabled = grokRefs.length >= MAX_GROK_REFS;
+
+  if (badge) {
+    if (grokRefs.length > 0) {
+      badge.textContent = String(grokRefs.length);
+      badge.style.display = "";
+    } else {
+      badge.style.display = "none";
+    }
+  }
+}
+
+function buildGrokRefSlot(ref, idx) {
+  const slot = document.createElement("div");
+  slot.className = "grok-ref-slot";
+
+  // Number badge
+  const num = document.createElement("span");
+  num.className = "grok-ref-number";
+  num.textContent = String(idx + 1);
+  num.setAttribute("aria-hidden", "true");
+  slot.appendChild(num);
+
+  // Thumbnail
+  const thumb = document.createElement("img");
+  thumb.className = "grok-ref-thumb";
+  thumb.src = `data:image/png;base64,${ref.base64}`;
+  thumb.alt = `Reference image ${idx + 1}`;
+  slot.appendChild(thumb);
+
+  // Remove button
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "vibe-remove-btn";
+  removeBtn.setAttribute("aria-label", `Remove reference image ${idx + 1}`);
+  removeBtn.textContent = "×";
+  removeBtn.addEventListener("click", () => {
+    grokRefs.splice(idx, 1);
+    renderGrokRefList();
+  });
+  slot.appendChild(removeBtn);
+
+  return slot;
+}
+
+/* ═══════════════════════════════════════════════════════════
    GENERATE
    ═══════════════════════════════════════════════════════════ */
 
@@ -1715,6 +1966,8 @@ function resetGenerateButton() {
   btn.querySelector(".btn-generate-label").textContent = isVideo ? "Generate Video" : "Generate";
   btn.querySelector(".btn-generate-hint").textContent = "Enter";
   _generateAbortController = null;
+  const inpaintBtn = document.getElementById("btn-inpaint");
+  if (inpaintBtn) inpaintBtn.disabled = false;
 }
 
 async function generate() {
@@ -1773,7 +2026,11 @@ async function generate() {
     use_coords: characters.some((c) => !c.positionAuto),
   };
 
-  if (state.img2img) {
+  if (state.inpaintMask) {
+    // Inpaint mode: supply both the source image and the binary mask
+    body.image = state.canvasImageBase64;
+    body.mask  = state.inpaintMask;
+  } else if (state.img2img) {
     body.image = state.img2img;
   }
 
@@ -1791,6 +2048,8 @@ async function generate() {
   btn.disabled = true;
   btn.classList.add("loading");
   clearError();
+  const inpaintBtn = document.getElementById("btn-inpaint");
+  if (inpaintBtn) inpaintBtn.disabled = true;
 
   _generateAbortController = new AbortController();
 
@@ -1833,6 +2092,7 @@ async function generate() {
 
     const actions = $("#image-actions");
     actions.style.display = "flex";
+    syncInpaintButtonVisibility();
     $("#info-seed").textContent = `Seed: ${data.seed}`;
 
     loadGallery();
@@ -1860,8 +2120,356 @@ async function generate() {
       showError(e.message);
     }
   } finally {
+    state.inpaintMask = null;
     resetGenerateButton();
   }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INPAINT — mask painting overlay
+   ═══════════════════════════════════════════════════════════ */
+
+// Call this whenever the canvas image state or provider changes
+// to show/hide the Inpaint button in #image-actions.
+function syncInpaintButtonVisibility() {
+  const btn = document.getElementById("btn-inpaint");
+  if (!btn) return;
+  const provider = document.getElementById("provider")?.value || "novelai";
+  const hasImage = !!state.canvasImageBase64;
+  btn.style.display = (hasImage && provider === "novelai") ? "" : "none";
+}
+
+function setupInpaint() {
+  const overlay  = document.getElementById("inpaint-overlay");
+  const btnOpen  = document.getElementById("btn-inpaint");
+  const btnCancel = document.getElementById("inpaint-cancel");
+  const btnConfirm = document.getElementById("inpaint-confirm");
+  const btnClear = document.getElementById("inpaint-clear");
+  const btnUndo  = document.getElementById("inpaint-undo");
+  const btnMode  = document.getElementById("inpaint-mode-toggle");
+  const brushSlider = document.getElementById("inpaint-brush-size");
+  const brushVal = document.getElementById("inpaint-brush-val");
+  const srcCanvas  = document.getElementById("inpaint-source");
+  const maskCanvas = document.getElementById("inpaint-mask");
+  const cursorEl   = document.getElementById("inpaint-cursor");
+  const stageWrap  = overlay?.querySelector(".inpaint-stage-wrap");
+
+  if (!overlay || !btnOpen || !srcCanvas || !maskCanvas) return;
+
+  const srcCtx  = srcCanvas.getContext("2d");
+  const maskCtx = maskCanvas.getContext("2d");
+
+  // Offscreen canvas — same pixel dimensions as source image, pure B&W
+  const offscreen    = document.createElement("canvas");
+  const offCtx       = offscreen.getContext("2d");
+  // Keep default anti-aliasing on — smooth brush edges improve inpaint quality
+
+  // Inpaint state
+  let brushSize   = 32;
+  let eraseMode   = false;
+  let isDrawing   = false;
+  let lastX       = 0;
+  let lastY       = 0;
+  let scaleX      = 1;  // offscreen / display scale
+  let scaleY      = 1;
+  // Undo stack — each entry is { mask: ImageData, off: ImageData }
+  const undoStack  = [];
+  const MAX_UNDO   = 20;
+
+  // ── Open overlay ─────────────────────────────────────────
+  function openInpaint() {
+    if (!state.canvasImageBase64) return;
+
+    const img = new Image();
+    img.onload = () => {
+      const imgW = img.naturalWidth;
+      const imgH = img.naturalHeight;
+
+      // Show overlay first so stageWrap has layout dimensions.
+      // Force animation replay (per learnings 2026-03-22).
+      overlay.style.animation = "none";
+      const shell = overlay.querySelector(".inpaint-shell");
+      if (shell) shell.style.animation = "none";
+      overlay.style.display = "flex";
+      void overlay.offsetWidth;
+      overlay.style.animation = "";
+      if (shell) shell.style.animation = "";
+
+      // Offscreen canvas at full image resolution
+      offscreen.width  = imgW;
+      offscreen.height = imgH;
+      offCtx.fillStyle = "#000000";
+      offCtx.fillRect(0, 0, imgW, imgH);
+
+      // Compute display size: fit within stageWrap (now visible)
+      const stageRect = stageWrap.getBoundingClientRect();
+      const stageW = stageRect.width  || stageWrap.offsetWidth;
+      const stageH = stageRect.height || stageWrap.offsetHeight;
+      const fitScale = Math.min(stageW / imgW, stageH / imgH, 1);
+      const dispW = Math.round(imgW * fitScale);
+      const dispH = Math.round(imgH * fitScale);
+      const offsetX = Math.round((stageW - dispW) / 2);
+      const offsetY = Math.round((stageH - dispH) / 2);
+
+      scaleX = imgW / dispW;
+      scaleY = imgH / dispH;
+
+      // Size both visible canvases identically
+      srcCanvas.width  = dispW;
+      srcCanvas.height = dispH;
+      maskCanvas.width = dispW;
+      maskCanvas.height = dispH;
+
+      // Position them centred in the stage
+      [srcCanvas, maskCanvas].forEach((c) => {
+        c.style.left   = offsetX + "px";
+        c.style.top    = offsetY + "px";
+        c.style.width  = dispW + "px";
+        c.style.height = dispH + "px";
+      });
+
+      // Draw source image
+      srcCtx.drawImage(img, 0, 0, dispW, dispH);
+
+      // Clear mask canvas
+      maskCtx.clearRect(0, 0, dispW, dispH);
+
+      // Clear undo stack
+      undoStack.length = 0;
+
+      // Reset mode and brush
+      setMode("paint");
+      updateBrushSize(parseInt(brushSlider.value, 10));
+    };
+    img.src = `data:image/png;base64,${state.canvasImageBase64}`;
+  }
+
+  // ── Close overlay ─────────────────────────────────────────
+  function closeInpaint() {
+    overlay.style.display = "none";
+    cursorEl.style.display = "none";
+  }
+
+  // ── Mode toggle ───────────────────────────────────────────
+  function setMode(mode) {
+    eraseMode = (mode === "erase");
+    btnMode.dataset.mode = mode;
+    const iconPaint = btnMode.querySelector(".inpaint-icon-paint");
+    const iconErase = btnMode.querySelector(".inpaint-icon-erase");
+    const label     = btnMode.querySelector(".inpaint-mode-label");
+    if (iconPaint) iconPaint.style.display = eraseMode ? "none" : "";
+    if (iconErase) iconErase.style.display = eraseMode ? "" : "none";
+    if (label)     label.textContent       = eraseMode ? "Erase" : "Paint";
+  }
+
+  btnMode.addEventListener("click", () => {
+    setMode(eraseMode ? "paint" : "erase");
+  });
+
+  // ── Brush size ────────────────────────────────────────────
+  function updateBrushSize(val) {
+    brushSize = val;
+    brushVal.textContent = val;
+    cursorEl.style.width  = val + "px";
+    cursorEl.style.height = val + "px";
+  }
+
+  brushSlider.addEventListener("input", () => {
+    updateBrushSize(parseInt(brushSlider.value, 10));
+  });
+
+  // ── Draw helpers ──────────────────────────────────────────
+  function drawAt(dispX, dispY, isFirst) {
+    const r = brushSize / 2;
+
+    // Visible mask canvas
+    maskCtx.save();
+    if (eraseMode) {
+      maskCtx.globalCompositeOperation = "destination-out";
+      maskCtx.fillStyle = "rgba(0,0,0,1)";
+    } else {
+      maskCtx.globalCompositeOperation = "source-over";
+      maskCtx.fillStyle = "rgba(240,80,80,0.55)";
+    }
+
+    if (!isFirst) {
+      // Interpolate between lastX/lastY and dispX/dispY to fill gaps
+      const dx = dispX - lastX;
+      const dy = dispY - lastY;
+      const dist = Math.hypot(dx, dy);
+      const step = Math.max(r * 0.4, 1);
+      const steps = Math.ceil(dist / step);
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        const cx = lastX + dx * t;
+        const cy = lastY + dy * t;
+        maskCtx.beginPath();
+        maskCtx.arc(cx, cy, r, 0, Math.PI * 2);
+        maskCtx.fill();
+      }
+    } else {
+      maskCtx.beginPath();
+      maskCtx.arc(dispX, dispY, r, 0, Math.PI * 2);
+      maskCtx.fill();
+    }
+    maskCtx.restore();
+
+    // Offscreen mask canvas (pure B&W, at image resolution)
+    const offX = dispX * scaleX;
+    const offY = dispY * scaleY;
+    const offR = r * Math.max(scaleX, scaleY);
+
+    offCtx.save();
+    if (eraseMode) {
+      offCtx.globalCompositeOperation = "source-over";
+      offCtx.fillStyle = "#000000";
+    } else {
+      offCtx.globalCompositeOperation = "source-over";
+      offCtx.fillStyle = "#ffffff";
+    }
+
+    if (!isFirst) {
+      const offLastX = lastX * scaleX;
+      const offLastY = lastY * scaleY;
+      const dx = offX - offLastX;
+      const dy = offY - offLastY;
+      const dist = Math.hypot(dx, dy);
+      const step = Math.max(offR * 0.4, 1);
+      const steps = Math.ceil(dist / step);
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        const cx = offLastX + dx * t;
+        const cy = offLastY + dy * t;
+        offCtx.beginPath();
+        offCtx.arc(cx, cy, offR, 0, Math.PI * 2);
+        offCtx.fill();
+      }
+    } else {
+      offCtx.beginPath();
+      offCtx.arc(offX, offY, offR, 0, Math.PI * 2);
+      offCtx.fill();
+    }
+    offCtx.restore();
+  }
+
+  // ── Undo ──────────────────────────────────────────────────
+  function saveUndoSnapshot() {
+    if (maskCanvas.width === 0 || maskCanvas.height === 0) return;
+    const maskSnap = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+    const offSnap  = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+    if (undoStack.length >= MAX_UNDO) undoStack.shift();
+    undoStack.push({ mask: maskSnap, off: offSnap });
+  }
+
+  function undo() {
+    if (undoStack.length === 0) return;
+    const snap = undoStack.pop();
+    maskCtx.putImageData(snap.mask, 0, 0);
+    offCtx.putImageData(snap.off, 0, 0);
+  }
+
+  btnUndo.addEventListener("click", undo);
+
+  // ── Clear mask ────────────────────────────────────────────
+  btnClear.addEventListener("click", () => {
+    saveUndoSnapshot();
+    maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+    offCtx.fillStyle = "#000000";
+    offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
+  });
+
+  // ── Pointer events ────────────────────────────────────────
+  function getCanvasPos(e) {
+    const rect = maskCanvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (maskCanvas.width / rect.width),
+      y: (e.clientY - rect.top)  * (maskCanvas.height / rect.height),
+    };
+  }
+
+  maskCanvas.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    maskCanvas.setPointerCapture(e.pointerId);
+    saveUndoSnapshot();
+    isDrawing = true;
+    const pos = getCanvasPos(e);
+    lastX = pos.x;
+    lastY = pos.y;
+    drawAt(pos.x, pos.y, true);
+  });
+
+  maskCanvas.addEventListener("pointermove", (e) => {
+    // Move cursor preview
+    const rect = maskCanvas.getBoundingClientRect();
+    const stageRect = stageWrap.getBoundingClientRect();
+    cursorEl.style.display = "block";
+    cursorEl.style.left = (e.clientX - stageRect.left) + "px";
+    cursorEl.style.top  = (e.clientY - stageRect.top)  + "px";
+
+    if (!isDrawing) return;
+    e.preventDefault();
+    const pos = getCanvasPos(e);
+    drawAt(pos.x, pos.y, false);
+    lastX = pos.x;
+    lastY = pos.y;
+  });
+
+  maskCanvas.addEventListener("pointerup", () => {
+    isDrawing = false;
+  });
+
+  maskCanvas.addEventListener("pointerleave", () => {
+    isDrawing = false;
+    cursorEl.style.display = "none";
+  });
+
+  maskCanvas.addEventListener("pointercancel", () => {
+    isDrawing = false;
+    cursorEl.style.display = "none";
+  });
+
+  // ── Keyboard: Cmd/Ctrl+Z undo ─────────────────────────────
+  document.addEventListener("keydown", (e) => {
+    if (overlay.style.display === "none") return;
+    if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+      e.preventDefault();
+      undo();
+    }
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      closeInpaint();
+    }
+  });
+
+  // ── Confirm ───────────────────────────────────────────────
+  btnConfirm.addEventListener("click", () => {
+    // Validate: check that the offscreen mask has at least some painted pixels
+    const imgData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+    const data = imgData.data;
+    let hasWhite = false;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] > 128) { hasWhite = true; break; }
+    }
+    if (!hasWhite) {
+      showError("Paint a mask over the area you want to change before generating.");
+      return;
+    }
+
+    // Export offscreen canvas as pure B&W PNG
+    const dataUrl = offscreen.toDataURL("image/png");
+    state.inpaintMask = dataUrl.replace("data:image/png;base64,", "");
+
+    closeInpaint();
+    generate();
+  });
+
+  // ── Cancel ────────────────────────────────────────────────
+  btnCancel.addEventListener("click", closeInpaint);
+
+  // ── Open button ───────────────────────────────────────────
+  btnOpen.addEventListener("click", () => {
+    openInpaint();
+  });
 }
 
 function reuseSeed() {
@@ -1912,9 +2520,12 @@ async function generateGrokImage() {
     model: quality === "pro" ? "grok-imagine-image-pro" : "grok-imagine-image",
   };
 
-  // Include img2img source if explicitly set (paste/drag/explore)
-  if (state.img2img) {
-    body.image = state.img2img;
+  // Include reference images if any are provided (replaces single img2img for Grok)
+  if (grokRefs.length > 0) {
+    body.images = grokRefs.map((r) => r.base64);
+  } else if (state.img2img) {
+    // Fallback: use img2img source if set without explicit grok refs
+    body.images = [state.img2img];
   }
 
   btn.disabled = true;
@@ -1963,6 +2574,7 @@ async function generateGrokImage() {
 
     const actions = $("#image-actions");
     if (actions) actions.style.display = "flex";
+    syncInpaintButtonVisibility();
     const infoSeed = $("#info-seed");
     if (infoSeed) infoSeed.textContent = "Grok";
 
@@ -2117,6 +2729,7 @@ async function generateGrokVideo() {
 
     const actions = $("#image-actions");
     if (actions) actions.style.display = "flex";
+    syncInpaintButtonVisibility();
     const infoSeed = $("#info-seed");
     if (infoSeed) infoSeed.textContent = "Grok Video";
 

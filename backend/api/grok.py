@@ -25,25 +25,33 @@ async def generate_image(
     aspect_ratio: str = "1:1",
     resolution: str = "1k",
     model: str = "grok-imagine-image",
-    image: str | None = None,
+    images: list[str] | None = None,
 ) -> bytes:
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
 
-    if image:
+    if images:
         # Image editing mode — use /v1/images/edits
-        payload = {
+        payload: dict = {
             "model": model,
             "prompt": prompt,
-            "image": {
-                "url": f"data:image/png;base64,{image}",
-                "type": "image_url",
-            },
             "response_format": "b64_json",
             "n": 1,
         }
+        if len(images) == 1:
+            # Single image: use singular "image" key for backward compatibility
+            payload["image"] = {
+                "url": f"data:image/png;base64,{images[0]}",
+                "type": "image_url",
+            }
+        else:
+            # Multiple images: use "images" array format
+            payload["images"] = [
+                {"url": f"data:image/png;base64,{img}", "type": "image_url"}
+                for img in images
+            ]
         url = IMAGE_EDIT_URL
     else:
         # Text-to-image generation — "auto" is not valid for generation

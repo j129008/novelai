@@ -27,11 +27,15 @@ The NovelAI API response is a ZIP archive containing a single PNG file.  The see
 for generation is tracked locally and returned alongside the image bytes so callers can
 embed it in the saved filename and in the response to the browser.
 """
+import base64
 import httpx
 import io
 import random
 import zipfile
 from typing import Optional
+
+import numpy as np
+from PIL import Image, ImageFilter
 
 from models.schemas import CharCaption, CharCenter, VibeImage
 
@@ -68,6 +72,7 @@ async def generate_image(
     reference_images: Optional[list[VibeImage]] = None,
     char_captions: Optional[list[CharCaption]] = None,
     use_coords: Optional[bool] = None,
+    mask: Optional[str] = None,
 ) -> tuple[bytes, int]:
     if reference_images is None:
         reference_images = []
@@ -131,7 +136,19 @@ async def generate_image(
         }
         params["characterPrompts"] = []
 
-    if action == "img2img" and image:
+    if mask:
+        # Use img2img action with base model (NOT -inpainting model which
+        # produces gray content). The mask tells the model where to focus
+        # regeneration. We composite ourselves for seamless edges.
+        action = "img2img"
+        params["image"] = image
+        params["mask"] = mask
+        params["strength"] = strength
+        params["noise"] = noise
+        params["add_original_image"] = False
+        params["sm"] = False
+        params["sm_dyn"] = False
+    elif action == "img2img" and image:
         params["image"] = image
         params["strength"] = strength
         params["noise"] = noise
@@ -164,5 +181,25 @@ async def generate_image(
         with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
             name = zf.namelist()[0]
             image_data = zf.read(name)
+
+    # Inpaint compositing: img2img regenerates the entire image, so we
+    # composite the generated content (inside mask) with the original
+    # (outside mask) using a feathered mask for seamless edges.
+    if mask and image:
+        original = Image.open(io.BytesIO(base64.b64decode(image))).convert("RGB")
+        generated = Image.open(io.BytesIO(image_data)).convert("RGB")
+        comp_mask = Image.open(io.BytesIO(base64.b64decode(mask))).convert("L")
+
+        if comp_mask.size != original.size:
+            comp_mask = comp_mask.resize(original.size, Image.NEAREST)
+        if generated.size != original.size:
+            generated = generated.resize(original.size, Image.LANCZOS)
+
+        comp_mask = comp_mask.filter(ImageFilter.GaussianBlur(radius=8))
+
+        result = Image.composite(generated, original, comp_mask)
+        out_buf = io.BytesIO()
+        result.save(out_buf, format="PNG")
+        image_data = out_buf.getvalue()
 
     return image_data, seed

@@ -51,10 +51,11 @@ class GenerateRequest(BaseModel):
     sm_dyn: bool = False
     noise_schedule: VALID_NOISE_SCHEDULES = "karras"
     cfg_rescale: float = Field(default=0.0, ge=0, le=1)
-    # img2img
+    # img2img / inpaint
     image: Optional[str] = None  # base64
     strength: float = Field(default=0.7, ge=0, le=1)
     noise: float = Field(default=0.0, ge=0, le=1)
+    mask: Optional[str] = None  # base64 PNG — inpaint mask
     # vibe transfer
     reference_images: list[VibeImage] = Field(default_factory=list)
     # multi-character composer
@@ -145,7 +146,7 @@ class GrokImageRequest(BaseModel):
     aspect_ratio: VALID_GROK_ASPECT_RATIOS = "1:1"
     resolution: VALID_GROK_IMAGE_RESOLUTIONS = "1k"
     model: VALID_GROK_IMAGE_MODELS = "grok-imagine-image"
-    image: Optional[str] = None  # base64 source image for editing
+    images: Optional[list[Annotated[str, Field(min_length=1)]]] = Field(default=None, max_length=5)  # base64 source images for editing
 
 
 class GrokVideoRequest(BaseModel):
