@@ -553,6 +553,40 @@ async def delete_gallery_image(filename: str, path: str = Query(default="")):
     return {"deleted": filename}
 
 
+class MoveFileRequest(BaseModel):
+    filename: str
+    source_path: str = ""
+    dest_folder: str
+
+
+@router.post("/gallery/move")
+async def move_gallery_file(req: MoveFileRequest):
+    out = _get_output_dir()
+    source = _resolve_gallery_path(out, req.source_path) / req.filename
+    source = source.resolve()
+    if not source.exists() or not source.is_relative_to(out.resolve()):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # Create destination folder if it doesn't exist
+    dest_dir = _resolve_gallery_path(out, req.dest_folder)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    dest = dest_dir / req.filename
+    if dest.exists():
+        raise HTTPException(status_code=409, detail="File already exists in destination")
+
+    source.rename(dest)
+    return {"moved": req.filename, "to": req.dest_folder}
+
+
+@router.post("/gallery/create-folder")
+async def create_gallery_folder(req: MoveFileRequest):
+    out = _get_output_dir()
+    folder = _resolve_gallery_path(out, req.dest_folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    return {"created": req.dest_folder}
+
+
 class SettingsUpdate(BaseModel):
     output_dir: str | None = None
 

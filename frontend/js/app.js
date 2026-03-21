@@ -3214,6 +3214,7 @@ function setupTagBrowser() {
 
 let _galleryData = [];
 let _galleryPath = "";
+let _galleryTypeFilter = "all";
 let _settingsLoadedToast = null;
 
 function setupHistoryTabs() {
@@ -3318,6 +3319,104 @@ function setupHistoryTabs() {
       renderGallery(_galleryData, [], searchInput.value.toLowerCase());
     });
   }
+
+  // Gallery type filters
+  document.querySelectorAll(".gallery-filter").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".gallery-filter").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      _galleryTypeFilter = btn.dataset.filter;
+      const searchVal = (searchInput?.value || "").toLowerCase();
+      renderGallery(_galleryData, [], searchVal);
+    });
+  });
+}
+
+async function showMoveDialog(filename) {
+  // Fetch existing folders
+  let folders = [];
+  try {
+    const resp = await fetch("/api/gallery" + (_galleryPath ? "?path=" + encodeURIComponent(_galleryPath) : ""));
+    if (resp.ok) {
+      const data = await resp.json();
+      folders = data.directories || [];
+    }
+  } catch {}
+
+  // Remove any existing dialog
+  document.querySelector(".move-dialog-overlay")?.remove();
+
+  const overlay = document.createElement("div");
+  overlay.className = "move-dialog-overlay";
+
+  const dialog = document.createElement("div");
+  dialog.className = "move-dialog";
+
+  dialog.innerHTML = `
+    <div class="move-dialog-title">移動「${filename}」到…</div>
+    <div class="move-dialog-folders"></div>
+    <div class="move-dialog-new">
+      <input type="text" class="move-dialog-input" placeholder="新資料夾名稱…" spellcheck="false">
+      <button type="button" class="btn-action btn-action--primary move-dialog-create">建立並移動</button>
+    </div>
+    <button type="button" class="btn-action move-dialog-cancel">取消</button>
+  `;
+
+  const foldersEl = dialog.querySelector(".move-dialog-folders");
+  for (const folder of folders) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn-action move-dialog-folder-btn";
+    btn.textContent = folder;
+    btn.addEventListener("click", async () => {
+      const dest = _galleryPath ? _galleryPath + "/" + folder : folder;
+      await doMove(filename, dest);
+      overlay.remove();
+    });
+    foldersEl.appendChild(btn);
+  }
+
+  const input = dialog.querySelector(".move-dialog-input");
+  const createBtn = dialog.querySelector(".move-dialog-create");
+  createBtn.addEventListener("click", async () => {
+    const name = input.value.trim();
+    if (!name) return;
+    const dest = _galleryPath ? _galleryPath + "/" + name : name;
+    await doMove(filename, dest);
+    overlay.remove();
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) {
+      e.preventDefault();
+      createBtn.click();
+    }
+  });
+
+  dialog.querySelector(".move-dialog-cancel").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+  input.focus();
+}
+
+async function doMove(filename, destFolder) {
+  try {
+    const resp = await fetch("/api/gallery/move", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename, source_path: _galleryPath, dest_folder: destFolder }),
+    });
+    if (resp.ok) {
+      loadGallery();
+      showStatus(`已移動到 ${destFolder}`);
+    } else {
+      const err = await resp.json().catch(() => ({}));
+      showError(err.detail || "移動失敗");
+    }
+  } catch {
+    showError("移動失敗");
+  }
 }
 
 function showSettingsLoadedToast() {
@@ -3416,15 +3515,27 @@ function renderGallery(files, directories, filter) {
   const empty = $("#gallery-empty");
   if (!list) return;
 
+  // Apply type/source filter
+  let typeFiltered = files;
+  if (_galleryTypeFilter === "image") {
+    typeFiltered = files.filter(f => !f.name.toLowerCase().endsWith(".mp4"));
+  } else if (_galleryTypeFilter === "video") {
+    typeFiltered = files.filter(f => f.name.toLowerCase().endsWith(".mp4"));
+  } else if (_galleryTypeFilter === "grok") {
+    typeFiltered = files.filter(f => f.name.includes("-grok"));
+  } else if (_galleryTypeFilter === "novelai") {
+    typeFiltered = files.filter(f => !f.name.includes("-grok"));
+  }
+
   const filtered = filter
-    ? files.filter((f) => {
+    ? typeFiltered.filter((f) => {
         const meta = f.meta || {};
         return (meta.prompt || "").toLowerCase().includes(filter)
           || (meta.uc || "").toLowerCase().includes(filter)
           || String(meta.seed || "").includes(filter)
           || f.name.toLowerCase().includes(filter);
       })
-    : files;
+    : typeFiltered;
 
   // When searching, directories are hidden (not searchable by design)
   const visibleDirs = filter ? [] : (directories || []);
@@ -3560,8 +3671,19 @@ function renderGallery(files, directories, filter) {
       else { card.style.opacity = ""; card.style.pointerEvents = ""; }
     });
 
+    const moveBtn = document.createElement("button");
+    moveBtn.className = "history-card-action-btn history-card-action-btn--move";
+    moveBtn.type = "button";
+    moveBtn.title = "Move to folder";
+    moveBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
+    moveBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showMoveDialog(file.name);
+    });
+
     actionBar.appendChild(iterateBtn);
     actionBar.appendChild(loadBtn);
+    actionBar.appendChild(moveBtn);
     actionBar.appendChild(delBtn);
 
     // Clicking the image area opens the lightbox

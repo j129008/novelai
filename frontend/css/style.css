@@ -274,6 +274,36 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 .gallery-breadcrumb-sep { color: var(--text-tertiary); user-select: none; }
 .gallery-breadcrumb-current { color: var(--text-primary); cursor: default; }
 
+/* Gallery filters */
+.gallery-filters { display: flex; gap: 4px; padding: 0 0 8px; flex-shrink: 0; flex-wrap: wrap; }
+.gallery-filter {
+  background: var(--bg-overlay); border: 1px solid var(--border-muted); color: var(--text-secondary);
+  font-size: 0.72rem; padding: 3px 10px; border-radius: 10px; cursor: pointer; transition: all 0.15s;
+}
+.gallery-filter:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.gallery-filter.active { background: var(--accent-dim); border-color: rgba(124,92,252,0.4); color: var(--accent-bright); }
+
+/* Move dialog */
+.move-dialog-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+}
+.move-dialog {
+  background: var(--bg-surface); border: 1px solid var(--border-muted); border-radius: var(--radius-md);
+  padding: 20px; width: 320px; max-width: 90vw; display: flex; flex-direction: column; gap: 12px;
+}
+.move-dialog-title { font-size: 0.88rem; color: var(--text-primary); font-weight: 600; }
+.move-dialog-folders { display: flex; flex-wrap: wrap; gap: 6px; }
+.move-dialog-folder-btn { font-size: 0.78rem; }
+.move-dialog-new { display: flex; gap: 6px; }
+.move-dialog-input {
+  flex: 1; background: var(--bg-deep); border: 1px solid var(--border-muted); border-radius: var(--radius-sm);
+  color: var(--text-primary); padding: 6px 10px; font-size: 0.8rem; outline: none;
+}
+.move-dialog-input:focus { border-color: var(--accent); }
+.move-dialog-create { font-size: 0.75rem; white-space: nowrap; }
+.move-dialog-cancel { font-size: 0.78rem; align-self: flex-end; }
+
 /* Gallery folder cards */
 .gallery-folder-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: var(--bg-float); border: 1px solid var(--border-muted); border-radius: var(--radius-md); cursor: pointer; padding: 16px; min-height: 100px; transition: border-color 0.15s, background 0.15s; }
 .gallery-folder-card:hover { border-color: var(--accent); background: var(--bg-overlay); }
