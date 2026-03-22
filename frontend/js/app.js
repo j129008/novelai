@@ -2014,10 +2014,12 @@ async function generate() {
     use_coords: characters.some((c) => !c.positionAuto),
   };
 
-  // Layers take priority over manual img2img source (when enabled)
+  // Layers composite → img2img source (when enabled)
   const layersEnabled = document.getElementById("layers-enabled");
   if (layersEnabled && layersEnabled.checked && layers.some((l) => l.visible && l.imageBase64)) {
     state.img2img = await compositeLayersToBase64(width, height);
+  } else {
+    state.img2img = null; // No layers active → pure text-to-image
   }
 
   const inpaintLayer = layers.find(l => l.inpaintMaskBase64);
@@ -2599,11 +2601,22 @@ function buildLayerRow(layer, realIdx) {
   inpaintBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>';
 
   inpaintBtn.addEventListener("click", () => {
+    // Right-click or long-press clears; regular click opens editor
     openLayerInpaintEditor(layer, () => {
       inpaintBtn.classList.toggle("layer-inpaint-btn--active", !!layer.inpaintMaskBase64);
-      inpaintBtn.title = layer.inpaintMaskBase64 ? "Edit inpaint mask (active)" : "Add inpaint mask";
+      inpaintBtn.title = layer.inpaintMaskBase64 ? "Edit inpaint mask (click to edit, right-click to clear)" : "Add inpaint mask";
       saveLayersToStorage();
     });
+  });
+  inpaintBtn.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    if (layer.inpaintMaskBase64) {
+      layer.inpaintMaskBase64 = null;
+      inpaintBtn.classList.remove("layer-inpaint-btn--active");
+      inpaintBtn.title = "Add inpaint mask";
+      saveLayersToStorage();
+      showStatus("Inpaint mask cleared");
+    }
   });
 
   // ── Output target button ──────────────────────────────────
@@ -3876,7 +3889,12 @@ function setupInpaint() {
       if (d[i] > 128) { hasWhite = true; break; }
     }
     if (!hasWhite) {
-      showError("Paint a mask over the area you want to change.");
+      // No mask painted — clear the inpaint mask (disable inpainting)
+      _currentLayer.inpaintMaskBase64 = null;
+      const cb = _onConfirmCb;
+      closeInpaint();
+      if (cb) cb();
+      showStatus("Inpaint mask cleared");
       return;
     }
 
