@@ -55,6 +55,10 @@ You generated something great but you're not sure which tags mattered. Was it `d
 - **Contrasts** — tags from a different direction (break out of creative ruts)
 - **Wildcards** — random picks for happy accidents
 
+### Prompt Focus Mode
+
+When the main prompt field isn't enough space, press **Cmd+E** (or Ctrl+E on Windows/Linux) to open a centered full-screen editor. Tabs switch between Prompt and Undesired Content. A live token counter shows how much of your budget you're using. Close with Done or Escape — changes sync back to the main field instantly.
+
 ### Compare variations systematically, not one at a time
 
 **Variation Dial** — pick a dimension (lighting / art style / composition / mood), hit one button, get 4 systematic variants side by side. Instead of "would neon lighting look good?" you just *see* warm vs dramatic vs neon vs moonlit in one grid.
@@ -69,9 +73,30 @@ Here you get a **visual 2D canvas** — click where each character goes, write i
 
 ![Two character slots with individual prompt fields, interaction controls, and scene composition](docs/screenshots/multi-character.png)
 
+### Composite multiple images with the Layers system
+
+Stack images as layers and send the merged result to the model as img2img input.
+
+Each layer supports:
+- **Opacity and visibility** — control how much each layer contributes
+- **Drag to reorder** — change stacking order by dragging
+- **Visibility masks** — Reveal (show only painted area) or Hide (erase painted area) per layer
+- **Inpaint masks** — paint a region on any layer; the mask persists across generations so you can refine the same area repeatedly
+- **Draw editor** — color picker, brush, and fill tool for painting directly on a layer
+- **Move/position** — drag a layer's content on the canvas to reposition it
+- **Output target** — designate which layer receives new generation results
+- **Live composite preview** — the canvas updates in real time as you adjust layers
+- **Transformation and Variation sliders** — control how closely the model follows the composite and how much variation to introduce
+
+### Inpaint
+
+Open the inpaint editor on any generated image. Paint a mask over the area you want to change, then generate — the model regenerates only the masked region and composites it back into the original. Undo support and adjustable brush size are included. Works with both NovelAI and via the Layers inpaint mask.
+
 ### Find that one good image from 200 you generated today
 
 Every generation auto-saves with **full metadata baked into the PNG** — prompt, negative prompt, seed, sampler, steps, all of it. The built-in gallery lets you browse, organize into folders, and **click any image to reload its exact parameters**. One click to resume iteration on anything from any session.
+
+The **History lightbox** now includes a **Slideshow** mode — press Play and images advance automatically, videos play to completion before advancing. Full-screen support is included.
 
 ![Gallery view with search bar, type filters (All/Image/Video/NovelAI/Grok), and folder navigation](docs/screenshots/gallery.png)
 
@@ -87,8 +112,13 @@ Or **Cmd+V** a clipboard image directly.
 
 Same prompt field, same gallery, same workflow. Grok adds:
 - Image generation and image editing (modify existing images with text)
+- **Up to 5 reference images** — attach multiple reference images to guide Grok edits
 - **Video generation** (5–15s clips) with real-time progress streaming
 - Live **cost dashboard** — know exactly what you're spending
+
+### Sidebar collapse
+
+Click the toggle button or press **Tab** to collapse the left sidebar and give your canvas more room. The collapsed state persists across sessions.
 
 ---
 
@@ -105,7 +135,9 @@ browser ──→ FastAPI backend ──→ NovelAI API
 
 **API tokens never touch the browser.** The backend is a secure proxy — all API calls, image processing, and web scraping happen server-side.
 
-The frontend is ~5.4k lines of vanilla JavaScript with zero dependencies. Deliberate choice: the app starts instantly, deploys anywhere Python runs, and the entire client-side codebase is a single file you can read top to bottom.
+**429 handling:** If NovelAI returns a concurrent generation lock (HTTP 429), the backend automatically retries up to 5 times with a 5-second delay between attempts. You never see a failed generation due to a transient lock.
+
+The frontend is ~7k lines of vanilla JavaScript with zero dependencies. Deliberate choice: the app starts instantly, deploys anywhere Python runs, and the entire client-side codebase is a single file you can read top to bottom.
 
 | Layer | Tech |
 |-------|------|
@@ -131,7 +163,7 @@ backend/
 
 frontend/
 ├── index.html
-├── js/app.js               # All frontend logic (~5.4k lines)
+├── js/app.js               # All frontend logic (~7k lines)
 └── css/style.css           # Design system + components
 ```
 

@@ -1617,7 +1617,7 @@ const _tagAC = (() => {
         insert(name.replace(/ /g, "_"));
       }
     } else if (e.key === "Escape") {
-      e.stopPropagation();
+      e.stopImmediatePropagation();
       hide();
     }
   }
@@ -2040,7 +2040,7 @@ async function generate() {
 
   const inpaintLayer = layers.find(l => l.inpaintMaskBase64);
   console.log("[generate] inpaintLayer:", inpaintLayer ? inpaintLayer.name : "none", "layers with inpaint mask:", layers.filter(l => l.inpaintMaskBase64).length);
-  if (inpaintLayer) {
+  if (inpaintLayer && (state.img2img || state.canvasImageBase64)) {
     // Inpaint mode: use composite as base + layer's inpaint mask
     // Both image and mask use the output resolution coordinate system
     body.image = state.img2img || state.canvasImageBase64;
@@ -2061,7 +2061,6 @@ async function generate() {
   body.cfg_rescale = parseFloat($("#cfg-rescale").value);
   body.noise_schedule = $("#noise-schedule").value;
 
-  btn.disabled = true;
   btn.classList.add("loading");
   clearError();
 
@@ -2186,6 +2185,8 @@ function loadLayersFromStorage() {
         opacity: typeof l.opacity === "number" ? l.opacity : 1.0,
         visible: l.visible !== false,
         isOutputTarget: l.isOutputTarget || false,
+        offsetX: l.offsetX || 0,
+        offsetY: l.offsetY || 0,
       });
     });
   } catch (_) { /* corrupt storage — ignore */ }
