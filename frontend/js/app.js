@@ -315,6 +315,22 @@ async function init() {
   $("#btn-reuse-seed").addEventListener("click", reuseSeed);
   $("#btn-download").addEventListener("click", downloadImage);
 
+  // Grok: Use as Source — set the current output as img2img source
+  const useAsSourceBtn = document.getElementById("btn-use-as-source");
+  if (useAsSourceBtn) {
+    useAsSourceBtn.addEventListener("click", () => {
+      if (!state.lastGeneratedImageBase64) return;
+      state.img2img = state.lastGeneratedImageBase64;
+      state.canvasImageBase64 = state.lastGeneratedImageBase64;
+      // Update source chip thumbnail
+      const chip = document.getElementById("ref-source-chip");
+      const chipImg = document.getElementById("ref-source-thumb-chip");
+      if (chip) chip.style.display = "";
+      if (chipImg) chipImg.src = "data:image/png;base64," + state.lastGeneratedImageBase64;
+      showStatus("Output set as source — edit with your next prompt");
+    });
+  }
+
   setupTagBrowser();
   setupGuide();
   setupSettings();
@@ -3555,6 +3571,11 @@ function syncInpaintButtonVisibility() {
       ? "Send this image to a new layer in the Layers panel"
       : "Generate an image first to send it to a layer";
   }
+  // Grok: Use as Source button
+  const useBtn = document.getElementById("btn-use-as-source");
+  if (useBtn) {
+    useBtn.style.display = (hasGenerated && !isNovelAI) ? "" : "none";
+  }
 }
 
 function setupInpaint() {
@@ -4008,6 +4029,7 @@ async function generateGrokImage() {
     const data = await resp.json();
     state.lastSeed = null;
     state.lastImageBase64 = data.image;
+    state.lastGeneratedImageBase64 = data.image;
     state.canvasImageBase64 = data.image;
     state.canvasImageWidth = null;
     state.canvasImageHeight = null;
@@ -4023,7 +4045,13 @@ async function generateGrokImage() {
     if (actions) actions.style.display = "flex";
     syncInpaintButtonVisibility();
     const infoSeed = $("#info-seed");
-    if (infoSeed) infoSeed.textContent = "Grok";
+    if (infoSeed) infoSeed.textContent = state.img2img ? "Grok (edit)" : "Grok";
+
+    // Hide source chip if not editing (will be shown by Use as Source)
+    if (!state.img2img) {
+      const chip = document.getElementById("ref-source-chip");
+      if (chip) chip.style.display = "none";
+    }
 
     loadGallery();
     fetchGrokUsage();
