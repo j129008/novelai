@@ -83,15 +83,24 @@ function _enableCanvasMove(layer) {
     dragging = false;
     saveLayersToStorage();
   }
+  function onWheel(e) {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.05 : 0.05;
+    layer.scale = Math.max(0.25, Math.min(4.0, (layer.scale !== undefined ? layer.scale : 1.0) + delta));
+    updateCanvasPanel();
+    refreshCompositePreview();
+  }
 
   output.addEventListener("pointerdown", onDown);
   document.addEventListener("pointermove", onMove);
   document.addEventListener("pointerup", onUp);
+  output.addEventListener("wheel", onWheel, { passive: false });
 
   _moveCleanup = () => {
     output.removeEventListener("pointerdown", onDown);
     document.removeEventListener("pointermove", onMove);
     document.removeEventListener("pointerup", onUp);
+    output.removeEventListener("wheel", onWheel);
     output.style.cursor = "";
   };
 }
@@ -102,7 +111,7 @@ function _disableCanvasMove() {
 
 // ── LAYER UNDO ────────────────────────────────────────────────
 // Snapshots metadata only — imageBase64 is intentionally excluded (too large).
-// Canonical metadata fields: id, name, opacity, visible, isOutputTarget, offsetX, offsetY, maskBase64, inpaintMaskBase64
+// Canonical metadata fields: id, name, opacity, visible, isOutputTarget, offsetX, offsetY, scale, maskBase64, inpaintMaskBase64
 const _layerUndoStack = [];
 const _layerRedoStack = [];
 const MAX_LAYER_UNDO = 20;
@@ -116,6 +125,7 @@ function _snapshotLayerMeta() {
     isOutputTarget: l.isOutputTarget,
     offsetX: l.offsetX,
     offsetY: l.offsetY,
+    scale: l.scale !== undefined ? l.scale : 1.0,
     maskBase64: l.maskBase64,
     inpaintMaskBase64: l.inpaintMaskBase64,
   }));
@@ -148,6 +158,7 @@ function _applyLayerMeta(meta) {
     l.isOutputTarget = m.isOutputTarget;
     l.offsetX        = m.offsetX;
     l.offsetY        = m.offsetY;
+    l.scale          = m.scale !== undefined ? m.scale : 1.0;
     l.maskBase64     = m.maskBase64;
     l.inpaintMaskBase64 = m.inpaintMaskBase64;
     layers.push(l);
@@ -791,7 +802,7 @@ function loadImageFile(file) {
         return;
       }
       const baseName = file.name ? file.name.replace(/\.[^.]+$/, "") : "Layer " + (layers.length + 1);
-      layers.push({ id: Date.now(), name: baseName, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0 });
+      layers.push({ id: Date.now(), name: baseName, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0, scale: 1.0 });
       renderLayerList();
       saveLayersToStorage();
       refreshCompositePreview();
@@ -1136,7 +1147,7 @@ function confirmCrop() {
     // NovelAI: add cropped image as a new layer
     if (layers.length < MAX_LAYERS) {
       const n = layers.length + 1;
-      layers.push({ id: Date.now(), name: "Layer " + n, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0 });
+      layers.push({ id: Date.now(), name: "Layer " + n, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0, scale: 1.0 });
       renderLayerList();
       saveLayersToStorage();
       refreshCompositePreview();
@@ -2265,6 +2276,7 @@ function saveLayersToStorage() {
       isOutputTarget: l.isOutputTarget || false,
       offsetX: l.offsetX || 0,
       offsetY: l.offsetY || 0,
+      scale: l.scale !== undefined ? l.scale : 1.0,
     }));
     localStorage.setItem("nai-layers", JSON.stringify(data));
   } catch (e) {
@@ -2291,6 +2303,7 @@ function loadLayersFromStorage() {
         isOutputTarget: l.isOutputTarget || false,
         offsetX: l.offsetX || 0,
         offsetY: l.offsetY || 0,
+        scale: typeof l.scale === "number" ? l.scale : 1.0,
       });
     });
   } catch (_) { /* corrupt storage — ignore */ }
@@ -2449,12 +2462,13 @@ async function compositeLayersToBase64(targetW, targetH) {
     img.onload = () => {
       const ox = layer.offsetX || 0;
       const oy = layer.offsetY || 0;
+      const scale = layer.scale !== undefined ? layer.scale : 1.0;
       if (layer.maskBase64) {
         const maskImg = new Image();
-        maskImg.onload = () => resolve({ img, maskImg, opacity: layer.opacity, ox, oy });
+        maskImg.onload = () => resolve({ img, maskImg, opacity: layer.opacity, ox, oy, scale });
         maskImg.src = "data:image/png;base64," + layer.maskBase64;
       } else {
-        resolve({ img, maskImg: null, opacity: layer.opacity, ox, oy });
+        resolve({ img, maskImg: null, opacity: layer.opacity, ox, oy, scale });
       }
     };
     img.src = "data:image/png;base64," + layer.imageBase64;
@@ -2466,7 +2480,7 @@ async function compositeLayersToBase64(targetW, targetH) {
   const ctx = offscreen.getContext("2d");
 
   // Draw bottom-to-top: last in array = bottom layer, drawn first
-  for (const { img, maskImg, opacity, ox, oy } of [...decoded].reverse()) {
+  for (const { img, maskImg, opacity, ox, oy, scale } of [...decoded].reverse()) {
     // Offset in pixels (stored as fraction of target dimensions)
     const pixOX = Math.round(ox * targetW);
     const pixOY = Math.round(oy * targetH);
@@ -2487,8 +2501,12 @@ async function compositeLayersToBase64(targetW, targetH) {
       sy = (img.naturalHeight - sh) / 2;
     }
 
-    // Destination rect with offset applied
-    const dx = pixOX, dy = pixOY, dw = targetW, dh = targetH;
+    // Destination rect: scale around center, then apply offset
+    const s  = scale !== undefined ? scale : 1.0;
+    const dw = targetW * s;
+    const dh = targetH * s;
+    const dx = (targetW - dw) / 2 + pixOX;
+    const dy = (targetH - dh) / 2 + pixOY;
 
     if (maskImg) {
       const maskCanvas = document.createElement("canvas");
@@ -2513,7 +2531,7 @@ async function compositeLayersToBase64(targetW, targetH) {
       tmpCtx.globalCompositeOperation = "source-over";
 
       ctx.globalAlpha = opacity;
-      ctx.drawImage(tmp, dx, dy);
+      ctx.drawImage(tmp, 0, 0, targetW, targetH, dx, dy, dw, dh);
       ctx.globalAlpha = 1.0;
     } else {
       ctx.globalAlpha = opacity;
@@ -2723,7 +2741,7 @@ function setupLayers() {
       const n = layers.length + 1;
       // Auto-select the new layer
       _activeLayerIdx = layers.length;
-      layers.push({ id: Date.now(), name: "Layer " + n, imageBase64: null, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0 });
+      layers.push({ id: Date.now(), name: "Layer " + n, imageBase64: null, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0, scale: 1.0 });
       renderLayerList();
       saveLayersToStorage();
     });
@@ -2754,7 +2772,7 @@ function setupLayers() {
         const b64 = ev.target.result.split(",")[1];
         pushLayerUndo("Add layer from file");
         const n = layers.length + 1;
-        layers.push({ id: Date.now(), name: file.name.replace(/\.[^.]+$/, "") || "Layer " + n, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0 });
+        layers.push({ id: Date.now(), name: file.name.replace(/\.[^.]+$/, "") || "Layer " + n, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0, scale: 1.0 });
         renderLayerList();
         saveLayersToStorage();
         refreshCompositePreview();
@@ -2782,7 +2800,7 @@ function setupLayers() {
         opacity: 1.0,
         visible: true,
         isOutputTarget: false,
-        offsetX: 0, offsetY: 0,
+        offsetX: 0, offsetY: 0, scale: 1.0,
       });
       renderLayerList();
       saveLayersToStorage();
@@ -2878,6 +2896,13 @@ function updateCanvasPanel() {
   const opacityVal    = document.getElementById("clp-opacity-val");
   if (opacitySlider) opacitySlider.value = String(layer.opacity);
   if (opacityVal)    opacityVal.textContent = Math.round(layer.opacity * 100) + "%";
+
+  // Scale
+  const scaleSlider = document.getElementById("clp-scale");
+  const scaleVal    = document.getElementById("clp-scale-val");
+  const currentScale = layer.scale !== undefined ? layer.scale : 1.0;
+  if (scaleSlider) scaleSlider.value = String(currentScale);
+  if (scaleVal)    scaleVal.textContent = Math.round(currentScale * 100) + "%";
 
   // AI Redraw visibility
   const redrawBtn = document.getElementById("clp-redraw");
@@ -2982,6 +3007,42 @@ function setupCanvasLayerPanel() {
       if (opacityVal) opacityVal.textContent = Math.round(layer.opacity * 100) + "%";
       saveLayersToStorage();
       // Mark input button as changed if on output view
+      _markInputChanged();
+      clearTimeout(_previewDebounceTimer);
+      _previewDebounceTimer = setTimeout(refreshCompositePreview, 50);
+    });
+  }
+
+  // ── Scale slider ──────────────────────────────────────────
+  let _clpScaleUndoPushed = false;
+  const scaleSlider = document.getElementById("clp-scale");
+  const scaleVal    = document.getElementById("clp-scale-val");
+  if (scaleSlider) {
+    scaleSlider.addEventListener("pointerdown", () => { _clpScaleUndoPushed = false; });
+    scaleSlider.addEventListener("input", () => {
+      if (layers.length === 0) return;
+      if (!_clpScaleUndoPushed) { pushLayerUndo("Change scale"); _clpScaleUndoPushed = true; }
+      const layer = layers[_activeLayerIdx];
+      layer.scale = parseFloat(scaleSlider.value);
+      if (scaleVal) scaleVal.textContent = Math.round(layer.scale * 100) + "%";
+      _markInputChanged();
+      clearTimeout(_previewDebounceTimer);
+      _previewDebounceTimer = setTimeout(refreshCompositePreview, 50);
+    });
+    scaleSlider.addEventListener("change", () => {
+      if (layers.length === 0) return;
+      saveLayersToStorage();
+    });
+  }
+  if (scaleVal) {
+    scaleVal.addEventListener("click", () => {
+      if (layers.length === 0) return;
+      const layer = layers[_activeLayerIdx];
+      pushLayerUndo("Reset scale");
+      layer.scale = 1.0;
+      if (scaleSlider) scaleSlider.value = "1";
+      scaleVal.textContent = "100%";
+      saveLayersToStorage();
       _markInputChanged();
       clearTimeout(_previewDebounceTimer);
       _previewDebounceTimer = setTimeout(refreshCompositePreview, 50);
@@ -4910,7 +4971,7 @@ function setupCraftPanel() {
           // Add variation result as a new layer
           if (layers.length < MAX_LAYERS) {
             const n = layers.length + 1;
-            layers.push({ id: Date.now(), name: variant.label + " Variation", imageBase64: data.image, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0 });
+            layers.push({ id: Date.now(), name: variant.label + " Variation", imageBase64: data.image, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0, scale: 1.0 });
             renderLayerList();
             saveLayersToStorage();
             refreshCompositePreview();
@@ -6423,7 +6484,7 @@ async function setHistoryImageAsSource(url, meta) {
       // Add to layers instead of img2img source
       if (layers.length < MAX_LAYERS) {
         const layerName = (meta && meta.prompt) ? meta.prompt.slice(0, 32) + "…" : "History Layer";
-        layers.push({ id: Date.now(), name: layerName, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0 });
+        layers.push({ id: Date.now(), name: layerName, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0, scale: 1.0 });
         renderLayerList();
         saveLayersToStorage();
         refreshCompositePreview();
@@ -6737,7 +6798,7 @@ function setupExplorePanel() {
         } else {
           // NovelAI: add to layers
           if (layers.length < MAX_LAYERS) {
-            layers.push({ id: Date.now(), name: "Explore Image", imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0 });
+            layers.push({ id: Date.now(), name: "Explore Image", imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0, scale: 1.0 });
             renderLayerList();
             saveLayersToStorage();
             refreshCompositePreview();
