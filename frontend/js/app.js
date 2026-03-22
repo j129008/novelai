@@ -4667,13 +4667,11 @@ async function generateGrokImage() {
     model: quality === "pro" ? "grok-imagine-image-pro" : "grok-imagine-image",
   };
 
-  // Include reference images if any are provided (replaces single img2img for Grok)
-  if (grokRefs.length > 0) {
-    body.images = grokRefs.map((r) => r.base64);
-  } else if (state.img2img) {
-    // Fallback: use img2img source if set without explicit grok refs
-    body.images = [state.img2img];
-  }
+  // Build images array: source image first (if set), then reference images
+  const allImages = [];
+  if (state.img2img) allImages.push(state.img2img);
+  if (grokRefs.length > 0) allImages.push(...grokRefs.map((r) => r.base64));
+  if (allImages.length > 0) body.images = allImages;
 
   btn.disabled = true;
   btn.classList.add("loading");
