@@ -638,6 +638,9 @@ function setupCanvasDropZone() {
       e.preventDefault();
       dragCounter = 0;
       dropTarget.classList.remove("drag-over");
+      // In Grok mode, the Images panel handles drops — don't double-process
+      const provider = document.getElementById("provider")?.value || "novelai";
+      if (provider === "grok") return;
       const file = e.dataTransfer.files[0];
       if (file && file.type.startsWith("image/")) {
         loadImageFile(file);
