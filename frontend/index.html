@@ -410,6 +410,34 @@
       </div>
     </div>
 
+    <!-- AI Redraw Modal — lightweight centered modal for sketch-to-AI redraw -->
+    <div id="layer-redraw-modal" style="display:none" class="layer-redraw-overlay" role="dialog" aria-modal="true" aria-labelledby="layer-redraw-title">
+      <div class="layer-redraw-panel">
+        <div class="layer-redraw-header">
+          <h3 id="layer-redraw-title">AI Redraw</h3>
+          <button id="layer-redraw-close" type="button" class="guide-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="layer-redraw-body">
+          <div class="layer-redraw-preview-wrap">
+            <img id="layer-redraw-preview" class="layer-redraw-preview" alt="Sketch preview">
+          </div>
+          <div class="layer-redraw-controls">
+            <label class="field-label" for="layer-redraw-prompt">Description</label>
+            <input type="text" id="layer-redraw-prompt" class="layer-redraw-input" placeholder="Describe what you drew (e.g., a black cat sitting)">
+            <div class="layer-redraw-slider-row">
+              <label class="field-label">Redraw Strength</label>
+              <div class="slider-endpoints"><span>Subtle</span><span class="slider-value" id="layer-redraw-strength-val">0.70</span><span>Strong</span></div>
+              <input type="range" id="layer-redraw-strength" class="field-range" min="0.3" max="0.9" step="0.05" value="0.7">
+            </div>
+          </div>
+        </div>
+        <div class="layer-redraw-footer">
+          <button id="layer-redraw-cancel" class="btn-action" type="button">Cancel</button>
+          <button id="layer-redraw-submit" class="btn-action btn-action--primary" type="button">Redraw</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Hidden file input for img2img — triggered programmatically -->
     <input type="file" id="img2img-file-input" accept="image/*" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" aria-hidden="true" tabindex="-1">
 

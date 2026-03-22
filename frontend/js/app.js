@@ -2856,6 +2856,13 @@ function buildLayerRow(layer, realIdx) {
       }
     ));
 
+    // AI Redraw (only when layer has content to redraw)
+    if (layer.imageBase64) {
+      menu.appendChild(makeItem("AI Redraw", false, false, () => {
+        openLayerRedrawModal(layer);
+      }));
+    }
+
     // Visibility Mask
     menu.appendChild(makeItem(
       layer.maskBase64 ? "Visibility Mask (active)" : "Visibility Mask",
@@ -4189,6 +4196,142 @@ function openLayerInpaintEditor(layer, onConfirm) {
     return;
   }
   setupInpaint._open(layer, onConfirm);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   AI REDRAW MODAL — redraw a sketch layer with AI while preserving transparency
+   ═══════════════════════════════════════════════════════════ */
+
+(function setupLayerRedraw() {
+  const modal      = document.getElementById("layer-redraw-modal");
+  const titleEl    = document.getElementById("layer-redraw-title");
+  const previewImg = document.getElementById("layer-redraw-preview");
+  const promptEl   = document.getElementById("layer-redraw-prompt");
+  const strengthEl = document.getElementById("layer-redraw-strength");
+  const strengthVal = document.getElementById("layer-redraw-strength-val");
+  const submitBtn  = document.getElementById("layer-redraw-submit");
+  const cancelBtn  = document.getElementById("layer-redraw-cancel");
+  const closeBtn   = document.getElementById("layer-redraw-close");
+
+  if (!modal) return;
+
+  let _activeLayer = null;
+
+  function openLayerRedrawModal(layer) {
+    _activeLayer = layer;
+    titleEl.textContent = "AI Redraw — " + layer.name;
+    previewImg.src = "data:image/png;base64," + layer.imageBase64;
+    promptEl.value = "";
+    strengthEl.value = "0.7";
+    strengthVal.textContent = "0.70";
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Redraw";
+    modal.style.display = "flex";
+    // Force animation replay
+    modal.style.animation = "none";
+    void modal.offsetWidth;
+    modal.style.animation = "";
+    setTimeout(() => promptEl.focus(), 50);
+  }
+
+  function closeModal() {
+    modal.style.display = "none";
+    _activeLayer = null;
+  }
+
+  strengthEl.addEventListener("input", () => {
+    strengthVal.textContent = parseFloat(strengthEl.value).toFixed(2);
+  });
+
+  async function doRedraw() {
+    const layer = _activeLayer;
+    if (!layer) return;
+
+    const desc = promptEl.value.trim();
+    if (!desc) {
+      promptEl.focus();
+      return;
+    }
+
+    const useQualityTags = document.getElementById("quality-tags")?.checked;
+    const qualityTagStr  = ", very aesthetic, masterpiece, no text";
+    const globalPrompt   = document.getElementById("prompt")?.value.trim() || "";
+    let fullPrompt = desc;
+    if (globalPrompt) fullPrompt += ", " + globalPrompt;
+    if (useQualityTags) fullPrompt += qualityTagStr;
+
+    const resVal   = document.getElementById("resolution")?.value || "832x1216";
+    const [width, height] = resVal.split("x").map(Number);
+
+    const body = {
+      image:           layer.imageBase64,
+      prompt:          fullPrompt,
+      negative_prompt: document.getElementById("negative-prompt")?.value || "",
+      width:           width  || 832,
+      height:          height || 1216,
+      steps:           parseInt(document.getElementById("steps")?.value) || 28,
+      scale:           parseFloat(document.getElementById("scale")?.value) || 6,
+      sampler:         document.getElementById("sampler")?.value || "k_euler",
+      seed:            parseInt(document.getElementById("seed")?.value) || 0,
+      strength:        parseFloat(strengthEl.value),
+    };
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Redrawing…";
+
+    try {
+      const resp = await fetch("/api/layer-redraw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+        throw new Error(err.detail || "Redraw failed");
+      }
+      const data = await resp.json();
+      pushLayerUndo("AI Redraw");
+      layer.imageBase64 = data.image;
+      closeModal();
+      renderLayerList();
+      saveLayersToStorage();
+      refreshCompositePreview();
+      showStatus("AI Redraw applied to " + layer.name);
+    } catch (err) {
+      showStatus("Redraw error: " + err.message);
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Redraw";
+    }
+  }
+
+  submitBtn.addEventListener("click", doRedraw);
+  cancelBtn.addEventListener("click", closeModal);
+  closeBtn.addEventListener("click", closeModal);
+
+  promptEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      doRedraw();
+    }
+  });
+
+  modal.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      e.stopImmediatePropagation();
+      closeModal();
+    }
+  });
+
+  // Expose open function
+  setupLayerRedraw._open = openLayerRedrawModal;
+})();
+
+function openLayerRedrawModal(layer) {
+  if (!setupLayerRedraw._open) {
+    showStatus("AI Redraw not ready — please wait.");
+    return;
+  }
+  setupLayerRedraw._open(layer);
 }
 
 function reuseSeed() {

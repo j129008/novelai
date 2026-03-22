@@ -35,6 +35,8 @@ from models.schemas import (
     GrokImageResponse,
     GrokVideoRequest,
     GrokVideoResponse,
+    LayerRedrawRequest,
+    LayerRedrawResponse,
     RecordCharactersRequest,
     SuggestTagsRequest,
     SuggestTagsResponse,
@@ -255,6 +257,76 @@ async def generate(req: GenerateRequest):
         image=base64.b64encode(image_data).decode(),
         seed=seed,
     )
+
+
+@router.post("/layer-redraw", response_model=LayerRedrawResponse)
+async def layer_redraw(req: LayerRedrawRequest):
+    if not TOKEN:
+        raise HTTPException(status_code=503, detail="NOVELAI_TOKEN not configured")
+
+    try:
+        from PIL import Image
+
+        raw = base64.b64decode(req.image)
+        original = Image.open(io.BytesIO(raw)).convert("RGBA")
+
+        # Extract alpha before sending to NAI (NAI only accepts RGB).
+        # We always convert to RGBA first so the split is always valid;
+        # if the source had no alpha, the channel will be fully opaque (255).
+        alpha = original.split()[3]
+        # Treat fully-opaque alpha as "no transparency" — skip re-application
+        if alpha.getextrema() == (255, 255):
+            alpha = None
+
+        white_bg = Image.new("RGB", original.size, (255, 255, 255))
+        white_bg.paste(original, mask=alpha)
+
+        # Resize to requested dimensions if different
+        if white_bg.size != (req.width, req.height):
+            white_bg = white_bg.resize((req.width, req.height), Image.LANCZOS)
+            if alpha is not None:
+                alpha = alpha.resize((req.width, req.height), Image.LANCZOS)
+
+        img_buf = io.BytesIO()
+        white_bg.save(img_buf, format="PNG")
+        img_b64 = base64.b64encode(img_buf.getvalue()).decode()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Image pre-processing error: {e}")
+
+    try:
+        image_data, _seed = await generate_image(
+            token=TOKEN,
+            prompt=req.prompt,
+            negative_prompt=req.negative_prompt,
+            action="img2img",
+            width=req.width,
+            height=req.height,
+            steps=req.steps,
+            scale=req.scale,
+            sampler=req.sampler,
+            seed=req.seed,
+            strength=req.strength,
+            image=img_b64,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"NovelAI API error: {e}")
+
+    try:
+        result = Image.open(io.BytesIO(image_data)).convert("RGBA")
+
+        if alpha is not None:
+            # Resize alpha to match result if NAI returned a different size
+            if alpha.size != result.size:
+                alpha = alpha.resize(result.size, Image.LANCZOS)
+            result.putalpha(alpha)
+
+        out_buf = io.BytesIO()
+        result.save(out_buf, format="PNG")
+        out_b64 = base64.b64encode(out_buf.getvalue()).decode()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Image post-processing error: {e}")
+
+    return LayerRedrawResponse(image=out_b64)
 
 
 @router.post("/grok/generate-image", response_model=GrokImageResponse)

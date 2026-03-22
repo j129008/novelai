@@ -3942,6 +3942,109 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   border-left-width: 2px;
 }
 
+/* ─── AI Redraw Modal ─── */
+.layer-redraw-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: rgba(4,4,10,0.85);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.layer-redraw-panel {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-xl);
+  width: min(420px, 90vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+}
+
+.layer-redraw-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.layer-redraw-header h3 {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.layer-redraw-body {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.layer-redraw-preview-wrap {
+  background: repeating-conic-gradient(var(--bg-overlay) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+}
+
+.layer-redraw-preview {
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  display: block;
+}
+
+.layer-redraw-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.layer-redraw-input {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.layer-redraw-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+  outline: none;
+}
+
+.layer-redraw-slider-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.layer-redraw-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
 /* ─── Generation section divider and label inside layers accordion ─── */
 .layers-gen-divider {
   height: 1px;

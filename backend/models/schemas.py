@@ -169,6 +169,31 @@ class GrokVideoResponse(BaseModel):
 # Image Explorer — web page proxy and image extraction
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Layer Redraw — AI redraw of sketch layers with alpha preservation
+# ---------------------------------------------------------------------------
+
+class LayerRedrawRequest(BaseModel):
+    image: str  # base64 PNG, may be RGBA with transparency
+    prompt: str = ""
+    negative_prompt: str = ""
+    strength: float = Field(default=0.7, ge=0.3, le=1.0)
+    width: int = Field(default=832, ge=64, le=2048)
+    height: int = Field(default=1216, ge=64, le=2048)
+    steps: int = Field(default=23, ge=1, le=50)
+    scale: float = Field(default=5.0, ge=0, le=10)
+    sampler: str = "k_euler_ancestral"
+    seed: int = Field(default=0, ge=0)
+
+
+class LayerRedrawResponse(BaseModel):
+    image: str  # base64 PNG, RGBA with transparency preserved
+
+
+# ---------------------------------------------------------------------------
+# Image Explorer — web page proxy and image extraction
+# ---------------------------------------------------------------------------
+
 class ExplorePageRequest(BaseModel):
     url: str = Field(min_length=1)
 
