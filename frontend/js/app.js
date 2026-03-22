@@ -3004,11 +3004,18 @@ function updateCanvasPanel() {
   const providerEl = document.getElementById("provider");
   const provider  = providerEl ? providerEl.value : "novelai";
 
-  // Panel is only for NovelAI mode with at least one layer
+  // Layer panel is only for NovelAI mode with at least one layer
   if (!panel) return;
   if (provider !== "novelai" || layers.length === 0) {
     panel.style.display = "none";
-    if (toggle) toggle.style.display = "none";
+  }
+
+  // Input/Output toggle: show for NovelAI (with layers) OR Grok (with source image)
+  const showToggle = (provider === "novelai" && layers.length > 0) ||
+                     (provider === "grok" && !!state.img2img);
+  if (toggle) toggle.style.display = showToggle ? "" : "none";
+
+  if (provider !== "novelai" || layers.length === 0) {
     return;
   }
 
@@ -3338,8 +3345,20 @@ function setupCanvasViewToggle() {
     outputBtn.classList.toggle("cvt-btn--active", view === "output");
     if (view === "input") {
       inputBtn.classList.remove("cvt-btn--changed");
-      // Show composite preview
-      refreshCompositePreview();
+      // Show source: composite preview (NovelAI) or source image (Grok)
+      const provider = document.getElementById("provider")?.value || "novelai";
+      if (provider === "grok" && state.img2img) {
+        const output = document.getElementById("output");
+        if (output) {
+          const img = document.createElement("img");
+          img.src = "data:image/png;base64," + state.img2img;
+          img.alt = "Source image";
+          output.innerHTML = "";
+          output.appendChild(img);
+        }
+      } else {
+        refreshCompositePreview();
+      }
     } else {
       // Show the last generated image
       if (state.lastGeneratedImageBase64) {
@@ -4716,8 +4735,16 @@ async function generateGrokImage() {
     const actions = $("#image-actions");
     if (actions) actions.style.display = "flex";
     syncInpaintButtonVisibility();
+    updateCanvasPanel(); // Show Input/Output toggle for Grok
     const infoSeed = $("#info-seed");
     if (infoSeed) infoSeed.textContent = state.img2img ? "Grok (edit)" : "Grok";
+
+    // Auto-switch to Output view
+    _canvasView = "output";
+    const cvtInput = document.getElementById("cvt-input");
+    const cvtOutput = document.getElementById("cvt-output");
+    if (cvtInput) { cvtInput.classList.remove("cvt-btn--active"); cvtInput.classList.remove("cvt-btn--changed"); }
+    if (cvtOutput) cvtOutput.classList.add("cvt-btn--active");
 
     // Hide source chip if not editing (will be shown by Use as Source)
     if (!state.img2img) {
