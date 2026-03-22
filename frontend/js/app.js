@@ -1526,10 +1526,13 @@ function setupAutoSavePrompt() {
     localStorage.setItem("nai-negative", negative.value);
   });
 
-  // ── Prompt History (separated by provider) ─────────────────
+  // ── Prompt History — Spotlight style (separated by provider) ──
   const MAX_PROMPT_HISTORY = 50;
   const histBtn = document.getElementById("prompt-history-btn");
-  const histDropdown = document.getElementById("prompt-history-dropdown");
+  const histOverlay = document.getElementById("prompt-history-overlay");
+  const histSearch = document.getElementById("prompt-history-search");
+  const histList = document.getElementById("prompt-history-list");
+  let _histSelectedIdx = -1;
 
   function _getHistoryKey() {
     const provider = document.getElementById("provider")?.value || "novelai";
@@ -1546,59 +1549,124 @@ function setupAutoSavePrompt() {
     catch { /* quota */ }
   }
 
-  // Save prompt to history on successful generation
   window._savePromptToHistory = function() {
     const text = prompt.value.trim();
+    console.log("[prompt-history] saving:", text ? text.substring(0, 30) + "..." : "(empty)");
     if (!text) return;
-    const list = _loadHistory().filter((p) => p !== text); // deduplicate
-    list.unshift(text); // most recent first
+    const list = _loadHistory().filter((p) => p !== text);
+    list.unshift(text);
     if (list.length > MAX_PROMPT_HISTORY) list.length = MAX_PROMPT_HISTORY;
     _saveHistory(list);
   };
 
-  function _renderHistory() {
-    if (!histDropdown) return;
+  function _highlightMatch(text, query) {
+    if (!query) return document.createTextNode(text);
+    const span = document.createElement("span");
+    const lower = text.toLowerCase();
+    const qLower = query.toLowerCase();
+    let pos = 0;
+    while (pos < text.length) {
+      const idx = lower.indexOf(qLower, pos);
+      if (idx === -1) { span.appendChild(document.createTextNode(text.slice(pos))); break; }
+      if (idx > pos) span.appendChild(document.createTextNode(text.slice(pos, idx)));
+      const mark = document.createElement("mark");
+      mark.textContent = text.slice(idx, idx + query.length);
+      span.appendChild(mark);
+      pos = idx + query.length;
+    }
+    return span;
+  }
+
+  function _renderHistoryList(query) {
+    if (!histList) return;
     const list = _loadHistory();
-    histDropdown.innerHTML = "";
-    if (list.length === 0) {
+    const q = (query || "").trim().toLowerCase();
+    const filtered = q ? list.filter((p) => p.toLowerCase().includes(q)) : list;
+
+    histList.innerHTML = "";
+    _histSelectedIdx = -1;
+
+    if (filtered.length === 0) {
       const empty = document.createElement("div");
       empty.className = "prompt-history-empty";
-      empty.textContent = "No prompt history yet";
-      histDropdown.appendChild(empty);
+      empty.textContent = q ? "No matches" : "No prompt history yet";
+      histList.appendChild(empty);
       return;
     }
-    list.forEach((text) => {
+
+    filtered.forEach((text, idx) => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "prompt-history-item";
-      btn.textContent = text;
-      btn.title = text;
+      btn.appendChild(_highlightMatch(text, query));
       btn.addEventListener("click", () => {
         prompt.value = text;
         prompt.dispatchEvent(new Event("input", { bubbles: true }));
-        histDropdown.style.display = "none";
+        _closeHistory();
       });
-      histDropdown.appendChild(btn);
+      btn.addEventListener("mouseenter", () => {
+        _histSelectedIdx = idx;
+        _updateSelection();
+      });
+      histList.appendChild(btn);
     });
   }
 
-  if (histBtn && histDropdown) {
-    histBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const open = histDropdown.style.display !== "none";
-      if (open) {
-        histDropdown.style.display = "none";
-      } else {
-        _renderHistory();
-        histDropdown.style.display = "";
-      }
-    });
-    // Close on outside click
-    document.addEventListener("click", () => {
-      if (histDropdown.style.display !== "none") histDropdown.style.display = "none";
-    });
-    histDropdown.addEventListener("click", (e) => e.stopPropagation());
+  function _updateSelection() {
+    const items = histList.querySelectorAll(".prompt-history-item");
+    items.forEach((el, i) => el.classList.toggle("prompt-history-item--selected", i === _histSelectedIdx));
+    if (_histSelectedIdx >= 0 && items[_histSelectedIdx]) {
+      items[_histSelectedIdx].scrollIntoView({ block: "nearest" });
+    }
   }
+
+  function _openHistory() {
+    if (!histOverlay) return;
+    histOverlay.style.display = "";
+    if (histSearch) { histSearch.value = ""; histSearch.focus(); }
+    _renderHistoryList("");
+  }
+
+  function _closeHistory() {
+    if (histOverlay) histOverlay.style.display = "none";
+  }
+
+  if (histBtn) histBtn.addEventListener("click", _openHistory);
+
+  if (histOverlay) {
+    histOverlay.addEventListener("click", (e) => { if (e.target === histOverlay) _closeHistory(); });
+
+    if (histSearch) {
+      histSearch.addEventListener("input", () => _renderHistoryList(histSearch.value));
+
+      histSearch.addEventListener("keydown", (e) => {
+        const items = histList.querySelectorAll(".prompt-history-item");
+        if (e.key === "Escape") { e.stopImmediatePropagation(); _closeHistory(); return; }
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          _histSelectedIdx = Math.min(_histSelectedIdx + 1, items.length - 1);
+          _updateSelection();
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          _histSelectedIdx = Math.max(_histSelectedIdx - 1, 0);
+          _updateSelection();
+        } else if (e.key === "Enter") {
+          e.preventDefault();
+          if (_histSelectedIdx >= 0 && items[_histSelectedIdx]) items[_histSelectedIdx].click();
+          else if (items.length > 0) items[0].click();
+        }
+      });
+    }
+  }
+
+  // Ctrl+H / Cmd+H shortcut to open prompt history
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "h") {
+      if (e.target.matches("input, textarea, [contenteditable]") && histOverlay?.style.display !== "none") return;
+      e.preventDefault();
+      if (histOverlay?.style.display === "none") _openHistory(); else _closeHistory();
+    }
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════

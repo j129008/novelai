@@ -485,11 +485,11 @@
             </div>
             <div class="prompt-history-wrap">
               <textarea id="prompt" class="field-textarea field-textarea--prompt" rows="6" placeholder="Describe your vision… e.g. a girl standing in a field of sunflowers at golden hour" spellcheck="false"></textarea>
-              <button id="prompt-history-btn" class="prompt-history-btn" type="button" title="Prompt history">
+              <button id="prompt-history-btn" class="prompt-history-btn" type="button" title="Prompt history (Ctrl+H)">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               </button>
-              <div id="prompt-history-dropdown" class="prompt-history-dropdown" style="display:none"></div>
             </div>
+
             <textarea id="negative-prompt" class="field-textarea field-textarea--negative" rows="6" placeholder="What to exclude…" spellcheck="false" style="display:none">nsfw, lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page, @_@, mismatched pupils, glowing eyes, bad anatomy</textarea>
           </div>
         </div>
@@ -1007,6 +1007,19 @@
   </div>
   <!-- Shared tag autocomplete dropdown — positioned via JS using getBoundingClientRect() -->
   <div id="tag-dropdown" class="tag-dropdown"></div>
+
+  <!-- Prompt History Spotlight — must be outside all containers to avoid stacking context issues -->
+  <div id="prompt-history-overlay" class="prompt-history-overlay" style="display:none">
+    <div class="prompt-history-panel">
+      <div class="prompt-history-search-row">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="prompt-history-search" class="prompt-history-search" placeholder="Search prompt history..." autofocus>
+        <kbd class="prompt-history-kbd">ESC</kbd>
+      </div>
+      <div id="prompt-history-list" class="prompt-history-list"></div>
+    </div>
+  </div>
+
   <script src="js/app.js?v=99"></script>
 </body>
 </html>
