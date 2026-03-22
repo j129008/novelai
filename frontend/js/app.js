@@ -1525,6 +1525,80 @@ function setupAutoSavePrompt() {
   negative.addEventListener("input", () => {
     localStorage.setItem("nai-negative", negative.value);
   });
+
+  // ── Prompt History (separated by provider) ─────────────────
+  const MAX_PROMPT_HISTORY = 50;
+  const histBtn = document.getElementById("prompt-history-btn");
+  const histDropdown = document.getElementById("prompt-history-dropdown");
+
+  function _getHistoryKey() {
+    const provider = document.getElementById("provider")?.value || "novelai";
+    return "nai-prompt-history-" + provider;
+  }
+
+  function _loadHistory() {
+    try { return JSON.parse(localStorage.getItem(_getHistoryKey()) || "[]"); }
+    catch { return []; }
+  }
+
+  function _saveHistory(list) {
+    try { localStorage.setItem(_getHistoryKey(), JSON.stringify(list)); }
+    catch { /* quota */ }
+  }
+
+  // Save prompt to history on successful generation
+  window._savePromptToHistory = function() {
+    const text = prompt.value.trim();
+    if (!text) return;
+    const list = _loadHistory().filter((p) => p !== text); // deduplicate
+    list.unshift(text); // most recent first
+    if (list.length > MAX_PROMPT_HISTORY) list.length = MAX_PROMPT_HISTORY;
+    _saveHistory(list);
+  };
+
+  function _renderHistory() {
+    if (!histDropdown) return;
+    const list = _loadHistory();
+    histDropdown.innerHTML = "";
+    if (list.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "prompt-history-empty";
+      empty.textContent = "No prompt history yet";
+      histDropdown.appendChild(empty);
+      return;
+    }
+    list.forEach((text) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "prompt-history-item";
+      btn.textContent = text;
+      btn.title = text;
+      btn.addEventListener("click", () => {
+        prompt.value = text;
+        prompt.dispatchEvent(new Event("input", { bubbles: true }));
+        histDropdown.style.display = "none";
+      });
+      histDropdown.appendChild(btn);
+    });
+  }
+
+  if (histBtn && histDropdown) {
+    histBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = histDropdown.style.display !== "none";
+      if (open) {
+        histDropdown.style.display = "none";
+      } else {
+        _renderHistory();
+        histDropdown.style.display = "";
+      }
+    });
+    // Close on outside click
+    document.addEventListener("click", () => {
+      if (histDropdown.style.display !== "none") histDropdown.style.display = "none";
+    });
+    histDropdown.addEventListener("click", (e) => e.stopPropagation());
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -2267,6 +2341,7 @@ async function generate() {
     updateCanvasPanel();
 
     loadGallery();
+    if (window._savePromptToHistory) window._savePromptToHistory();
 
     // Fire-and-forget: record character tags from prompt + all character slots
     const allPromptText = [prompt, ...characters.map((c) => c.prompt)].join(", ");
@@ -4585,6 +4660,7 @@ async function generateGrokImage() {
     }
 
     loadGallery();
+    if (window._savePromptToHistory) window._savePromptToHistory();
     fetchGrokUsage();
   } catch (e) {
     clearTimeout(stopTimeout);
