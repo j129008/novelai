@@ -73,36 +73,50 @@ Here you get a **visual 2D canvas** — click where each character goes, write i
 
 ![Two character slots with individual prompt fields, interaction controls, and scene composition](docs/screenshots/multi-character.png)
 
-### Composite multiple images with the Layers system
+---
 
-Stack images as layers and send the merged result to the model as img2img input.
+### Layers — a full compositing workspace
 
-Each layer supports:
-- **Opacity and visibility** — control how much each layer contributes
-- **Drag to reorder** — change stacking order by dragging
-- **Visibility masks** — Reveal (show only painted area) or Hide (erase painted area) per layer
-- **Inpaint masks** — paint a region on any layer; the mask persists across generations so you can refine the same area repeatedly
-- **Draw editor** — color picker, brush, and fill tool for painting directly on a layer
-- **Move/position** — drag a layer's content on the canvas to reposition it
-- **Output target** — designate which layer receives new generation results
-- **Live composite preview** — the canvas updates in real time as you adjust layers
-- **Transformation and Variation sliders** — control how closely the model follows the composite and how much variation to introduce
+Stack images as layers and send the merged result to the model as img2img input. The canvas becomes your workspace — a floating control panel at the bottom-left gives you direct access to every layer operation without touching the sidebar.
+
+**Canvas layer panel:**
+- **Layer navigation** — prev/next buttons cycle through layers; click sidebar rows to select
+- **Opacity and visibility** — per-layer opacity slider and eye toggle
+- **Scale** — resize each layer from 25% to 400% via slider or scroll wheel in Move mode
+- **Move** — drag layers directly on the canvas to reposition them
+- **Output target** — designate which layer automatically receives generation results
+
+**Per-layer tools (accessed from the canvas panel):**
+- **Draw** — freehand painting with color picker, adjustable brush, fill tool, and eraser. Canvas starts transparent so drawn content composites cleanly with other layers
+- **AI Redraw** — sketch something rough, write a short description ("a black cat sitting"), and let the AI redraw it properly. The sketch is cropped to its bounding box, sent for img2img, then white background is auto-removed to preserve transparency. Stay in the modal to retry with different prompts/strength until satisfied
+- **Visibility mask** — paint to Reveal (white) or Hide (black) specific areas of a layer. Red overlay shows hidden regions at a glance
+- **Inpaint mask** — paint the region you want the AI to regenerate. The mask persists across generations — no redrawing needed. A red overlay on the canvas preview shows exactly where the mask is active
+
+**Input/Output toggle** at the canvas top-right switches between:
+- **Input** — live composite preview of all layers (updates in real time as you adjust)
+- **Output** — the last generated image
+
+**Layer undo** — Ctrl+Z (Cmd+Z on Mac) reverses layer operations: add, remove, reorder, opacity, visibility, scale, masks. Up to 20 steps. Ctrl+Shift+Z to redo.
+
+**Sidebar layer list** stays as a compact navigator — small thumbnails with drag-to-reorder. All editing happens on the canvas.
 
 ### Inpaint
 
-Open the inpaint editor on any generated image. Paint a mask over the area you want to change, then generate — the model regenerates only the masked region and composites it back into the original. Undo support and adjustable brush size are included. Works with both NovelAI and via the Layers inpaint mask.
+Paint a mask over any area of an image and regenerate just that region. The model fills the masked area with context-aware content while preserving everything outside it. Works two ways:
+- **Per-layer inpaint masks** — set once, regenerate repeatedly. The mask persists until you clear it.
+- **Standalone** — open from the canvas on any generated image for quick touch-ups.
 
 ### Find that one good image from 200 you generated today
 
 Every generation auto-saves with **full metadata baked into the PNG** — prompt, negative prompt, seed, sampler, steps, all of it. The built-in gallery lets you browse, organize into folders, and **click any image to reload its exact parameters**. One click to resume iteration on anything from any session.
 
-The **History lightbox** now includes a **Slideshow** mode — press Play and images advance automatically, videos play to completion before advancing. Full-screen support is included.
+The **History lightbox** includes a **Slideshow** mode — press Play and images advance automatically (3s per image, videos play to completion before advancing). Full-screen support with auto-hiding controls.
 
 ![Gallery view with search bar, type filters (All/Image/Video/NovelAI/Grok), and folder navigation](docs/screenshots/gallery.png)
 
 ### Use any web image as a reference without leaving the app
 
-**Image Explorer** — paste a URL and see every image on that page. Click one. It's now your img2img source. The app handles proxying, format conversion, and aspect ratio cropping with built-in pan/zoom tools.
+**Image Explorer** — paste a URL and see every image on that page. Click one. It's now your layer source. The app handles proxying, format conversion, and aspect ratio cropping with built-in pan/zoom tools.
 
 Or **Cmd+V** a clipboard image directly.
 
@@ -113,6 +127,7 @@ Or **Cmd+V** a clipboard image directly.
 Same prompt field, same gallery, same workflow. Grok adds:
 - Image generation and image editing (modify existing images with text)
 - **Up to 5 reference images** — attach multiple reference images to guide Grok edits
+- **Use as Source** — one click to set your generated output as the next edit source
 - **Video generation** (5–15s clips) with real-time progress streaming
 - Live **cost dashboard** — know exactly what you're spending
 
@@ -137,13 +152,17 @@ browser ──→ FastAPI backend ──→ NovelAI API
 
 **429 handling:** If NovelAI returns a concurrent generation lock (HTTP 429), the backend automatically retries up to 5 times with a 5-second delay between attempts. You never see a failed generation due to a transient lock.
 
-The frontend is ~7k lines of vanilla JavaScript with zero dependencies. Deliberate choice: the app starts instantly, deploys anywhere Python runs, and the entire client-side codebase is a single file you can read top to bottom.
+**Structured logging** tracks request metadata (dimensions, flags, timing) without recording any sensitive content — no prompts, images, or API tokens are logged.
+
+The frontend is ~7.5k lines of vanilla JavaScript with zero dependencies. Deliberate choice: the app starts instantly, deploys anywhere Python runs, and the entire client-side codebase is a single file you can read top to bottom.
 
 | Layer | Tech |
 |-------|------|
 | Server | Python 3.11+, FastAPI, Uvicorn, fully async |
 | HTTP | httpx |
-| Image analysis | ONNX Runtime (WD Tagger v3), Pillow |
+| Image processing | Pillow, NumPy, SciPy |
+| Image analysis | ONNX Runtime (WD Tagger v3) |
+| Video processing | ffmpeg (optional, for video transforms) |
 | Frontend | Vanilla JS/CSS, zero build step |
 | Data | 400k-tag CSV, curated co-occurrence graph |
 
@@ -152,7 +171,7 @@ backend/
 ├── main.py                 # Entry point — serves frontend + API
 ├── api/
 │   ├── routes.py           # 30+ API endpoints
-│   ├── novelai.py          # NovelAI API client
+│   ├── novelai.py          # NovelAI API client + inpaint compositing
 │   ├── grok.py             # Grok/xAI client (image + video)
 │   └── tagger.py           # WD Tagger v3 (ONNX inference)
 ├── models/schemas.py       # Pydantic models
@@ -163,7 +182,7 @@ backend/
 
 frontend/
 ├── index.html
-├── js/app.js               # All frontend logic (~7k lines)
+├── js/app.js               # All frontend logic (~7.5k lines)
 └── css/style.css           # Design system + components
 ```
 
