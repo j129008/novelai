@@ -1260,6 +1260,16 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   border-bottom: 1px solid var(--border-subtle);
 }
 
+/* @ image mention dropdown */
+.image-mention-dropdown { position: absolute; z-index: 210; background: var(--bg-float); border: 1px solid var(--border-muted); border-radius: var(--radius-md); box-shadow: 0 6px 20px rgba(0,0,0,0.5); min-width: 180px; max-width: 260px; overflow: hidden; }
+.image-mention-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 10px; background: none; border: none; border-bottom: 1px solid var(--border-subtle); color: var(--text-secondary); font-size: 0.78rem; cursor: pointer; text-align: left; }
+.image-mention-item:hover, .image-mention-item--selected { background: var(--bg-overlay); color: var(--text-primary); }
+.image-mention-item:last-child { border-bottom: none; }
+.image-mention-thumb { width: 28px; height: 28px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+.image-mention-thumb--empty { width: 28px; height: 28px; border: 1px dashed var(--border-muted); border-radius: 4px; flex-shrink: 0; }
+.image-mention-label { flex: 1; }
+.image-mention-hint { font-size: 0.65rem; color: var(--text-tertiary); }
+
 /* Prompt history — Spotlight style */
 .prompt-history-wrap { position: relative; }
 .prompt-history-btn { position: absolute; top: 4px; right: 4px; background: none; border: none; color: var(--text-tertiary); cursor: pointer; padding: 3px; border-radius: var(--radius-sm); z-index: 2; }

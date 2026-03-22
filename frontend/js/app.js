@@ -1522,7 +1522,97 @@ function setupAutoSavePrompt() {
 
   prompt.addEventListener("input", () => {
     localStorage.setItem("nai-prompt", prompt.value);
+    _checkImageMention(prompt);
   });
+
+  // ── @ Image Mention ───────────────────────────────────────
+  let _mentionDropdown = null;
+  let _mentionTarget = null;
+
+  function _checkImageMention(textarea) {
+    const provider = document.getElementById("provider")?.value || "novelai";
+    if (provider !== "grok") { _closeMention(); return; }
+
+    const val = textarea.value;
+    const pos = textarea.selectionStart;
+    // Check if the character just before cursor is @
+    if (pos > 0 && val[pos - 1] === "@") {
+      _showMentionDropdown(textarea, pos);
+    } else {
+      _closeMention();
+    }
+  }
+
+  function _showMentionDropdown(textarea, atPos) {
+    _closeMention();
+    const images = [];
+    if (state.img2img) images.push({ label: "Source · Image 1", b64: state.img2img, ref: "the source image" });
+    grokRefs.forEach((r, i) => {
+      images.push({ label: `Ref ${i + 1} · Image ${i + 2}`, b64: r.base64, ref: `image ${i + 2}` });
+    });
+    if (images.length === 0) return;
+
+    const dd = document.createElement("div");
+    dd.className = "image-mention-dropdown";
+    _mentionDropdown = dd;
+    _mentionTarget = textarea;
+
+    images.forEach((img, idx) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "image-mention-item";
+      if (idx === 0) btn.classList.add("image-mention-item--selected");
+
+      const thumb = document.createElement("img");
+      thumb.className = "image-mention-thumb";
+      thumb.src = "data:image/png;base64," + img.b64;
+
+      const label = document.createElement("span");
+      label.className = "image-mention-label";
+      label.textContent = img.label;
+
+      btn.appendChild(thumb);
+      btn.appendChild(label);
+
+      btn.addEventListener("mousedown", (e) => {
+        e.preventDefault(); // prevent blur
+        // Replace the @ with the reference text
+        const before = textarea.value.substring(0, atPos - 1);
+        const after = textarea.value.substring(atPos);
+        textarea.value = before + img.ref + " " + after;
+        textarea.dispatchEvent(new Event("input", { bubbles: true }));
+        const newPos = (before + img.ref + " ").length;
+        textarea.setSelectionRange(newPos, newPos);
+        textarea.focus();
+        _closeMention();
+      });
+
+      dd.appendChild(btn);
+    });
+
+    // Position near the textarea cursor
+    const rect = textarea.getBoundingClientRect();
+    dd.style.position = "fixed";
+    dd.style.left = rect.left + "px";
+    dd.style.top = (rect.bottom + 4) + "px";
+    document.body.appendChild(dd);
+
+    // Close on next input that isn't @, or on blur/escape
+    function onBlur() { setTimeout(_closeMention, 150); }
+    function onKeydown(e) {
+      if (e.key === "Escape") { e.stopImmediatePropagation(); _closeMention(); }
+    }
+    textarea.addEventListener("blur", onBlur, { once: true });
+    textarea.addEventListener("keydown", onKeydown, { once: true });
+  }
+
+  function _closeMention() {
+    if (_mentionDropdown && _mentionDropdown.parentNode) {
+      _mentionDropdown.parentNode.removeChild(_mentionDropdown);
+    }
+    _mentionDropdown = null;
+    _mentionTarget = null;
+  }
   negative.addEventListener("input", () => {
     localStorage.setItem("nai-negative", negative.value);
   });
