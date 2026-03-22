@@ -165,15 +165,19 @@ async def generate_image(
         "parameters": params,
     }
 
+    import asyncio as _asyncio
+
     async with httpx.AsyncClient(timeout=120.0) as client:
-        resp = await client.post(
-            API_URL,
-            json=payload,
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-            },
-        )
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+        for _attempt in range(6):
+            resp = await client.post(API_URL, json=payload, headers=headers)
+            if resp.status_code == 429 and _attempt < 5:
+                await _asyncio.sleep(5)
+                continue
+            break
         if resp.status_code != 200:
             raise RuntimeError(f"{resp.status_code}: {resp.text[:500]}")
 

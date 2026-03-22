@@ -592,18 +592,6 @@
             <span class="config-bar-label">Canvas</span>
             <select id="resolution" class="config-bar-select"></select>
           </div>
-          <!-- Grok: Color Disguise -->
-          <div class="config-bar-field grok-only" id="grok-disguise-field" style="display:none">
-            <span class="config-bar-label">Disguise</span>
-            <select id="grok-color-disguise" class="config-bar-select">
-              <option value="none">Off</option>
-              <option value="scramble">Scramble</option>
-              <option value="negate_rg">Negate R+G</option>
-              <option value="channel_swap">Ch. Swap</option>
-              <option value="invert">Invert</option>
-              <option value="channel_rotate">Ch. Rotate</option>
-            </select>
-          </div>
           <!-- Grok: Aspect Ratio + Resolution merged into one field -->
           <div class="config-bar-field grok-only" id="grok-canvas-field" style="display:none">
             <span class="config-bar-label">Canvas</span>
@@ -729,18 +717,6 @@
               <option value="480p">480p</option>
               <option value="720p">720p</option>
             </select>
-          </div>
-          <div class="field-group compact">
-            <label class="field-label" for="grok-video-color-disguise">Color Disguise</label>
-            <select id="grok-video-color-disguise" class="field-select">
-              <option value="none">None (off)</option>
-              <option value="scramble">Scramble (strongest)</option>
-              <option value="negate_rg">Negate R+G</option>
-              <option value="channel_swap">Channel Swap (R↔B)</option>
-              <option value="invert">Color Inversion</option>
-              <option value="channel_rotate">Channel Rotation</option>
-            </select>
-            <p class="field-hint" style="font-size:0.72rem; color:var(--text-tertiary); margin-top:2px">Applied before sending, reversed on output.</p>
           </div>
         </div>
 

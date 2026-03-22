@@ -3863,10 +3863,6 @@ async function generateGrokImage() {
     model: quality === "pro" ? "grok-imagine-image-pro" : "grok-imagine-image",
   };
 
-  // Color disguise (shared with video)
-  const disguise = document.getElementById("grok-color-disguise")?.value;
-  if (disguise && disguise !== "none") body.color_disguise = disguise;
-
   // Include reference images if any are provided (replaces single img2img for Grok)
   if (grokRefs.length > 0) {
     body.images = grokRefs.map((r) => r.base64);
@@ -3962,10 +3958,7 @@ async function generateGrokVideo() {
     duration: parseInt(document.getElementById("grok-duration")?.value) || 5,
   };
 
-  const colorDisguise = document.getElementById("grok-video-color-disguise")?.value;
-  if (colorDisguise && colorDisguise !== "none") {
-    body.color_disguise = colorDisguise;
-  }
+
 
   // Include source image for image-to-video: prefer explicit img2img source,
   // fall back to whatever is currently on the canvas
