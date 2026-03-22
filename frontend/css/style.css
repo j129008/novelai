@@ -3308,3 +3308,730 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   border-color: var(--accent);
   background: var(--accent-dim);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   LAYERS — client-side compositing panel
+   ═══════════════════════════════════════════════════════════ */
+
+.layers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.layers-empty {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+  padding: 2px 0;
+}
+
+.layers-hint {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+  margin: 4px 0 0;
+}
+
+.layers-hint strong {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.layer-row {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 8px;
+  align-items: start;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 8px 8px 8px;
+  cursor: grab;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.layer-row:hover {
+  border-color: var(--border-muted);
+}
+
+.layer-row--dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+.layer-row--drag-over {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+/* Thumbnail */
+.layer-thumb-wrap {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.layer-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--border-muted);
+  display: block;
+}
+
+.layer-thumb-empty {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: 1px dashed var(--border-strong);
+  color: var(--text-tertiary);
+  background: var(--bg-overlay);
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.layer-thumb-wrap:hover .layer-thumb-empty {
+  border-color: var(--accent);
+  color: var(--accent-bright);
+}
+
+/* Middle: name + opacity */
+.layer-mid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.layer-name {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  outline: none;
+  border-radius: 3px;
+  padding: 1px 3px;
+  margin: -1px -3px;
+  cursor: text;
+  transition: background 0.12s;
+  min-height: 18px;
+}
+
+.layer-name:focus {
+  background: var(--bg-overlay);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-dim);
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+
+.layer-opacity-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.layer-opacity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.layer-opacity-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-tertiary);
+}
+
+.layer-opacity-val {
+  font-size: 0.72rem;
+}
+
+.layer-opacity-slider {
+  height: 4px;
+  cursor: pointer;
+}
+
+/* Controls: eye + remove */
+.layer-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.layer-eye-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.12s, background 0.12s;
+  min-width: 26px;
+  min-height: 26px;
+}
+
+.layer-eye-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-overlay);
+}
+
+.layer-eye-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.layer-eye-off {
+  color: var(--text-tertiary);
+  opacity: 0.5;
+}
+
+.layer-eye-off:hover {
+  opacity: 1;
+}
+
+.layer-remove-btn {
+  font-size: 1rem;
+}
+
+/* ─── Layer mask button in the layer row controls ─── */
+.layer-mask-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.12s, background 0.12s;
+  min-width: 26px;
+  min-height: 26px;
+  position: relative;
+}
+
+.layer-mask-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-overlay);
+}
+
+.layer-mask-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+/* Active indicator dot — shown when layer has a mask */
+.layer-mask-btn--active {
+  color: var(--accent-bright);
+}
+
+.layer-mask-btn--active::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent-bright);
+  border: 1px solid var(--bg-deep);
+}
+
+/* ─── Composite preview badge on canvas area ─── */
+.composite-preview-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  background: var(--accent-dim);
+  border: 1px solid rgba(124, 92, 252, 0.4);
+  color: var(--accent-bright);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 3px 9px;
+  border-radius: 10px;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LAYER MASK OVERLAY — full-screen mask-painting modal
+   ═══════════════════════════════════════════════════════════ */
+
+.layer-mask-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(4, 4, 10, 0.92);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: cropOverlayIn 0.2s var(--ease-out) both;
+}
+
+.layer-mask-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  max-width: 860px;
+  height: calc(100vh - 48px);
+  max-height: calc(100vh - 48px);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(124, 92, 252, 0.15);
+  animation: cropShellIn 0.25s var(--ease-out) both;
+}
+
+/* Layer mask header */
+.layer-mask-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.layer-mask-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.layer-mask-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.layer-mask-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(124, 92, 252, 0.4);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--accent-bright);
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.layer-mask-hint {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layer-mask-mode-btn {
+  min-width: 84px;
+  justify-content: center;
+}
+
+/* Reveal mode: accent colors signal a constructive action */
+.layer-mask-mode-btn.layer-mask-mode--reveal {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent-bright);
+}
+
+/* Hide mode: danger colors signal a destructive/removal action */
+.layer-mask-mode-btn.layer-mask-mode--hide {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+
+/* Layer mask stage */
+.layer-mask-stage-wrap {
+  position: relative;
+  flex: 1 1 0%;
+  min-height: 200px;
+  overflow: hidden;
+  background: var(--bg-deep);
+  background-image:
+    linear-gradient(45deg, #1a1a2e 25%, transparent 25%),
+    linear-gradient(-45deg, #1a1a2e 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #1a1a2e 75%),
+    linear-gradient(-45deg, transparent 75%, #1a1a2e 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+}
+
+.layer-mask-canvas {
+  position: absolute;
+  display: block;
+  touch-action: none;
+}
+
+.layer-mask-canvas--source {
+  /* sized and positioned by JS */
+}
+
+.layer-mask-canvas--draw {
+  cursor: crosshair;
+  /* sized and positioned by JS — sits on top of source */
+}
+
+.layer-mask-cursor {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  transition: width 0.1s, height 0.1s;
+  display: none;
+  z-index: 10;
+}
+
+/* Layer mask footer */
+.layer-mask-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.layer-mask-brush-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 180px;
+  max-width: 320px;
+}
+
+.layer-mask-brush-control .field-label {
+  flex-shrink: 0;
+}
+
+.layer-mask-brush-range {
+  flex: 1;
+  margin: 0;
+}
+
+.layer-mask-brush-val {
+  font-size: 0.82rem;
+  color: var(--accent-bright);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  min-width: 26px;
+  text-align: right;
+}
+
+.layer-mask-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 860px) {
+  .layer-mask-hint {
+    display: none;
+  }
+  .layer-mask-shell {
+    max-height: calc(100vh - 24px);
+    max-width: 100%;
+  }
+  .layer-mask-overlay {
+    padding: 12px;
+  }
+  .layer-mask-footer {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+/* ─── Layer draw button in the layer row controls ─── */
+.layer-draw-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.12s, background 0.12s;
+  min-width: 26px;
+  min-height: 26px;
+  position: relative;
+}
+
+.layer-draw-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-overlay);
+}
+
+.layer-draw-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+/* Active indicator dot — shown when layer has drawn content */
+.layer-draw-btn--active {
+  color: var(--accent-bright);
+}
+
+.layer-draw-btn--active::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent-bright);
+  border: 1px solid var(--bg-deep);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LAYER DRAW OVERLAY — full-screen freehand drawing modal
+   ═══════════════════════════════════════════════════════════ */
+
+.layer-draw-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(4, 4, 10, 0.92);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: cropOverlayIn 0.2s var(--ease-out) both;
+}
+
+.layer-draw-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  max-width: 860px;
+  height: calc(100vh - 48px);
+  max-height: calc(100vh - 48px);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(124, 92, 252, 0.25);
+  animation: cropShellIn 0.25s var(--ease-out) both;
+}
+
+/* Layer draw header */
+.layer-draw-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.layer-draw-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.layer-draw-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.layer-draw-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(124, 92, 252, 0.4);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--accent-bright);
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.layer-draw-hint {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layer-draw-mode-btn {
+  min-width: 84px;
+  justify-content: center;
+}
+
+/* Erase mode: use neutral tone */
+.layer-draw-mode-btn[data-mode="erase"] {
+  background: var(--bg-overlay);
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
+}
+
+/* Layer draw stage */
+.layer-draw-stage-wrap {
+  position: relative;
+  flex: 1 1 0%;
+  min-height: 200px;
+  overflow: hidden;
+  background: var(--bg-deep);
+  background-image:
+    linear-gradient(45deg, #1a1a2e 25%, transparent 25%),
+    linear-gradient(-45deg, #1a1a2e 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #1a1a2e 75%),
+    linear-gradient(-45deg, transparent 75%, #1a1a2e 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+}
+
+.layer-draw-canvas {
+  position: absolute;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+  /* sized and positioned by JS */
+}
+
+.layer-draw-cursor {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  background: transparent;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  transition: width 0.1s, height 0.1s, border-color 0.1s;
+  display: none;
+  z-index: 10;
+}
+
+/* Layer draw footer */
+.layer-draw-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.layer-draw-color-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.layer-draw-color-input {
+  width: 32px;
+  height: 28px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: 2px;
+  background: var(--bg-deep);
+}
+
+.layer-draw-color-input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-dim);
+  border-color: var(--accent);
+}
+
+.layer-draw-brush-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 180px;
+  max-width: 320px;
+}
+
+.layer-draw-brush-control .field-label {
+  flex-shrink: 0;
+}
+
+.layer-draw-brush-range {
+  flex: 1;
+  margin: 0;
+}
+
+.layer-draw-brush-val {
+  font-size: 0.82rem;
+  color: var(--accent-bright);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  min-width: 26px;
+  text-align: right;
+}
+
+.layer-draw-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 860px) {
+  .layer-draw-hint {
+    display: none;
+  }
+  .layer-draw-shell {
+    max-height: calc(100vh - 24px);
+    max-width: 100%;
+  }
+  .layer-draw-overlay {
+    padding: 12px;
+  }
+  .layer-draw-footer {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}

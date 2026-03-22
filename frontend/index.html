@@ -282,6 +282,132 @@
       </div>
     </div>
 
+    <!-- ═══════════════════════════════════════════════════════════
+         LAYER MASK OVERLAY — full-screen modal for per-layer mask painting
+         ═══════════════════════════════════════════════════════════ -->
+    <div id="layer-mask-overlay" class="layer-mask-overlay" style="display:none" aria-modal="true" role="dialog" aria-label="Edit layer mask">
+      <div class="layer-mask-shell">
+
+        <div class="layer-mask-header">
+          <div class="layer-mask-header-left">
+            <div class="layer-mask-mode-badge">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M3 15l4-4 4 4 4-4 4 4"/></svg>
+              Layer Mask
+            </div>
+            <span class="layer-mask-hint">Paint to reveal &nbsp;·&nbsp; Unpainted areas are hidden</span>
+          </div>
+          <div class="layer-mask-header-right">
+            <button id="layer-mask-mode-toggle" class="btn-action layer-mask-mode-btn layer-mask-mode--reveal" type="button" data-mode="paint" title="Switch between Reveal and Hide">
+              <svg class="layer-mask-icon-paint" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              <svg class="layer-mask-icon-erase" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none"><path d="M20 20H7L3 16l9-9 8 8"/><path d="m6.5 17.5 8-8"/></svg>
+              <span class="layer-mask-mode-label">Reveal</span>
+            </button>
+            <button id="layer-mask-cancel" class="crop-cancel-btn" type="button">Cancel</button>
+          </div>
+        </div>
+
+        <div class="layer-mask-stage-wrap">
+          <!-- Source image layer — read-only display -->
+          <canvas id="layer-mask-source" class="layer-mask-canvas layer-mask-canvas--source"></canvas>
+          <!-- Mask layer — receives all pointer events -->
+          <canvas id="layer-mask-canvas" class="layer-mask-canvas layer-mask-canvas--draw"></canvas>
+          <!-- Cursor preview circle -->
+          <div id="layer-mask-cursor" class="layer-mask-cursor" aria-hidden="true"></div>
+        </div>
+
+        <div class="layer-mask-footer">
+          <button id="layer-mask-clear" class="btn-action btn-action--danger" type="button">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+            Clear
+          </button>
+          <button id="layer-mask-invert" class="btn-action" type="button" title="Swap visible and hidden areas">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2v20"/><path d="M12 2a10 10 0 0 1 0 20z" fill="currentColor" stroke="none"/></svg>
+            Flip
+          </button>
+          <div class="layer-mask-brush-control">
+            <label class="field-label" for="layer-mask-brush-size">Brush</label>
+            <input type="range" id="layer-mask-brush-size" class="field-range layer-mask-brush-range" min="4" max="120" step="2" value="32">
+            <span class="slider-value layer-mask-brush-val" id="layer-mask-brush-val">32</span>
+          </div>
+          <div class="layer-mask-footer-actions">
+            <button id="layer-mask-undo" class="btn-action" type="button" title="Undo (Cmd+Z / Ctrl+Z)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+              Undo
+            </button>
+            <button id="layer-mask-confirm" class="btn-action btn-action--confirm" type="button">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              Apply Mask
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         LAYER DRAW OVERLAY — full-screen modal for freehand drawing on a layer
+         ═══════════════════════════════════════════════════════════ -->
+    <div id="layer-draw-overlay" class="layer-draw-overlay" style="display:none" aria-modal="true" role="dialog" aria-label="Draw on layer">
+      <div class="layer-draw-shell">
+
+        <div class="layer-draw-header">
+          <div class="layer-draw-header-left">
+            <div class="layer-draw-mode-badge">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              Draw
+            </div>
+            <span class="layer-draw-hint">Sketch on this layer</span>
+          </div>
+          <div class="layer-draw-header-right">
+            <button id="layer-draw-mode-toggle" class="btn-action layer-draw-mode-btn" type="button" data-mode="paint" title="Switch between Paint and Erase">
+              <svg class="layer-draw-icon-paint" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              <svg class="layer-draw-icon-erase" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none"><path d="M20 20H7L3 16l9-9 8 8"/><path d="m6.5 17.5 8-8"/></svg>
+              <span class="layer-draw-mode-label">Paint</span>
+            </button>
+            <button id="layer-draw-cancel" class="crop-cancel-btn" type="button">Cancel</button>
+          </div>
+        </div>
+
+        <div class="layer-draw-stage-wrap">
+          <!-- Draw canvas — receives all pointer events -->
+          <canvas id="layer-draw-canvas" class="layer-draw-canvas"></canvas>
+          <!-- Cursor preview circle -->
+          <div id="layer-draw-cursor" class="layer-draw-cursor" aria-hidden="true"></div>
+        </div>
+
+        <div class="layer-draw-footer">
+          <button id="layer-draw-clear" class="btn-action btn-action--danger" type="button">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+            Clear
+          </button>
+          <button id="layer-draw-fill" class="btn-action" type="button" title="Fill canvas with selected color">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 22l1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="M14 6l3-3 3 3"/><path d="M20 9a3 3 0 1 1 0 6"/></svg>
+            Fill
+          </button>
+          <div class="layer-draw-color-control">
+            <label class="field-label" for="layer-draw-color">Color</label>
+            <input type="color" id="layer-draw-color" class="layer-draw-color-input" value="#000000" title="Brush color">
+          </div>
+          <div class="layer-draw-brush-control">
+            <label class="field-label" for="layer-draw-brush-size">Brush</label>
+            <input type="range" id="layer-draw-brush-size" class="field-range layer-draw-brush-range" min="4" max="120" step="2" value="20">
+            <span class="slider-value layer-draw-brush-val" id="layer-draw-brush-val">20</span>
+          </div>
+          <div class="layer-draw-footer-actions">
+            <button id="layer-draw-undo" class="btn-action" type="button" title="Undo (Cmd+Z / Ctrl+Z)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+              Undo
+            </button>
+            <button id="layer-draw-confirm" class="btn-action btn-action--confirm" type="button">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              Apply
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
     <!-- Hidden file input for img2img — triggered programmatically -->
     <input type="file" id="img2img-file-input" accept="image/*" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" aria-hidden="true" tabindex="-1">
 
@@ -419,6 +545,24 @@
               <input type="range" id="noise" class="field-range" min="0" max="1" step="0.05" value="0.0">
               <div class="slider-endpoints"><span>None</span><span>Maximum</span></div>
             </div>
+          </div>
+        </details>
+
+        <!-- 4. Layers accordion (NovelAI only) -->
+        <details class="accordion" id="layers-accordion">
+          <summary class="accordion-header">
+            <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
+            Layers
+            <span id="layers-badge" class="accordion-badge" style="display:none">0</span>
+          </summary>
+          <div class="accordion-body">
+            <p class="accordion-hint">Composite multiple images as input. Layers are blended top-to-bottom at generate time. Click a thumbnail to load an image.</p>
+            <div id="layers-list" class="layers-list"></div>
+            <p id="layers-hint" class="layers-hint" style="display:none">Adjust <strong>Transformation</strong> strength in Image to Image to control how closely AI follows the composite.</p>
+            <button id="btn-add-layer" class="btn-action btn-action--primary" type="button" style="width:100%; justify-content:center; margin-top:4px">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Layer
+            </button>
           </div>
         </details>
 
@@ -640,6 +784,7 @@
         <div id="panel-canvas" class="canvas-panel">
 
           <div id="canvas-drop-target" class="canvas-drop-target">
+            <div id="composite-preview-badge" class="composite-preview-badge" aria-hidden="true" style="display:none">Preview</div>
             <div id="output" class="output-area">
               <div class="placeholder">
                 <div class="placeholder-icon">
@@ -682,6 +827,10 @@
               <button id="btn-inpaint" class="btn-action btn-action--iterate novelai-only" type="button" style="display:none">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                 Inpaint
+              </button>
+              <button id="btn-send-to-layer" class="btn-action novelai-only" type="button" title="Send this image to a new layer in the Layers panel" style="display:none">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M9 10l3 3 3-3"/></svg>
+                Send to Layer
               </button>
               <button id="btn-download" class="btn-action btn-action--primary" type="button">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
