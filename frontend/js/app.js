@@ -2209,6 +2209,7 @@ function setupGrokRefs() {
   // ── Drag-and-drop on the list panel ────────────────────
   imagesList.addEventListener("dragover", (e) => {
     e.preventDefault();
+    e.stopPropagation();
     imagesList.classList.add("drag-over");
   });
   imagesList.addEventListener("dragleave", (e) => {
@@ -2218,6 +2219,7 @@ function setupGrokRefs() {
   });
   imagesList.addEventListener("drop", (e) => {
     e.preventDefault();
+    e.stopPropagation();
     imagesList.classList.remove("drag-over");
     const file = e.dataTransfer.files[0];
     if (!file || !file.type.startsWith("image/")) return;
