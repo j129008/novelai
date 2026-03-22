@@ -523,19 +523,12 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   .canvas-tabbar { flex-wrap: wrap; }
   .history-search-wrap { max-width: none; }
 }
-/* img2img sidebar */
-.img2img-source-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-.btn-img2img-upload { width: 100%; justify-content: center; padding: 9px 14px; border-style: dashed; }
-.img2img-source-hint { font-size: 0.75rem; color: var(--text-tertiary); line-height: 1.4; }
-.img2img-source-preview-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.img2img-source-actions { display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .btn-action--danger { border-color: var(--danger-border); color: var(--danger); }
 .btn-action--danger:hover { background: var(--danger-bg); border-color: var(--danger); }
 .btn-action--danger-subtle { border-color: var(--border-muted); color: var(--text-tertiary); font-size: 1rem; padding: 4px 8px; min-width: 0; }
 .btn-action--danger-subtle:hover { border-color: var(--danger); color: var(--danger); }
 .btn-action--iterate { background: var(--accent-dim); border-color: rgba(124,92,252,0.3); color: var(--accent-bright); }
 .btn-action--iterate:hover { background: rgba(124,92,252,0.28); border-color: var(--accent); color: white; }
-.img2img-sidebar-active { margin-left: auto; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: var(--accent-dim); border: 1px solid rgba(124,92,252,0.4); color: var(--accent-bright); padding: 1px 7px; border-radius: 10px; }
 
 /* ═══════════════════════════════════════════════════════════
    IMG2IMG — DROP TARGET (legacy, kept for crop overlay)
@@ -607,120 +600,6 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   font-weight: 600;
 }
 
-/* ═══════════════════════════════════════════════════════════
-   IMG2IMG — ACTIVE BADGE (in tabbar)
-   ═══════════════════════════════════════════════════════════ */
-
-.img2img-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(124, 92, 252, 0.18);
-  border: 1px solid rgba(124, 92, 252, 0.45);
-  border-radius: 20px;
-  padding: 4px 8px 4px 10px;
-  font-size: 0.73rem;
-  font-weight: 600;
-  color: var(--accent-bright);
-  letter-spacing: 0.02em;
-  /* Animate in */
-  animation: badgeIn 0.22s var(--ease-out) both;
-}
-
-@keyframes badgeIn {
-  from { opacity: 0; transform: scale(0.85) translateY(4px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.img2img-badge-clear {
-  background: none;
-  border: none;
-  color: var(--accent-bright);
-  font-size: 1rem;
-  line-height: 1;
-  padding: 0 2px;
-  cursor: pointer;
-  opacity: 0.7;
-  transition: opacity 0.12s, color 0.12s;
-  font-family: inherit;
-}
-
-.img2img-badge-clear:hover {
-  opacity: 1;
-  color: var(--danger);
-}
-
-/* ═══════════════════════════════════════════════════════════
-   IMG2IMG — CONTROLS BAR (below output, when active)
-   ═══════════════════════════════════════════════════════════ */
-
-.img2img-controls {
-  border: 1px solid rgba(124, 92, 252, 0.25);
-  border-radius: var(--radius-md);
-  background: rgba(124, 92, 252, 0.06);
-  padding: 12px 14px;
-  animation: slideDown 0.22s var(--ease-out) both;
-}
-
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.img2img-controls-inner {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-}
-
-.img2img-source-preview {
-  position: relative;
-  flex-shrink: 0;
-  width: 64px;
-  height: 64px;
-  border-radius: var(--radius-sm);
-  overflow: visible;
-}
-
-.img2img-thumb {
-  width: 64px;
-  height: 64px;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-muted);
-  display: block;
-}
-
-.img2img-change-btn {
-  position: absolute;
-  bottom: -8px;
-  right: -8px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--bg-float);
-  border: 1px solid var(--border-strong);
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-
-.img2img-change-btn:hover {
-  background: var(--accent-dim);
-  border-color: var(--accent);
-  color: var(--accent-bright);
-}
-
-.img2img-sliders {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px 16px;
-  min-width: 0;
-}
 
 /* ═══════════════════════════════════════════════════════════
    CROP OVERLAY — full-screen modal
@@ -1149,9 +1028,6 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
    ═══════════════════════════════════════════════════════════ */
 
 @media (max-width: 860px) {
-  .img2img-sliders {
-    grid-template-columns: 1fr;
-  }
   .crop-hint {
     display: none;
   }
@@ -1165,17 +1041,6 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 }
 
 @media (max-width: 480px) {
-  .img2img-controls-inner {
-    flex-direction: column;
-  }
-  .img2img-source-preview {
-    width: 48px;
-    height: 48px;
-  }
-  .img2img-thumb {
-    width: 48px;
-    height: 48px;
-  }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -3842,6 +3707,104 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   border: 1px solid var(--bg-deep);
 }
 
+/* ─── Layer inpaint mask button in the layer row controls ─── */
+.layer-inpaint-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.12s, background 0.12s;
+  min-width: 26px;
+  min-height: 26px;
+  position: relative;
+}
+
+.layer-inpaint-btn:hover {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.layer-inpaint-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(240, 80, 80, 0.2);
+}
+
+/* Active state — danger/red to distinguish from visibility mask (accent/purple) */
+.layer-inpaint-btn--active {
+  color: var(--danger);
+}
+
+.layer-inpaint-btn--active::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--danger);
+  border: 1px solid var(--bg-deep);
+}
+
+/* ─── Layer output target button in the layer row controls ─── */
+.layer-target-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.12s, background 0.12s;
+  min-width: 26px;
+  min-height: 26px;
+}
+
+.layer-target-btn:hover {
+  color: var(--accent-bright);
+  background: var(--accent-dim);
+}
+
+.layer-target-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+/* Active state — accent colored to indicate "output goes here" */
+.layer-target-btn--active {
+  color: var(--accent-bright);
+}
+
+/* Row-level indicator: accent left border when this layer is the output target */
+.layer-row--output-target {
+  border-left-color: var(--accent);
+  border-left-width: 2px;
+}
+
+/* ─── Generation section divider and label inside layers accordion ─── */
+.layers-gen-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 8px 0 0;
+}
+
+.layers-gen-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-tertiary);
+  margin: 8px 0 4px;
+}
+
 /* ═══════════════════════════════════════════════════════════
    LAYER DRAW OVERLAY — full-screen freehand drawing modal
    ═══════════════════════════════════════════════════════════ */
@@ -3951,6 +3914,13 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   background-position: 0 0, 0 10px, 10px -10px, -10px 0;
 }
 
+.layer-draw-bg {
+  position: absolute;
+  display: block;
+  opacity: 0.3;
+  pointer-events: none;
+  /* sized and positioned by JS — same as draw canvas */
+}
 .layer-draw-canvas {
   position: absolute;
   display: block;

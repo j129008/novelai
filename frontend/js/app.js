@@ -20,8 +20,7 @@ const UC_PRESETS = {
 };
 
 const state = {
-  img2img: null,          // base64 PNG at exact output resolution, set after crop confirmed
-  img2imgThumbDataUrl: null, // small data URL just for the thumbnail preview
+  img2img: null,          // base64 PNG at exact output resolution, set by compositeLayersToBase64()
   lastSeed: null,
   lastImageBase64: null,
   lastVideoBase64: null,  // base64 MP4 from Grok video generation
@@ -31,7 +30,6 @@ const state = {
   canvasImageWidth: null,
   canvasImageHeight: null,
   grokOutputType: "image", // "image" | "video" — Grok output mode
-  inpaintMask: null,      // base64 PNG black/white mask for inpainting (NovelAI only)
 };
 
 // ── VIBES ─────────────────────────────────────────────────
@@ -44,7 +42,7 @@ const grokRefs = [];
 const MAX_GROK_REFS = 5;
 
 // ── LAYERS ────────────────────────────────────────────────────
-// Each entry: { id, name, imageBase64, opacity, visible }
+// Each entry: { id, name, imageBase64, maskBase64, inpaintMaskBase64, opacity, visible, isOutputTarget }
 // Index 0 = bottom layer, last index = top layer.
 const layers = [];
 const MAX_LAYERS = 8;
@@ -114,11 +112,8 @@ function applyProvider(provider) {
     document.querySelector('[data-target="negative-prompt"]'), // Undesired tab button
     document.getElementById("quality-tags-pill"),
     document.getElementById("characters-accordion"),
-    document.getElementById("auto-iterate")?.closest(".toggle-switch"),
     document.getElementById("auto-generate")?.closest(".toggle-switch"),
-    document.querySelector(".auto-toggles-divider"),
     document.getElementById("gen-settings-btn"),
-    document.getElementById("img2img-accordion"),
     document.getElementById("layers-accordion"),
   ];
 
@@ -256,8 +251,7 @@ async function init() {
 
   setupVibes();
   setupGrokRefs();
-
-  setupImg2ImgControls();
+  setupCanvasDropZone();
 
   setupPromptTabs();
   setupHdEnhancement();
@@ -267,7 +261,6 @@ async function init() {
   loadGallery();
 
   $("#generate-btn").addEventListener("click", generate);
-  $("#btn-iterate").addEventListener("click", iterateOnResult);
   $("#btn-random-seed").addEventListener("click", () => { $("#seed").value = 0; });
   $("#btn-reuse-seed").addEventListener("click", reuseSeed);
   $("#btn-download").addEventListener("click", downloadImage);
@@ -352,14 +345,11 @@ async function init() {
     });
   }
 
-  $("#btn-set-as-source").addEventListener("click", setCanvasImageAsSource);
-
-
-  // "×" Clear canvas + img2img source
+  // "×" Clear canvas
   const clearCanvasBtn = $("#btn-clear-canvas");
   if (clearCanvasBtn) {
     clearCanvasBtn.addEventListener("click", () => {
-      clearImg2Img();
+      state.img2img = null;
       state.canvasImageBase64 = null;
       state.lastImageBase64 = null;
       state.lastVideoBase64 = null;
@@ -424,28 +414,10 @@ async function init() {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   IMG2IMG — DROP ZONE SETUP
+   CANVAS DROP ZONE SETUP
    ═══════════════════════════════════════════════════════════ */
 
-function setupImg2ImgControls() {
-  const fileInput = $("#img2img-file-input");
-  const uploadBtn = $("#btn-upload-img2img");
-  const clearBtn  = $("#img2img-badge-clear");
-  const changeBtn = $("#img2img-change");
-
-  if (uploadBtn) uploadBtn.addEventListener("click", () => fileInput && fileInput.click());
-  if (changeBtn) changeBtn.addEventListener("click", () => fileInput && fileInput.click());
-  if (clearBtn)  clearBtn.addEventListener("click", clearImg2Img);
-
-  if (fileInput) {
-    fileInput.addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (file) loadImageFile(file);
-      fileInput.value = "";
-    });
-  }
-
-  // Canvas drop zone — shortcut to img2img
+function setupCanvasDropZone() {
   const dropTarget = $("#canvas-drop-target");
   if (dropTarget) {
     let dragCounter = 0;
@@ -469,8 +441,6 @@ function setupImg2ImgControls() {
       const file = e.dataTransfer.files[0];
       if (file && file.type.startsWith("image/")) {
         loadImageFile(file);
-        const accordion = $("#img2img-accordion");
-        if (accordion && !accordion.open) accordion.open = true;
       }
     });
   }
@@ -571,16 +541,10 @@ function showPasteActionPopup(file) {
   const btnI2I = document.createElement("button");
   btnI2I.type = "button";
   btnI2I.className = "btn-action btn-action--primary";
-  btnI2I.textContent = "Use as img2img";
+  btnI2I.textContent = "Add to Layer";
   btnI2I.addEventListener("click", () => {
     popup.remove();
     loadImageFile(file);
-    const provider = document.getElementById("provider")?.value || "novelai";
-    if (provider !== "grok") {
-      const accordion = $("#img2img-accordion");
-      if (accordion && !accordion.open) accordion.open = true;
-    }
-    showStatus("Image set as img2img source");
   });
 
   const btnSettings = document.createElement("button");
@@ -631,23 +595,17 @@ function showPasteActionPopup(file) {
 }
 
 function loadImageFile(file) {
-  console.log("[loadImageFile] called, file:", file?.name, file?.size);
   const reader = new FileReader();
   reader.onload = (ev) => {
-    console.log("[loadImageFile] FileReader loaded, dataUrl length:", ev.target.result.length);
     const img = new Image();
     img.onload = () => {
       const provider = document.getElementById("provider")?.value || "novelai";
-      console.log("[loadImageFile] img loaded, provider:", provider, "size:", img.naturalWidth, "x", img.naturalHeight);
 
       if (provider === "grok") {
         const ar = document.getElementById("grok-aspect-ratio")?.value || "auto";
-        console.log("[loadImageFile] grok mode, aspect_ratio:", ar);
         if (ar === "auto") {
           // Auto: use image as-is, no crop
           state.img2img = ev.target.result.split(",")[1];
-          state.img2imgThumbDataUrl = ev.target.result;
-          activateImg2ImgMode();
           showGrokSourceOnCanvas(ev.target.result);
           state.canvasImageBase64 = state.img2img;
           state.canvasImageWidth = img.naturalWidth;
@@ -661,58 +619,25 @@ function loadImageFile(file) {
         return;
       }
 
-      const resVal = $("#resolution").value || "832x1216";
-      const [tw, th] = resVal.split("x").map(Number);
-      // Skip crop if image already matches target resolution
-      if (img.naturalWidth === tw && img.naturalHeight === th) {
-        const canvas = document.createElement("canvas");
-        canvas.width = tw;
-        canvas.height = th;
-        canvas.getContext("2d").drawImage(img, 0, 0);
-        state.img2img = canvas.toDataURL("image/png").split(",")[1];
-        state.img2imgThumbDataUrl = ev.target.result;
-        activateImg2ImgMode();
-      } else {
-        openCropOverlay(img);
+      // NovelAI: add image to a new layer instead of img2img source
+      const b64 = ev.target.result.split(",")[1];
+      if (layers.length >= MAX_LAYERS) {
+        showStatus("Maximum of " + MAX_LAYERS + " layers reached.");
+        return;
       }
+      const baseName = file.name ? file.name.replace(/\.[^.]+$/, "") : "Layer " + (layers.length + 1);
+      layers.push({ id: Date.now(), name: baseName, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false });
+      renderLayerList();
+      saveLayersToStorage();
+      refreshCompositePreview();
+      // Open layers accordion so the user sees the new layer
+      const accordion = document.getElementById("layers-accordion");
+      if (accordion && !accordion.open) accordion.open = true;
+      showStatus("Image added as layer \"" + baseName + "\"");
     };
     img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
-}
-
-function iterateOnResult() {
-  if (!state.lastImageBase64) return;
-  state.img2img = state.lastImageBase64;
-  const outputImg = $("#output img");
-  if (outputImg) {
-    const thumb = document.createElement("canvas");
-    thumb.width = 128; thumb.height = 128;
-    thumb.getContext("2d").drawImage(outputImg, 0, 0, 128, 128);
-    state.img2imgThumbDataUrl = thumb.toDataURL("image/jpeg", 0.8);
-  }
-  activateImg2ImgMode();
-  const accordion = $("#img2img-accordion");
-  if (accordion && !accordion.open) accordion.open = true;
-}
-
-function clearImg2Img() {
-  state.img2img = null;
-  state.img2imgThumbDataUrl = null;
-
-  const sourceEmpty  = $("#img2img-source-empty");
-  const sourceActive = $("#img2img-source-active");
-  const thumb        = $("#img2img-source-thumb");
-  const badge        = $("#img2img-sidebar-badge");
-  const refChip      = $("#ref-source-chip");
-  const refChipImg   = $("#ref-source-thumb-chip");
-
-  if (sourceEmpty)  sourceEmpty.style.display  = "flex";
-  if (sourceActive) sourceActive.style.display = "none";
-  if (thumb)        thumb.src = "";
-  if (badge)        badge.style.display        = "none";
-  if (refChip)      refChip.style.display      = "none";
-  if (refChipImg)   refChipImg.src             = "";
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1031,42 +956,33 @@ function confirmCrop() {
 
   // Export as PNG base64
   const dataUrl = exportCanvas.toDataURL("image/png");
-  state.img2img = dataUrl.split(",")[1]; // strip "data:image/png;base64,"
-  console.log("[cropConfirm] exported:", crop.targetW, "x", crop.targetH, "b64 length:", state.img2img.length);
-
-  // Generate a small thumbnail for the controls bar
-  const thumbCanvas = document.createElement("canvas");
-  const thumbSize = 128;
-  thumbCanvas.width  = thumbSize;
-  thumbCanvas.height = thumbSize;
-  const thumbCtx = thumbCanvas.getContext("2d");
-  thumbCtx.drawImage(exportCanvas, 0, 0, crop.targetW, crop.targetH, 0, 0, thumbSize, thumbSize);
-  state.img2imgThumbDataUrl = thumbCanvas.toDataURL("image/jpeg", 0.8);
+  const b64 = dataUrl.split(",")[1];
 
   closeCropOverlay();
-  activateImg2ImgMode();
-
-  // Show the cropped image on canvas
-  state.canvasImageBase64 = state.img2img;
-  state.canvasImageWidth = crop.targetW;
-  state.canvasImageHeight = crop.targetH;
 
   const provider = document.getElementById("provider")?.value || "novelai";
   if (provider === "grok") {
+    state.img2img = b64;
+    state.canvasImageBase64 = b64;
+    state.canvasImageWidth = crop.targetW;
+    state.canvasImageHeight = crop.targetH;
     showGrokSourceOnCanvas(dataUrl);
   } else {
-    // NovelAI: show source image on canvas and switch to Canvas tab
-    const output = $("#output");
-    const img = document.createElement("img");
-    img.src = dataUrl;
-    img.alt = "Source image";
-    output.innerHTML = "";
-    output.appendChild(img);
+    // NovelAI: add cropped image as a new layer
+    if (layers.length < MAX_LAYERS) {
+      const n = layers.length + 1;
+      layers.push({ id: Date.now(), name: "Layer " + n, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false });
+      renderLayerList();
+      saveLayersToStorage();
+      refreshCompositePreview();
+      const accordion = document.getElementById("layers-accordion");
+      if (accordion && !accordion.open) accordion.open = true;
+      showStatus("Cropped image added as layer.");
+    } else {
+      showStatus("Maximum of " + MAX_LAYERS + " layers reached.");
+    }
     const canvasTab = $("#tab-canvas");
     if (canvasTab) canvasTab.click();
-    const actions = $("#image-actions");
-    if (actions) actions.style.display = "flex";
-    syncInpaintButtonVisibility();
   }
 }
 
@@ -1092,7 +1008,7 @@ function showGrokSourceOnCanvas(dataUrl) {
   removeBtn.title = "Remove source image";
   removeBtn.innerHTML = "✕";
   removeBtn.addEventListener("click", () => {
-    clearImg2Img();
+    state.img2img = null;
     output.innerHTML = "";
     state.canvasImageBase64 = null;
     state.canvasImageWidth = null;
@@ -1103,31 +1019,6 @@ function showGrokSourceOnCanvas(dataUrl) {
   wrap.appendChild(badge);
   wrap.appendChild(removeBtn);
   output.appendChild(wrap);
-}
-
-function showSourceRefThumb(outputEl, thumbDataUrl) {
-  // Populate the ref-source-chip in the image-actions bar
-  const chip = document.getElementById("ref-source-chip");
-  const chipImg = document.getElementById("ref-source-thumb-chip");
-  if (chip && chipImg) {
-    chipImg.src = thumbDataUrl;
-    chip.style.display = "inline-flex";
-  }
-}
-
-function activateImg2ImgMode() {
-  const sourceEmpty  = $("#img2img-source-empty");
-  const sourceActive = $("#img2img-source-active");
-  const thumb        = $("#img2img-source-thumb");
-  const badge        = $("#img2img-sidebar-badge");
-
-  if (sourceEmpty)  sourceEmpty.style.display  = "none";
-  if (sourceActive) sourceActive.style.display = "block";
-  if (badge)        badge.style.display        = "inline-block";
-
-  if (thumb && state.img2imgThumbDataUrl) {
-    thumb.src = state.img2imgThumbDataUrl;
-  }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -2013,8 +1904,6 @@ function resetGenerateButton() {
   btn.querySelector(".btn-generate-label").textContent = isVideo ? "Generate Video" : "Generate";
   btn.querySelector(".btn-generate-hint").textContent = "Enter";
   _generateAbortController = null;
-  const inpaintBtn = document.getElementById("btn-inpaint");
-  if (inpaintBtn) inpaintBtn.disabled = false;
 }
 
 async function generate() {
@@ -2079,11 +1968,12 @@ async function generate() {
     state.img2img = await compositeLayersToBase64(width, height);
   }
 
-  if (state.inpaintMask) {
-    // Inpaint mode: supply both the source image and the binary mask
-    body.image = state.canvasImageBase64;
-    body.mask  = state.inpaintMask;
-    // Use source image dimensions (not resolution dropdown) for inpaint
+  const inpaintLayer = layers.find(l => l.inpaintMaskBase64);
+  if (inpaintLayer) {
+    // Inpaint mode: use composite (or canvas image) as base + layer's inpaint mask
+    body.image = state.img2img || state.canvasImageBase64;
+    body.mask  = inpaintLayer.inpaintMaskBase64;
+    // Use canvas image dimensions for inpaint
     if (state.canvasImageWidth && state.canvasImageHeight) {
       body.width = state.canvasImageWidth;
       body.height = state.canvasImageHeight;
@@ -2106,8 +1996,6 @@ async function generate() {
   btn.disabled = true;
   btn.classList.add("loading");
   clearError();
-  const inpaintBtn = document.getElementById("btn-inpaint");
-  if (inpaintBtn) inpaintBtn.disabled = true;
 
   _generateAbortController = new AbortController();
 
@@ -2157,16 +2045,19 @@ async function generate() {
     syncInpaintButtonVisibility();
     $("#info-seed").textContent = `Seed: ${data.seed}`;
 
+    // Output target layer: write result back into the designated layer
+    const outputLayer = layers.find(l => l.isOutputTarget);
+    if (outputLayer) {
+      outputLayer.imageBase64 = data.image;
+      saveLayersToStorage();
+      refreshCompositePreview();
+    }
+
     loadGallery();
 
     // Fire-and-forget: record character tags from prompt + all character slots
     const allPromptText = [prompt, ...characters.map((c) => c.prompt)].join(", ");
     recordRecentCharacters(allPromptText);
-
-    // Auto Iterate: set output as img2img source for next generation
-    if ($("#auto-iterate") && $("#auto-iterate").checked) {
-      iterateOnResult();
-    }
 
     // Auto Generate: start next generation after a short delay
     if ($("#auto-generate") && $("#auto-generate").checked) {
@@ -2182,7 +2073,6 @@ async function generate() {
       showError(e.message);
     }
   } finally {
-    state.inpaintMask = null;
     resetGenerateButton();
   }
 }
@@ -2198,8 +2088,10 @@ function saveLayersToStorage() {
       name: l.name,
       imageBase64: l.imageBase64,
       maskBase64: l.maskBase64 || null,
+      inpaintMaskBase64: l.inpaintMaskBase64 || null,
       opacity: l.opacity,
       visible: l.visible,
+      isOutputTarget: l.isOutputTarget || false,
     }));
     localStorage.setItem("nai-layers", JSON.stringify(data));
   } catch (e) {
@@ -2220,8 +2112,10 @@ function loadLayersFromStorage() {
         name: l.name || "Layer",
         imageBase64: l.imageBase64 || null,
         maskBase64: l.maskBase64 || null,
+        inpaintMaskBase64: l.inpaintMaskBase64 || null,
         opacity: typeof l.opacity === "number" ? l.opacity : 1.0,
         visible: l.visible !== false,
+        isOutputTarget: l.isOutputTarget || false,
       });
     });
   } catch (_) { /* corrupt storage — ignore */ }
@@ -2416,7 +2310,7 @@ const _layerDrag = { active: false, fromId: null };
 
 function buildLayerRow(layer, realIdx) {
   const row = document.createElement("div");
-  row.className = "layer-row";
+  row.className = "layer-row" + (layer.isOutputTarget ? " layer-row--output-target" : "");
   row.dataset.layerId = String(layer.id);
   row.draggable = true;
 
@@ -2624,9 +2518,55 @@ function buildLayerRow(layer, realIdx) {
     });
   });
 
+  // ── Inpaint mask button ───────────────────────────────────
+  const inpaintBtn = document.createElement("button");
+  inpaintBtn.type = "button";
+  inpaintBtn.className = "layer-inpaint-btn" + (layer.inpaintMaskBase64 ? " layer-inpaint-btn--active" : "");
+  inpaintBtn.title = layer.inpaintMaskBase64 ? "Edit inpaint mask (active)" : "Add inpaint mask";
+  inpaintBtn.setAttribute("aria-label", "Edit inpaint mask");
+  inpaintBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>';
+
+  inpaintBtn.addEventListener("click", () => {
+    openLayerInpaintEditor(layer, () => {
+      inpaintBtn.classList.toggle("layer-inpaint-btn--active", !!layer.inpaintMaskBase64);
+      inpaintBtn.title = layer.inpaintMaskBase64 ? "Edit inpaint mask (active)" : "Add inpaint mask";
+      saveLayersToStorage();
+    });
+  });
+
+  // ── Output target button ──────────────────────────────────
+  const targetBtn = document.createElement("button");
+  targetBtn.type = "button";
+  targetBtn.className = "layer-target-btn" + (layer.isOutputTarget ? " layer-target-btn--active" : "");
+  targetBtn.title = layer.isOutputTarget ? "Output target (active) — generated images go here" : "Set as output target";
+  targetBtn.setAttribute("aria-label", "Toggle output target");
+  targetBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>';
+
+  targetBtn.addEventListener("click", () => {
+    const wasTarget = layer.isOutputTarget;
+    // Clear all other output targets first
+    layers.forEach(l => { l.isOutputTarget = false; });
+    layer.isOutputTarget = !wasTarget;
+    // Update all rows in-place to avoid re-render (learnings 2026-03-20)
+    document.querySelectorAll(".layer-row").forEach((rowEl) => {
+      const id = Number(rowEl.dataset.layerId);
+      const l = layers.find(x => x.id === id);
+      if (!l) return;
+      rowEl.classList.toggle("layer-row--output-target", !!l.isOutputTarget);
+      const btn = rowEl.querySelector(".layer-target-btn");
+      if (btn) {
+        btn.classList.toggle("layer-target-btn--active", !!l.isOutputTarget);
+        btn.title = l.isOutputTarget ? "Output target (active) — generated images go here" : "Set as output target";
+      }
+    });
+    saveLayersToStorage();
+  });
+
   controls.appendChild(eyeBtn);
   controls.appendChild(drawBtn);
   controls.appendChild(maskBtn);
+  controls.appendChild(inpaintBtn);
+  controls.appendChild(targetBtn);
   controls.appendChild(removeBtn);
 
   row.appendChild(thumbWrap);
@@ -2700,7 +2640,7 @@ function setupLayers() {
         return;
       }
       const n = layers.length + 1;
-      layers.push({ id: Date.now(), name: "Layer " + n, imageBase64: null, maskBase64: null, opacity: 1.0, visible: true });
+      layers.push({ id: Date.now(), name: "Layer " + n, imageBase64: null, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false });
       renderLayerList();
       saveLayersToStorage();
     });
@@ -2730,7 +2670,7 @@ function setupLayers() {
       reader.onload = (ev) => {
         const b64 = ev.target.result.split(",")[1];
         const n = layers.length + 1;
-        layers.push({ id: Date.now(), name: file.name.replace(/\.[^.]+$/, "") || "Layer " + n, imageBase64: b64, maskBase64: null, opacity: 1.0, visible: true });
+        layers.push({ id: Date.now(), name: file.name.replace(/\.[^.]+$/, "") || "Layer " + n, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false });
         renderLayerList();
         saveLayersToStorage();
         refreshCompositePreview();
@@ -2752,8 +2692,10 @@ function setupLayers() {
         name,
         imageBase64: state.lastGeneratedImageBase64,
         maskBase64: null,
+        inpaintMaskBase64: null,
         opacity: 1.0,
         visible: true,
+        isOutputTarget: false,
       });
       renderLayerList();
       saveLayersToStorage();
@@ -3425,6 +3367,33 @@ function openLayerDrawEditor(layer, onApply) {
   drawCanvas.style.width  = dispW + "px";
   drawCanvas.style.height = dispH + "px";
 
+  // Background preview: composite of all OTHER visible layers
+  const bgCanvas = document.getElementById("layer-draw-bg");
+  if (bgCanvas) {
+    bgCanvas.width  = dispW;
+    bgCanvas.height = dispH;
+    bgCanvas.style.left   = offsetX + "px";
+    bgCanvas.style.top    = offsetY + "px";
+    bgCanvas.style.width  = dispW + "px";
+    bgCanvas.style.height = dispH + "px";
+    const bgCtx = bgCanvas.getContext("2d");
+    bgCtx.clearRect(0, 0, dispW, dispH);
+    // Draw other layers (excluding current layer) as background
+    const otherLayers = layers.filter((l) => l.visible && l.imageBase64 && l.id !== layer.id);
+    if (otherLayers.length > 0) {
+      // Draw bottom-to-top (reversed array order: last = bottom)
+      [...otherLayers].reverse().forEach((other) => {
+        const img = new Image();
+        img.onload = () => {
+          bgCtx.globalAlpha = other.opacity;
+          bgCtx.drawImage(img, 0, 0, dispW, dispH);
+          bgCtx.globalAlpha = 1.0;
+        };
+        img.src = "data:image/png;base64," + other.imageBase64;
+      });
+    }
+  }
+
   function initContents() {
     if (layer.imageBase64) {
       // Load existing image data into both canvases
@@ -3463,15 +3432,13 @@ function setupLayerDraw() {
    ═══════════════════════════════════════════════════════════ */
 
 // Call this whenever the canvas image state or provider changes
-// to show/hide the Inpaint button in #image-actions.
+// to show/hide action buttons in #image-actions.
 function syncInpaintButtonVisibility() {
-  const btn = document.getElementById("btn-inpaint");
   const sendBtn = document.getElementById("btn-send-to-layer");
   const provider = document.getElementById("provider")?.value || "novelai";
   const hasImage = !!state.canvasImageBase64;
   const hasGenerated = !!state.lastGeneratedImageBase64;
   const isNovelAI = provider === "novelai";
-  if (btn) btn.style.display = (hasImage && isNovelAI) ? "" : "none";
   if (sendBtn) {
     sendBtn.style.display = (hasImage && isNovelAI) ? "" : "none";
     sendBtn.disabled = !hasGenerated;
@@ -3482,8 +3449,11 @@ function syncInpaintButtonVisibility() {
 }
 
 function setupInpaint() {
+  // The inpaint overlay is now opened via openLayerInpaintEditor(layer, onConfirm).
+  // This setup function wires up the static controls (brush, mode, clear, undo, cancel, confirm).
+  // The open logic and confirm callback are injected per-call.
+
   const overlay  = document.getElementById("inpaint-overlay");
-  const btnOpen  = document.getElementById("btn-inpaint");
   const btnCancel = document.getElementById("inpaint-cancel");
   const btnConfirm = document.getElementById("inpaint-confirm");
   const btnClear = document.getElementById("inpaint-clear");
@@ -3496,37 +3466,46 @@ function setupInpaint() {
   const cursorEl   = document.getElementById("inpaint-cursor");
   const stageWrap  = overlay?.querySelector(".inpaint-stage-wrap");
 
-  if (!overlay || !btnOpen || !srcCanvas || !maskCanvas) return;
+  if (!overlay || !srcCanvas || !maskCanvas) return;
 
   const srcCtx  = srcCanvas.getContext("2d");
   const maskCtx = maskCanvas.getContext("2d");
 
   // Offscreen canvas — same pixel dimensions as source image, pure B&W
-  const offscreen    = document.createElement("canvas");
-  const offCtx       = offscreen.getContext("2d");
-  // Keep default anti-aliasing on — smooth brush edges improve inpaint quality
+  const offscreen = document.createElement("canvas");
+  const offCtx    = offscreen.getContext("2d");
 
-  // Inpaint state
-  let brushSize   = 32;
-  let eraseMode   = false;
-  let isDrawing   = false;
-  let lastX       = 0;
-  let lastY       = 0;
-  let scaleX      = 1;  // offscreen / display scale
-  let scaleY      = 1;
-  // Undo stack — each entry is { mask: ImageData, off: ImageData }
-  const undoStack  = [];
-  const MAX_UNDO   = 20;
+  // Editor state
+  let brushSize = 32;
+  let eraseMode = false;
+  let isDrawing = false;
+  let lastX = 0;
+  let lastY = 0;
+  let scaleX = 1;
+  let scaleY = 1;
+  const undoStack = [];
+  const MAX_UNDO  = 20;
 
-  // ── Open overlay ─────────────────────────────────────────
-  function openInpaint() {
-    if (!state.canvasImageBase64) return;
+  // Per-call confirm callback — set by openLayerInpaintEditor
+  let _currentLayer    = null;
+  let _onConfirmCb     = null;
+
+  // ── Open (called from openLayerInpaintEditor) ──────────────
+  function openInpaint(layer, onConfirm) {
+    _currentLayer = layer;
+    _onConfirmCb  = onConfirm;
+
+    // Prefer the layer's own image; fall back to canvas composite
+    const sourceb64 = layer.imageBase64 || state.canvasImageBase64;
+    if (!sourceb64) {
+      showStatus("No image to inpaint — load an image into this layer first.");
+      return;
+    }
 
     const img = new Image();
     img.onload = () => {
       const imgW = img.naturalWidth;
       const imgH = img.naturalHeight;
-      console.log("[inpaint] source image:", imgW, "x", imgH, "canvasImageWidth:", state.canvasImageWidth, "canvasImageHeight:", state.canvasImageHeight);
 
       // Show overlay first so stageWrap has layout dimensions.
       // Force animation replay (per learnings 2026-03-22).
@@ -3538,13 +3517,13 @@ function setupInpaint() {
       overlay.style.animation = "";
       if (shell) shell.style.animation = "";
 
-      // Offscreen canvas at full image resolution
+      // Offscreen canvas at full image resolution — start black (no-paint)
       offscreen.width  = imgW;
       offscreen.height = imgH;
       offCtx.fillStyle = "#000000";
       offCtx.fillRect(0, 0, imgW, imgH);
 
-      // Compute display size: fit within stageWrap (now visible)
+      // Compute display size: fit within stageWrap
       const stageRect = stageWrap.getBoundingClientRect();
       const stageW = stageRect.width  || stageWrap.offsetWidth;
       const stageH = stageRect.height || stageWrap.offsetHeight;
@@ -3563,7 +3542,6 @@ function setupInpaint() {
       maskCanvas.width = dispW;
       maskCanvas.height = dispH;
 
-      // Position them centred in the stage
       [srcCanvas, maskCanvas].forEach((c) => {
         c.style.left   = offsetX + "px";
         c.style.top    = offsetY + "px";
@@ -3574,23 +3552,44 @@ function setupInpaint() {
       // Draw source image
       srcCtx.drawImage(img, 0, 0, dispW, dispH);
 
-      // Clear mask canvas
+      // Load existing mask if present
       maskCtx.clearRect(0, 0, dispW, dispH);
+      if (layer.inpaintMaskBase64) {
+        const maskImg = new Image();
+        maskImg.onload = () => {
+          // Restore offscreen (B&W) from saved mask
+          offCtx.drawImage(maskImg, 0, 0, imgW, imgH);
+          // Re-draw visible tint overlay from offscreen
+          const od = offCtx.getImageData(0, 0, imgW, imgH).data;
+          maskCtx.clearRect(0, 0, dispW, dispH);
+          for (let py = 0; py < dispH; py++) {
+            for (let px = 0; px < dispW; px++) {
+              const ox = Math.round(px * scaleX);
+              const oy = Math.round(py * scaleY);
+              const i = (oy * imgW + ox) * 4;
+              if (od[i] > 128) {
+                maskCtx.fillStyle = "rgba(240,80,80,0.55)";
+                maskCtx.fillRect(px, py, 1, 1);
+              }
+            }
+          }
+        };
+        maskImg.src = "data:image/png;base64," + layer.inpaintMaskBase64;
+      }
 
-      // Clear undo stack
       undoStack.length = 0;
-
-      // Reset mode and brush
       setMode("paint");
       updateBrushSize(parseInt(brushSlider.value, 10));
     };
-    img.src = `data:image/png;base64,${state.canvasImageBase64}`;
+    img.src = "data:image/png;base64," + sourceb64;
   }
 
   // ── Close overlay ─────────────────────────────────────────
   function closeInpaint() {
     overlay.style.display = "none";
     cursorEl.style.display = "none";
+    _currentLayer = null;
+    _onConfirmCb  = null;
   }
 
   // ── Mode toggle ───────────────────────────────────────────
@@ -3625,7 +3624,6 @@ function setupInpaint() {
   function drawAt(dispX, dispY, isFirst) {
     const r = brushSize / 2;
 
-    // Visible mask canvas
     maskCtx.save();
     if (eraseMode) {
       maskCtx.globalCompositeOperation = "destination-out";
@@ -3636,7 +3634,6 @@ function setupInpaint() {
     }
 
     if (!isFirst) {
-      // Interpolate between lastX/lastY and dispX/dispY to fill gaps
       const dx = dispX - lastX;
       const dy = dispY - lastY;
       const dist = Math.hypot(dx, dy);
@@ -3657,19 +3654,13 @@ function setupInpaint() {
     }
     maskCtx.restore();
 
-    // Offscreen mask canvas (pure B&W, at image resolution)
     const offX = dispX * scaleX;
     const offY = dispY * scaleY;
     const offR = r * Math.max(scaleX, scaleY);
 
     offCtx.save();
-    if (eraseMode) {
-      offCtx.globalCompositeOperation = "source-over";
-      offCtx.fillStyle = "#000000";
-    } else {
-      offCtx.globalCompositeOperation = "source-over";
-      offCtx.fillStyle = "#ffffff";
-    }
+    offCtx.globalCompositeOperation = "source-over";
+    offCtx.fillStyle = eraseMode ? "#000000" : "#ffffff";
 
     if (!isFirst) {
       const offLastX = lastX * scaleX;
@@ -3742,8 +3733,6 @@ function setupInpaint() {
   });
 
   maskCanvas.addEventListener("pointermove", (e) => {
-    // Move cursor preview
-    const rect = maskCanvas.getBoundingClientRect();
     const stageRect = stageWrap.getBoundingClientRect();
     cursorEl.style.display = "block";
     cursorEl.style.left = (e.clientX - stageRect.left) + "px";
@@ -3757,21 +3746,11 @@ function setupInpaint() {
     lastY = pos.y;
   });
 
-  maskCanvas.addEventListener("pointerup", () => {
-    isDrawing = false;
-  });
+  maskCanvas.addEventListener("pointerup", () => { isDrawing = false; });
+  maskCanvas.addEventListener("pointerleave", () => { isDrawing = false; cursorEl.style.display = "none"; });
+  maskCanvas.addEventListener("pointercancel", () => { isDrawing = false; cursorEl.style.display = "none"; });
 
-  maskCanvas.addEventListener("pointerleave", () => {
-    isDrawing = false;
-    cursorEl.style.display = "none";
-  });
-
-  maskCanvas.addEventListener("pointercancel", () => {
-    isDrawing = false;
-    cursorEl.style.display = "none";
-  });
-
-  // ── Keyboard: Cmd/Ctrl+Z undo ─────────────────────────────
+  // ── Keyboard: Cmd/Ctrl+Z undo, Escape close ───────────────
   document.addEventListener("keydown", (e) => {
     if (overlay.style.display === "none") return;
     if ((e.metaKey || e.ctrlKey) && e.key === "z") {
@@ -3784,35 +3763,46 @@ function setupInpaint() {
     }
   });
 
-  // ── Confirm ───────────────────────────────────────────────
+  // ── Confirm: save mask to layer ───────────────────────────
   btnConfirm.addEventListener("click", () => {
-    // Validate: check that the offscreen mask has at least some painted pixels
+    if (!_currentLayer) return;
+
+    // Check that the mask has at least some painted pixels
     const imgData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
-    const data = imgData.data;
+    const d = imgData.data;
     let hasWhite = false;
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i] > 128) { hasWhite = true; break; }
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] > 128) { hasWhite = true; break; }
     }
     if (!hasWhite) {
-      showError("Paint a mask over the area you want to change before generating.");
+      showError("Paint a mask over the area you want to change.");
       return;
     }
 
-    // Export offscreen canvas as pure B&W PNG
+    // Save mask to layer — does NOT trigger generate()
     const dataUrl = offscreen.toDataURL("image/png");
-    state.inpaintMask = dataUrl.replace("data:image/png;base64,", "");
+    _currentLayer.inpaintMaskBase64 = dataUrl.replace("data:image/png;base64,", "");
 
+    const cb = _onConfirmCb;
     closeInpaint();
-    generate();
+    if (cb) cb();
   });
 
   // ── Cancel ────────────────────────────────────────────────
   btnCancel.addEventListener("click", closeInpaint);
 
-  // ── Open button ───────────────────────────────────────────
-  btnOpen.addEventListener("click", () => {
-    openInpaint();
-  });
+  // Expose open function so openLayerInpaintEditor can call it
+  setupInpaint._open = openInpaint;
+}
+
+// Called from buildLayerRow's inpaint button.
+// onConfirm() is called after the mask is saved to layer.inpaintMaskBase64.
+function openLayerInpaintEditor(layer, onConfirm) {
+  if (!setupInpaint._open) {
+    showStatus("Inpaint editor not ready — please wait.");
+    return;
+  }
+  setupInpaint._open(layer, onConfirm);
 }
 
 function reuseSeed() {
@@ -3909,11 +3899,6 @@ async function generateGrokImage() {
     img.alt = "Generated image";
     output.innerHTML = "";
     output.appendChild(img);
-
-    // Show source reference thumbnail if img2img was used
-    if (state.img2imgThumbDataUrl) {
-      showSourceRefThumb(output, state.img2imgThumbDataUrl);
-    }
 
     const actions = $("#image-actions");
     if (actions) actions.style.display = "flex";
@@ -4090,57 +4075,6 @@ async function generateGrokVideo() {
     }
   } finally {
     resetGenerateButton();
-  }
-}
-
-function setCanvasImageAsSource() {
-  if (!state.canvasImageBase64) return;
-
-  // Use the canvas-displayed image as img2img source
-  state.img2img = state.canvasImageBase64;
-
-  // Generate thumbnail from the output img element
-  const outputImg = $("#output img");
-  if (outputImg) {
-    const thumb = document.createElement("canvas");
-    thumb.width = 128; thumb.height = 128;
-    thumb.getContext("2d").drawImage(outputImg, 0, 0, 128, 128);
-    state.img2imgThumbDataUrl = thumb.toDataURL("image/jpeg", 0.8);
-  }
-
-  const provider = document.getElementById("provider")?.value || "novelai";
-
-  if (provider === "grok") {
-    // Grok: show source on canvas, no accordion needed
-    activateImg2ImgMode();
-    const dataUrl = `data:image/png;base64,${state.canvasImageBase64}`;
-    showGrokSourceOnCanvas(dataUrl);
-    return;
-  }
-
-  // Check if resolution matches — if so, skip crop overlay
-  const resVal = $("#resolution").value || "832x1216";
-  const [tw, th] = resVal.split("x").map(Number);
-  const iw = state.canvasImageWidth;
-  const ih = state.canvasImageHeight;
-
-  if (iw && ih && iw === tw && ih === th) {
-    activateImg2ImgMode();
-    const accordion = $("#img2img-accordion");
-    if (accordion && !accordion.open) accordion.open = true;
-  } else if (iw && ih) {
-    const img = new Image();
-    img.onload = () => {
-      activateImg2ImgMode();
-      const accordion = $("#img2img-accordion");
-      if (accordion && !accordion.open) accordion.open = true;
-      openCropOverlay(img);
-    };
-    img.src = `data:image/png;base64,${state.canvasImageBase64}`;
-  } else {
-    activateImg2ImgMode();
-    const accordion = $("#img2img-accordion");
-    if (accordion && !accordion.open) accordion.open = true;
   }
 }
 
@@ -4391,23 +4325,24 @@ function setupCraftPanel() {
         const iterateBtn = document.createElement("button");
         iterateBtn.type = "button";
         iterateBtn.className = "btn-action btn-action--iterate variation-overlay-btn";
-        iterateBtn.textContent = "Iterate";
+        iterateBtn.textContent = "Add to Layer";
         iterateBtn.addEventListener("click", () => {
-          // Set as img2img source at strength 0.55
-          state.img2img = data.image;
-          // Build small thumbnail for sidebar preview
-          const thumbCanvas = document.createElement("canvas");
-          thumbCanvas.width = 128; thumbCanvas.height = 128;
-          thumbCanvas.getContext("2d").drawImage(img, 0, 0, 128, 128);
-          state.img2imgThumbDataUrl = thumbCanvas.toDataURL("image/jpeg", 0.8);
+          // Add variation result as a new layer
+          if (layers.length < MAX_LAYERS) {
+            const n = layers.length + 1;
+            layers.push({ id: Date.now(), name: variant.label + " Variation", imageBase64: data.image, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false });
+            renderLayerList();
+            saveLayersToStorage();
+            refreshCompositePreview();
+            const accordion = document.getElementById("layers-accordion");
+            if (accordion && !accordion.open) accordion.open = true;
+          }
+          // Set strength to 0.55 for typical iteration workflow
           const strengthEl = $("#strength");
           if (strengthEl) {
             strengthEl.value = "0.55";
             strengthEl.dispatchEvent(new Event("input"));
           }
-          activateImg2ImgMode();
-          const accordion = $("#img2img-accordion");
-          if (accordion && !accordion.open) accordion.open = true;
           insertTagIntoPrompt(variant.tags);
           $("#tab-canvas").click();
         });
@@ -5554,12 +5489,12 @@ function renderGallery(files, directories, filter) {
     const iterateBtn = document.createElement("button");
     iterateBtn.className = "history-card-action-btn history-card-action-btn--iterate";
     iterateBtn.type = "button";
-    iterateBtn.title = "Iterate: load settings + use as source";
-    iterateBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>Iterate`;
+    iterateBtn.title = "Add to Layer: load settings + add image as a new layer";
+    iterateBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M9 10l3 3 3-3"/></svg>Add to Layer`;
     iterateBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
       loadSettingsFromMeta(meta);
-      // Set image as img2img source from URL
+      // Add image to a new layer
       await setHistoryImageAsSource(galleryFileUrl(file.name), meta);
       card.classList.add("settings-loaded");
       setTimeout(() => card.classList.remove("settings-loaded"), 1800);
@@ -5680,8 +5615,8 @@ function setupLightbox() {
           Load
         </button>
         <button class="btn-action btn-action--iterate" id="lb-iterate" type="button">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
-          Iterate
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M9 10l3 3 3-3"/></svg>
+          Add to Layer
         </button>
         <button class="btn-action" id="lb-slideshow" type="button" title="Auto-play slideshow (3s per image)">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -5899,36 +5834,26 @@ async function setHistoryImageAsSource(url, meta) {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
-      // Draw to canvas to get base64
       const c = document.createElement("canvas");
       c.width = img.naturalWidth;
       c.height = img.naturalHeight;
       c.getContext("2d").drawImage(img, 0, 0);
+      const b64 = c.toDataURL("image/png").split(",")[1];
 
-      const resVal = $("#resolution").value || "832x1216";
-      const [tw, th] = resVal.split("x").map(Number);
-      const iw = img.naturalWidth;
-      const ih = img.naturalHeight;
-
-      if (iw === tw && ih === th) {
-        // Exact match — use directly
-        state.img2img = c.toDataURL("image/png").split(",")[1];
-        // Make thumbnail
-        const thumb = document.createElement("canvas");
-        thumb.width = 128; thumb.height = 128;
-        thumb.getContext("2d").drawImage(img, 0, 0, 128, 128);
-        state.img2imgThumbDataUrl = thumb.toDataURL("image/jpeg", 0.8);
-        activateImg2ImgMode();
-        const accordion = $("#img2img-accordion");
+      // Add to layers instead of img2img source
+      if (layers.length < MAX_LAYERS) {
+        const layerName = (meta && meta.prompt) ? meta.prompt.slice(0, 32) + "…" : "History Layer";
+        layers.push({ id: Date.now(), name: layerName, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false });
+        renderLayerList();
+        saveLayersToStorage();
+        refreshCompositePreview();
+        const accordion = document.getElementById("layers-accordion");
         if (accordion && !accordion.open) accordion.open = true;
-        resolve();
+        showStatus("History image added as layer.");
       } else {
-        // Needs crop — openCropOverlay will call activateImg2ImgMode() on confirm
-        const accordion = $("#img2img-accordion");
-        if (accordion && !accordion.open) accordion.open = true;
-        openCropOverlay(img);
-        resolve();
+        showStatus("Maximum of " + MAX_LAYERS + " layers reached.");
       }
+      resolve();
     };
     img.onerror = () => resolve();
     img.src = url;
@@ -6220,19 +6145,27 @@ function setupExplorePanel() {
       const reader = new FileReader();
       reader.onload = (ev) => {
         const dataUrl = ev.target.result;
-        state.img2img = dataUrl.split(",")[1];
-        state.img2imgThumbDataUrl = dataUrl;
-        activateImg2ImgMode();
+        const b64 = dataUrl.split(",")[1];
 
         const provider = document.getElementById("provider")?.value || "novelai";
         if (provider === "grok") {
+          state.img2img = b64;
           showGrokSourceOnCanvas(dataUrl);
-          state.canvasImageBase64 = state.img2img;
+          state.canvasImageBase64 = b64;
           state.canvasImageWidth = null;
           state.canvasImageHeight = null;
         } else {
-          const accordion = $("#img2img-accordion");
-          if (accordion && !accordion.open) accordion.open = true;
+          // NovelAI: add to layers
+          if (layers.length < MAX_LAYERS) {
+            layers.push({ id: Date.now(), name: "Explore Image", imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false });
+            renderLayerList();
+            saveLayersToStorage();
+            refreshCompositePreview();
+            const accordion = document.getElementById("layers-accordion");
+            if (accordion && !accordion.open) accordion.open = true;
+          } else {
+            showStatus("Maximum of " + MAX_LAYERS + " layers reached.");
+          }
         }
 
         // Switch to Canvas tab so the user sees the loaded source

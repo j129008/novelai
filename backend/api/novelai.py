@@ -141,6 +141,14 @@ async def generate_image(
         # produces gray content). The mask tells the model where to focus
         # regeneration. We composite ourselves for seamless edges.
         action = "img2img"
+        # Ensure mask matches source image dimensions
+        _src_img = Image.open(io.BytesIO(base64.b64decode(image))).convert("RGB")
+        _mask_img = Image.open(io.BytesIO(base64.b64decode(mask))).convert("L")
+        if _mask_img.size != _src_img.size:
+            _mask_img = _mask_img.resize(_src_img.size, Image.NEAREST)
+            _mbuf = io.BytesIO()
+            _mask_img.save(_mbuf, format="PNG")
+            mask = base64.b64encode(_mbuf.getvalue()).decode()
         params["image"] = image
         params["mask"] = mask
         params["strength"] = strength
