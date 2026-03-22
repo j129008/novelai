@@ -137,11 +137,10 @@ async def generate_image(
         params["characterPrompts"] = []
 
     if mask:
-        # Use img2img action with base model (NOT -inpainting model which
-        # produces gray content). The mask tells the model where to focus
-        # regeneration. We composite ourselves for seamless edges.
+        # img2img with mask + server-side compositing.
+        # The model regenerates the full image; we composite the original
+        # pixels back in non-masked areas for a seamless result.
         action = "img2img"
-        # Ensure mask matches source image dimensions
         _src_img = Image.open(io.BytesIO(base64.b64decode(image))).convert("RGB")
         _mask_img = Image.open(io.BytesIO(base64.b64decode(mask))).convert("L")
         if _mask_img.size != _src_img.size:
@@ -194,9 +193,7 @@ async def generate_image(
             name = zf.namelist()[0]
             image_data = zf.read(name)
 
-    # Inpaint compositing: img2img regenerates the entire image, so we
-    # composite the generated content (inside mask) with the original
-    # (outside mask) using a feathered mask for seamless edges.
+    # Inpaint compositing: paste original pixels back in non-masked areas
     if mask and image:
         original = Image.open(io.BytesIO(base64.b64decode(image))).convert("RGB")
         generated = Image.open(io.BytesIO(image_data)).convert("RGB")
@@ -208,7 +205,6 @@ async def generate_image(
             generated = generated.resize(original.size, Image.LANCZOS)
 
         comp_mask = comp_mask.filter(ImageFilter.GaussianBlur(radius=8))
-
         result = Image.composite(generated, original, comp_mask)
         out_buf = io.BytesIO()
         result.save(out_buf, format="PNG")

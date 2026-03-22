@@ -3752,6 +3752,20 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 }
 
 /* ─── Layer output target button in the layer row controls ─── */
+.layer-move-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.12s, background 0.12s;
+}
+.layer-move-btn:hover { color: var(--text-primary); background: var(--bg-overlay); }
+.layer-move-btn--active { color: var(--accent-bright); background: var(--accent-dim); }
 .layer-target-btn {
   background: none;
   border: none;
