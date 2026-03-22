@@ -802,19 +802,22 @@ function loadImageFile(file) {
       const provider = document.getElementById("provider")?.value || "novelai";
 
       if (provider === "grok") {
+        const b64 = ev.target.result.split(",")[1];
         const ar = document.getElementById("grok-aspect-ratio")?.value || "auto";
-        if (ar === "auto") {
-          // Auto: use image as-is, no crop
-          state.img2img = ev.target.result.split(",")[1];
-          showGrokSourceOnCanvas(ev.target.result);
-          state.canvasImageBase64 = state.img2img;
-          state.canvasImageWidth = img.naturalWidth;
-          state.canvasImageHeight = img.naturalHeight;
-          renderGrokImagesList();
-        } else {
+        if (ar !== "auto") {
           // Specific aspect ratio: open crop overlay
           openCropOverlay(img);
+        } else if (!state.img2img) {
+          // No source yet — set as source
+          state.img2img = b64;
+          state.canvasImageBase64 = b64;
+          state.canvasImageWidth = img.naturalWidth;
+          state.canvasImageHeight = img.naturalHeight;
+        } else if (grokRefs.length < MAX_GROK_REFS) {
+          // Source exists — add as reference
+          grokRefs.push({ base64: b64 });
         }
+        renderGrokImagesList();
         const canvasTab = $("#tab-canvas");
         if (canvasTab) canvasTab.click();
         return;
