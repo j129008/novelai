@@ -48,6 +48,8 @@ const layers = [];
 const MAX_LAYERS = 8;
 let _movingLayer = null;
 let _moveCleanup = null;
+let _activeLayerIdx = 0;   // index into layers[] of the currently-selected layer
+let _canvasView = localStorage.getItem("nai-canvas-view") || "output"; // "input" | "output"
 
 function _enableCanvasMove(layer) {
   _disableCanvasMove();
@@ -297,6 +299,9 @@ function applyProvider(provider) {
 
   // Fetch Grok usage when switching to Grok
   if (isGrok) fetchGrokUsage();
+
+  // Update canvas layer panel visibility for new provider
+  updateCanvasPanel();
 }
 
 async function fetchGrokUsage() {
@@ -417,6 +422,8 @@ async function init() {
   setupExplorePanel();
   setupInpaint();
   setupLayers();
+  setupCanvasLayerPanel();
+  setupCanvasViewToggle();
   setupLayerMask();
   setupLayerDraw();
 
@@ -2185,10 +2192,6 @@ async function generate() {
     state.canvasImageWidth = width;
     state.canvasImageHeight = height;
 
-    // Hide composite preview badge — showing a real generation result
-    const previewBadge = document.getElementById("composite-preview-badge");
-    if (previewBadge) previewBadge.style.display = "none";
-
     const output = $("#output");
     const img = document.createElement("img");
     img.src = `data:image/png;base64,${data.image}`;
@@ -2210,6 +2213,15 @@ async function generate() {
       saveLayersToStorage();
       refreshCompositePreview();
     }
+
+    // Auto-switch canvas to Output view on generation complete
+    _canvasView = "output";
+    localStorage.setItem("nai-canvas-view", "output");
+    const cvtInput  = document.getElementById("cvt-input");
+    const cvtOutput = document.getElementById("cvt-output");
+    if (cvtInput)  { cvtInput.classList.remove("cvt-btn--active"); cvtInput.classList.remove("cvt-btn--changed"); }
+    if (cvtOutput) cvtOutput.classList.add("cvt-btn--active");
+    updateCanvasPanel();
 
     loadGallery();
 
@@ -2289,7 +2301,6 @@ let _previewDebounceTimer = null;
 async function refreshCompositePreview() {
   const layersEnabled = document.getElementById("layers-enabled");
   const hasVisibleLayer = (layersEnabled && layersEnabled.checked) && layers.some((l) => l.visible && l.imageBase64);
-  const previewBadge = document.getElementById("composite-preview-badge");
   const output = $("#output");
 
   if (!hasVisibleLayer) {
@@ -2303,7 +2314,6 @@ async function refreshCompositePreview() {
         placeholder.innerHTML = '<p class="placeholder-sub">Add images to layers to preview</p>';
         output.appendChild(placeholder);
       }
-      if (previewBadge) previewBadge.style.display = "none";
       _clearInpaintMaskOverlay();
       return;
     }
@@ -2320,7 +2330,6 @@ async function refreshCompositePreview() {
         renderCharacterMarkers();
       }
     }
-    if (previewBadge) previewBadge.style.display = "none";
     _clearInpaintMaskOverlay();
     return;
   }
@@ -2342,7 +2351,6 @@ async function refreshCompositePreview() {
 
   const compositeBase64 = await compositeLayersToBase64(targetW, targetH);
   if (!compositeBase64) {
-    if (previewBadge) previewBadge.style.display = "none";
     _clearInpaintMaskOverlay();
     return;
   }
@@ -2363,8 +2371,6 @@ async function refreshCompositePreview() {
       syncInpaintButtonVisibility();
     }
   }
-
-  if (previewBadge) previewBadge.style.display = "";
 
   // Draw inpaint mask overlay if any visible layer has one
   const inpaintLayer = layers.find((l) => l.visible && l.inpaintMaskBase64);
@@ -2529,7 +2535,6 @@ function updateLayersBadge() {
 function renderLayerList() {
   const list = document.getElementById("layers-list");
   if (!list) return;
-  _closeActiveOverflowMenu();
   list.innerHTML = "";
 
   if (layers.length === 0) {
@@ -2538,8 +2543,13 @@ function renderLayerList() {
     empty.textContent = "No layers yet. Add a layer to start compositing.";
     list.appendChild(empty);
     updateLayersBadge();
+    updateCanvasPanel();
     return;
   }
+
+  // Clamp active index to valid range
+  if (_activeLayerIdx >= layers.length) _activeLayerIdx = layers.length - 1;
+  if (_activeLayerIdx < 0) _activeLayerIdx = 0;
 
   // Display order matches array order: index 0 = top of list = top layer
   layers.forEach((layer, idx) => {
@@ -2554,34 +2564,29 @@ function renderLayerList() {
   }
 
   updateLayersBadge();
+  updateCanvasPanel();
 }
 
 // Module-level drag state for layer reordering
 const _layerDrag = { active: false, fromId: null };
 
-// Module-level tracker so renderLayerList can close any open overflow menu
-let _activeOverflowCleanup = null;
-function _closeActiveOverflowMenu() {
-  if (_activeOverflowCleanup) { _activeOverflowCleanup(); _activeOverflowCleanup = null; }
-}
-
 function buildLayerRow(layer, realIdx) {
   const row = document.createElement("div");
-  row.className = "layer-row" + (layer.isOutputTarget ? " layer-row--output-target" : "");
+  row.className = "layer-row" +
+    (layer.isOutputTarget ? " layer-row--output-target" : "") +
+    (realIdx === _activeLayerIdx ? " layer-row--selected" : "");
   row.dataset.layerId = String(layer.id);
   row.draggable = true;
 
-  // ── Thumbnail ─────────────────────────────────────────────
+  // ── Drag grip ─────────────────────────────────────────────
+  const grip = document.createElement("div");
+  grip.className = "layer-drag-grip";
+  grip.innerHTML = '<svg width="8" height="12" viewBox="0 0 8 12" fill="none" aria-hidden="true"><circle cx="2" cy="2" r="1" fill="currentColor"/><circle cx="6" cy="2" r="1" fill="currentColor"/><circle cx="2" cy="6" r="1" fill="currentColor"/><circle cx="6" cy="6" r="1" fill="currentColor"/><circle cx="2" cy="10" r="1" fill="currentColor"/><circle cx="6" cy="10" r="1" fill="currentColor"/></svg>';
+
+  // ── Thumbnail (compact, 28×28) ─────────────────────────────
   const thumbWrap = document.createElement("div");
   thumbWrap.className = "layer-thumb-wrap";
-  thumbWrap.title = "Click to load image";
-
-  const thumbFileInput = document.createElement("input");
-  thumbFileInput.type = "file";
-  thumbFileInput.accept = "image/*";
-  thumbFileInput.style.cssText = "position:absolute;opacity:0;pointer-events:none;width:0;height:0";
-  thumbFileInput.tabIndex = -1;
-  thumbWrap.appendChild(thumbFileInput);
+  thumbWrap.title = "Click to select layer";
 
   if (layer.imageBase64) {
     const img = document.createElement("img");
@@ -2592,10 +2597,10 @@ function buildLayerRow(layer, realIdx) {
   } else {
     const placeholder = document.createElement("div");
     placeholder.className = "layer-thumb layer-thumb-empty";
-    placeholder.setAttribute("aria-label", "No image — click to load");
+    placeholder.setAttribute("aria-label", "No image");
     const plusSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    plusSvg.setAttribute("width", "16");
-    plusSvg.setAttribute("height", "16");
+    plusSvg.setAttribute("width", "12");
+    plusSvg.setAttribute("height", "12");
     plusSvg.setAttribute("viewBox", "0 0 24 24");
     plusSvg.setAttribute("fill", "none");
     plusSvg.setAttribute("stroke", "currentColor");
@@ -2607,29 +2612,7 @@ function buildLayerRow(layer, realIdx) {
     thumbWrap.appendChild(placeholder);
   }
 
-  thumbWrap.addEventListener("click", () => {
-    thumbFileInput.value = "";
-    thumbFileInput.click();
-  });
-
-  thumbFileInput.addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      layer.imageBase64 = ev.target.result.split(",")[1];
-      renderLayerList();
-      saveLayersToStorage();
-      refreshCompositePreview();
-    };
-    reader.readAsDataURL(file);
-    thumbFileInput.value = "";
-  });
-
-  // ── Middle column: name + opacity ─────────────────────────
-  const mid = document.createElement("div");
-  mid.className = "layer-mid";
-
+  // ── Name label ─────────────────────────────────────────────
   const nameSpan = document.createElement("span");
   nameSpan.className = "layer-name";
   nameSpan.contentEditable = "true";
@@ -2642,309 +2625,29 @@ function buildLayerRow(layer, realIdx) {
     layer.name = trimmed || layer.name;
     if (!trimmed) nameSpan.textContent = layer.name;
     saveLayersToStorage();
+    // Sync name to CLP if this is the active layer
+    const clpName = document.getElementById("clp-name");
+    if (clpName && _activeLayerIdx === realIdx) clpName.value = layer.name;
   });
   nameSpan.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); nameSpan.blur(); }
   });
 
-  const opacityRow = document.createElement("div");
-  opacityRow.className = "layer-opacity-row";
-
-  const opacityLabel = document.createElement("span");
-  opacityLabel.className = "layer-opacity-label";
-  opacityLabel.textContent = "Opacity";
-
-  const opacityVal = document.createElement("span");
-  opacityVal.className = "slider-value layer-opacity-val";
-  opacityVal.textContent = Math.round(layer.opacity * 100) + "%";
-
-  const opacitySlider = document.createElement("input");
-  opacitySlider.type = "range";
-  opacitySlider.className = "field-range layer-opacity-slider";
-  opacitySlider.min = "0";
-  opacitySlider.max = "1";
-  opacitySlider.step = "0.05";
-  opacitySlider.value = String(layer.opacity);
-  // Snapshot undo state on first interaction, not every tick
-  let _opacityUndoPushed = false;
-  opacitySlider.addEventListener("pointerdown", () => {
-    _opacityUndoPushed = false;
-  });
-  opacitySlider.addEventListener("input", () => {
-    if (!_opacityUndoPushed) {
-      pushLayerUndo("Change opacity");
-      _opacityUndoPushed = true;
-    }
-    layer.opacity = parseFloat(opacitySlider.value);
-    opacityVal.textContent = Math.round(layer.opacity * 100) + "%";
-    saveLayersToStorage();
-    // Debounced composite preview refresh (50ms)
-    clearTimeout(_previewDebounceTimer);
-    _previewDebounceTimer = setTimeout(refreshCompositePreview, 50);
-  });
-
-  const opacityHeader = document.createElement("div");
-  opacityHeader.className = "layer-opacity-header";
-  opacityHeader.appendChild(opacityLabel);
-  opacityHeader.appendChild(opacityVal);
-
-  opacityRow.appendChild(opacityHeader);
-  opacityRow.appendChild(opacitySlider);
-
-  mid.appendChild(nameSpan);
-  mid.appendChild(opacityRow);
-
-  // ── Controls: eye + target + overflow ────────────────────
-  const controls = document.createElement("div");
-  controls.className = "layer-controls";
-
-  // Eye button — always visible
-  const eyeBtn = document.createElement("button");
-  eyeBtn.type = "button";
-  eyeBtn.className = "layer-eye-btn" + (layer.visible ? "" : " layer-eye-off");
-  eyeBtn.title = layer.visible ? "Hide layer" : "Show layer";
-  eyeBtn.setAttribute("aria-label", layer.visible ? "Hide layer" : "Show layer");
-  eyeBtn.innerHTML = layer.visible
-    ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
-    : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
-
-  eyeBtn.addEventListener("click", () => {
-    pushLayerUndo("Toggle visibility");
-    layer.visible = !layer.visible;
-    // Update in-place to avoid re-render breaking double-click detection (learnings 2026-03-20)
-    eyeBtn.classList.toggle("layer-eye-off", !layer.visible);
-    eyeBtn.title = layer.visible ? "Hide layer" : "Show layer";
-    eyeBtn.setAttribute("aria-label", layer.visible ? "Hide layer" : "Show layer");
-    eyeBtn.innerHTML = layer.visible
-      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
-      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
-    saveLayersToStorage();
-    updateLayersBadge();
-    refreshCompositePreview();
-  });
-
-  // Target button — always visible
-  const targetBtn = document.createElement("button");
-  targetBtn.type = "button";
-  targetBtn.className = "layer-target-btn" + (layer.isOutputTarget ? " layer-target-btn--active" : "");
-  targetBtn.title = layer.isOutputTarget ? "Output target (active) — generated images go here" : "Set as output target";
-  targetBtn.setAttribute("aria-label", "Toggle output target");
-  targetBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>';
-
-  targetBtn.addEventListener("click", () => {
-    pushLayerUndo("Toggle output target");
-    const wasTarget = layer.isOutputTarget;
-    // Clear all other output targets first
-    layers.forEach(l => { l.isOutputTarget = false; });
-    layer.isOutputTarget = !wasTarget;
-    // Update all rows in-place to avoid re-render (learnings 2026-03-20)
-    document.querySelectorAll(".layer-row").forEach((rowEl) => {
-      const id = Number(rowEl.dataset.layerId);
-      const l = layers.find(x => x.id === id);
-      if (!l) return;
-      rowEl.classList.toggle("layer-row--output-target", !!l.isOutputTarget);
-      const btn = rowEl.querySelector(".layer-target-btn");
-      if (btn) {
-        btn.classList.toggle("layer-target-btn--active", !!l.isOutputTarget);
-        btn.title = l.isOutputTarget ? "Output target (active) — generated images go here" : "Set as output target";
-      }
+  // ── Row click: select this layer ──────────────────────────
+  row.addEventListener("click", (e) => {
+    // Don't steal clicks intended for contentEditable
+    if (e.target === nameSpan) return;
+    _activeLayerIdx = realIdx;
+    // Update selected class on all rows in-place
+    document.querySelectorAll(".layer-row").forEach((rowEl, i) => {
+      rowEl.classList.toggle("layer-row--selected", i === _activeLayerIdx);
     });
-    saveLayersToStorage();
+    updateCanvasPanel();
   });
 
-  // ── Overflow menu button (⋯) ──────────────────────────────
-  // Has active dot if move mode on, draw content, visibility mask, or inpaint mask
-  const _hasOverflowActive = () =>
-    (_movingLayer === layer) ||
-    !!layer.maskBase64 ||
-    !!layer.inpaintMaskBase64 ||
-    ((layer.offsetX || 0) !== 0 || (layer.offsetY || 0) !== 0);
-
-  const overflowBtn = document.createElement("button");
-  overflowBtn.type = "button";
-  overflowBtn.className = "layer-overflow-btn" + (_hasOverflowActive() ? " layer-overflow-btn--has-active" : "");
-  overflowBtn.title = "More options";
-  overflowBtn.setAttribute("aria-label", "More layer options");
-  overflowBtn.setAttribute("aria-haspopup", "true");
-  overflowBtn.textContent = "⋯";
-
-  // Helper to sync the overflow dot indicator
-  function _syncOverflowDot() {
-    overflowBtn.classList.toggle("layer-overflow-btn--has-active", _hasOverflowActive());
-  }
-
-  // Helper to close this row's overflow menu
-  let _currentOverflowMenu = null;
-  function _closeOverflowMenu() {
-    if (_currentOverflowMenu) {
-      _currentOverflowMenu.remove();
-      _currentOverflowMenu = null;
-    }
-    if (_activeOverflowCleanup === _closeOverflowMenu) _activeOverflowCleanup = null;
-  }
-
-  overflowBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    // Toggle: if already open, close it
-    if (_currentOverflowMenu) { _closeOverflowMenu(); return; }
-    // Close any previously open overflow menu from another row
-    _closeActiveOverflowMenu();
-    _activeOverflowCleanup = _closeOverflowMenu;
-
-    const menu = document.createElement("div");
-    menu.className = "layer-overflow-menu";
-    _currentOverflowMenu = menu;
-
-    // Helper to create a menu item
-    function makeItem(label, isActive, isDanger, onClick) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "layer-overflow-item" +
-        (isActive ? " layer-overflow-item--active" : "") +
-        (isDanger ? " layer-overflow-item--danger" : "");
-      btn.textContent = label;
-      btn.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        _closeOverflowMenu();
-        onClick();
-      });
-      return btn;
-    }
-
-    // Move
-    const isMoveActive = _movingLayer === layer;
-    const hasMoveOffset = (layer.offsetX || 0) !== 0 || (layer.offsetY || 0) !== 0;
-    menu.appendChild(makeItem(
-      isMoveActive ? "Move (active — click canvas)" : (hasMoveOffset ? "Move (offset set)" : "Move"),
-      isMoveActive || hasMoveOffset, false, () => {
-        if (_movingLayer === layer) {
-          _movingLayer = null;
-          _disableCanvasMove();
-          _syncOverflowDot();
-        } else {
-          _movingLayer = layer;
-          _enableCanvasMove(layer);
-          _syncOverflowDot();
-        }
-      }
-    ));
-
-    // Draw
-    const isDrawActive = !!layer.imageBase64;
-    menu.appendChild(makeItem(
-      isDrawActive ? "Draw (has content)" : "Draw",
-      isDrawActive, false, () => {
-        openLayerDrawEditor(layer, (base64) => {
-          layer.imageBase64 = base64;
-          refreshCompositePreview();
-          saveLayersToStorage();
-          // Refresh thumbnail without full re-render
-          const existingImg = thumbWrap.querySelector(".layer-thumb");
-          const existingPlaceholder = thumbWrap.querySelector(".layer-thumb-empty");
-          if (existingPlaceholder) existingPlaceholder.remove();
-          if (existingImg) {
-            existingImg.src = "data:image/png;base64," + base64;
-          } else {
-            const newImg = document.createElement("img");
-            newImg.className = "layer-thumb";
-            newImg.src = "data:image/png;base64," + base64;
-            newImg.alt = layer.name;
-            thumbWrap.appendChild(newImg);
-          }
-          _syncOverflowDot();
-        });
-      }
-    ));
-
-    // AI Redraw (only when layer has content to redraw)
-    if (layer.imageBase64) {
-      menu.appendChild(makeItem("AI Redraw", false, false, () => {
-        openLayerRedrawModal(layer);
-      }));
-    }
-
-    // Visibility Mask
-    menu.appendChild(makeItem(
-      layer.maskBase64 ? "Visibility Mask (active)" : "Visibility Mask",
-      !!layer.maskBase64, false, () => {
-        pushLayerUndo("Edit visibility mask");
-        openLayerMaskEditor(layer, () => {
-          saveLayersToStorage();
-          refreshCompositePreview();
-          _syncOverflowDot();
-        });
-      }
-    ));
-
-    // Inpaint Mask
-    menu.appendChild(makeItem(
-      layer.inpaintMaskBase64 ? "Inpaint Mask (active)" : "Inpaint Mask",
-      !!layer.inpaintMaskBase64, false, () => {
-        pushLayerUndo("Edit inpaint mask");
-        openLayerInpaintEditor(layer, () => {
-          saveLayersToStorage();
-          refreshCompositePreview();
-          _syncOverflowDot();
-        });
-      }
-    ));
-
-    // Clear Inpaint Mask (only if active)
-    if (layer.inpaintMaskBase64) {
-      menu.appendChild(makeItem("Clear Inpaint Mask", false, false, () => {
-        pushLayerUndo("Clear inpaint mask");
-        layer.inpaintMaskBase64 = null;
-        saveLayersToStorage();
-        refreshCompositePreview();
-        _syncOverflowDot();
-        showStatus("Inpaint mask cleared");
-      }));
-    }
-
-    // Divider
-    const divider = document.createElement("div");
-    divider.className = "layer-overflow-divider";
-    menu.appendChild(divider);
-
-    // Remove
-    menu.appendChild(makeItem("Remove", false, true, () => {
-      pushLayerUndo("Remove layer");
-      layers.splice(realIdx, 1);
-      renderLayerList();
-      saveLayersToStorage();
-      refreshCompositePreview();
-    }));
-
-    overflowBtn.appendChild(menu);
-
-    // Close on outside click or Escape
-    function onOutsideClick(ev) {
-      if (!overflowBtn.contains(ev.target)) {
-        _closeOverflowMenu();
-        document.removeEventListener("click", onOutsideClick, true);
-        document.removeEventListener("keydown", onEscape);
-      }
-    }
-    function onEscape(ev) {
-      if (ev.key === "Escape") {
-        ev.stopImmediatePropagation();
-        _closeOverflowMenu();
-        document.removeEventListener("click", onOutsideClick, true);
-        document.removeEventListener("keydown", onEscape);
-        overflowBtn.focus();
-      }
-    }
-    document.addEventListener("click", onOutsideClick, true);
-    document.addEventListener("keydown", onEscape);
-  });
-
-  controls.appendChild(eyeBtn);
-  controls.appendChild(targetBtn);
-  controls.appendChild(overflowBtn);
-
+  row.appendChild(grip);
   row.appendChild(thumbWrap);
-  row.appendChild(mid);
-  row.appendChild(controls);
+  row.appendChild(nameSpan);
 
   // ── HTML5 Drag-and-drop reorder ───────────────────────────
   row.addEventListener("dragstart", (e) => {
@@ -3008,13 +2711,17 @@ function setupLayers() {
   const sendToLayer = document.getElementById("btn-send-to-layer");
 
   if (addBtn) {
-    addBtn.addEventListener("click", () => {
+    addBtn.addEventListener("click", (e) => {
+      // Prevent the button inside <summary> from toggling the accordion
+      e.stopPropagation();
       if (layers.length >= MAX_LAYERS) {
         showStatus("Maximum of " + MAX_LAYERS + " layers reached.");
         return;
       }
       pushLayerUndo("Add layer");
       const n = layers.length + 1;
+      // Auto-select the new layer
+      _activeLayerIdx = layers.length;
       layers.push({ id: Date.now(), name: "Layer " + n, imageBase64: null, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0 });
       renderLayerList();
       saveLayersToStorage();
@@ -3064,6 +2771,7 @@ function setupLayers() {
       const outputLayers = layers.filter((l) => l.name.startsWith("Output"));
       const n = outputLayers.length;
       const name = n === 0 ? "Output" : "Output " + (n + 1);
+      _activeLayerIdx = layers.length;
       layers.push({
         id: Date.now(),
         name,
@@ -3091,6 +2799,329 @@ function setupLayers() {
   if (layersToggle) {
     layersToggle.addEventListener("change", () => refreshCompositePreview());
   }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CANVAS LAYER PANEL — floating panel for active layer controls
+   ═══════════════════════════════════════════════════════════ */
+
+function updateCanvasPanel() {
+  const panel     = document.getElementById("canvas-layer-panel");
+  const toggle    = document.getElementById("canvas-view-toggle");
+  const providerEl = document.getElementById("provider");
+  const provider  = providerEl ? providerEl.value : "novelai";
+
+  // Panel is only for NovelAI mode with at least one layer
+  if (!panel) return;
+  if (provider !== "novelai" || layers.length === 0) {
+    panel.style.display = "none";
+    if (toggle) toggle.style.display = "none";
+    return;
+  }
+
+  // Clamp index
+  if (_activeLayerIdx >= layers.length) _activeLayerIdx = layers.length - 1;
+  if (_activeLayerIdx < 0) _activeLayerIdx = 0;
+
+  const layer = layers[_activeLayerIdx];
+
+  // Show panel
+  panel.style.display = "";
+  if (toggle) toggle.style.display = "";
+
+  // Update layer info
+  const info = document.getElementById("clp-layer-info");
+  if (info) info.textContent = "Layer " + (_activeLayerIdx + 1) + " of " + layers.length;
+
+  // Prev/Next button state
+  const prevBtn = document.getElementById("clp-prev");
+  const nextBtn = document.getElementById("clp-next");
+  if (prevBtn) prevBtn.disabled = (_activeLayerIdx === 0);
+  if (nextBtn) nextBtn.disabled = (_activeLayerIdx === layers.length - 1);
+
+  // Thumbnail
+  const thumbEl = document.getElementById("clp-thumb");
+  if (thumbEl) {
+    thumbEl.innerHTML = "";
+    if (layer.imageBase64) {
+      const img = document.createElement("img");
+      img.src = "data:image/png;base64," + layer.imageBase64;
+      img.alt = layer.name;
+      thumbEl.appendChild(img);
+    }
+  }
+
+  // Name
+  const nameInput = document.getElementById("clp-name");
+  if (nameInput) nameInput.value = layer.name;
+
+  // Eye button
+  const eyeBtn = document.getElementById("clp-eye");
+  if (eyeBtn) {
+    eyeBtn.classList.toggle("clp-icon-btn--active", layer.visible);
+    eyeBtn.title = layer.visible ? "Hide layer" : "Show layer";
+    eyeBtn.innerHTML = layer.visible
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+  }
+
+  // Target button
+  const targetBtn = document.getElementById("clp-target");
+  if (targetBtn) {
+    targetBtn.classList.toggle("clp-icon-btn--active", !!layer.isOutputTarget);
+    targetBtn.title = layer.isOutputTarget ? "Output target (active)" : "Set as output target";
+  }
+
+  // Opacity
+  const opacitySlider = document.getElementById("clp-opacity");
+  const opacityVal    = document.getElementById("clp-opacity-val");
+  if (opacitySlider) opacitySlider.value = String(layer.opacity);
+  if (opacityVal)    opacityVal.textContent = Math.round(layer.opacity * 100) + "%";
+
+  // AI Redraw visibility
+  const redrawBtn = document.getElementById("clp-redraw");
+  if (redrawBtn) redrawBtn.style.display = layer.imageBase64 ? "" : "none";
+
+  // Move button active state
+  const moveBtn = document.getElementById("clp-move");
+  if (moveBtn) moveBtn.classList.toggle("clp-action-btn--active", _movingLayer === layer);
+
+  // Highlight corresponding sidebar row
+  document.querySelectorAll(".layer-row").forEach((rowEl, i) => {
+    rowEl.classList.toggle("layer-row--selected", i === _activeLayerIdx);
+  });
+}
+
+function setupCanvasLayerPanel() {
+  // ── Collapse toggle ───────────────────────────────────────
+  const collapseBtn = document.getElementById("clp-collapse");
+  const clpBody     = document.getElementById("clp-body");
+  const savedCollapsed = localStorage.getItem("nai-clp-collapsed") === "true";
+  if (savedCollapsed && clpBody) clpBody.style.display = "none";
+
+  if (collapseBtn && clpBody) {
+    collapseBtn.textContent = savedCollapsed ? "▸" : "▾";
+    collapseBtn.addEventListener("click", () => {
+      const isCollapsed = clpBody.style.display === "none";
+      clpBody.style.display = isCollapsed ? "" : "none";
+      collapseBtn.textContent = isCollapsed ? "▾" : "▸";
+      localStorage.setItem("nai-clp-collapsed", isCollapsed ? "false" : "true");
+    });
+  }
+
+  // ── Prev / Next ───────────────────────────────────────────
+  document.getElementById("clp-prev")?.addEventListener("click", () => {
+    if (_activeLayerIdx > 0) { _activeLayerIdx--; updateCanvasPanel(); }
+  });
+  document.getElementById("clp-next")?.addEventListener("click", () => {
+    if (_activeLayerIdx < layers.length - 1) { _activeLayerIdx++; updateCanvasPanel(); }
+  });
+
+  // ── Name input ────────────────────────────────────────────
+  const nameInput = document.getElementById("clp-name");
+  if (nameInput) {
+    nameInput.addEventListener("change", () => {
+      if (layers.length === 0) return;
+      const layer = layers[_activeLayerIdx];
+      const trimmed = nameInput.value.trim();
+      layer.name = trimmed || layer.name;
+      if (!trimmed) nameInput.value = layer.name;
+      saveLayersToStorage();
+      // Sync name in sidebar row without full re-render
+      const rowEl = document.querySelectorAll(".layer-row")[_activeLayerIdx];
+      if (rowEl) {
+        const nameSpan = rowEl.querySelector(".layer-name");
+        if (nameSpan) nameSpan.textContent = layer.name;
+      }
+    });
+  }
+
+  // ── Eye button ────────────────────────────────────────────
+  document.getElementById("clp-eye")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    const layer = layers[_activeLayerIdx];
+    pushLayerUndo("Toggle visibility");
+    layer.visible = !layer.visible;
+    saveLayersToStorage();
+    updateLayersBadge();
+    refreshCompositePreview();
+    updateCanvasPanel();
+  });
+
+  // ── Target button ─────────────────────────────────────────
+  document.getElementById("clp-target")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    const layer = layers[_activeLayerIdx];
+    pushLayerUndo("Toggle output target");
+    const wasTarget = layer.isOutputTarget;
+    layers.forEach(l => { l.isOutputTarget = false; });
+    layer.isOutputTarget = !wasTarget;
+    // Update sidebar rows in-place
+    document.querySelectorAll(".layer-row").forEach((rowEl) => {
+      const id = Number(rowEl.dataset.layerId);
+      const l = layers.find(x => x.id === id);
+      if (!l) return;
+      rowEl.classList.toggle("layer-row--output-target", !!l.isOutputTarget);
+    });
+    saveLayersToStorage();
+    updateCanvasPanel();
+  });
+
+  // ── Opacity slider ────────────────────────────────────────
+  let _clpOpacityUndoPushed = false;
+  const opacitySlider = document.getElementById("clp-opacity");
+  const opacityVal    = document.getElementById("clp-opacity-val");
+  if (opacitySlider) {
+    opacitySlider.addEventListener("pointerdown", () => { _clpOpacityUndoPushed = false; });
+    opacitySlider.addEventListener("input", () => {
+      if (layers.length === 0) return;
+      if (!_clpOpacityUndoPushed) { pushLayerUndo("Change opacity"); _clpOpacityUndoPushed = true; }
+      const layer = layers[_activeLayerIdx];
+      layer.opacity = parseFloat(opacitySlider.value);
+      if (opacityVal) opacityVal.textContent = Math.round(layer.opacity * 100) + "%";
+      saveLayersToStorage();
+      // Mark input button as changed if on output view
+      _markInputChanged();
+      clearTimeout(_previewDebounceTimer);
+      _previewDebounceTimer = setTimeout(refreshCompositePreview, 50);
+    });
+  }
+
+  // ── Action buttons ────────────────────────────────────────
+  document.getElementById("clp-move")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    const layer = layers[_activeLayerIdx];
+    if (_movingLayer === layer) {
+      _movingLayer = null;
+      _disableCanvasMove();
+    } else {
+      _movingLayer = layer;
+      _enableCanvasMove(layer);
+    }
+    updateCanvasPanel();
+  });
+
+  document.getElementById("clp-draw")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    const layer = layers[_activeLayerIdx];
+    openLayerDrawEditor(layer, (base64) => {
+      layer.imageBase64 = base64;
+      refreshCompositePreview();
+      saveLayersToStorage();
+      _markInputChanged();
+      updateCanvasPanel();
+    });
+  });
+
+  document.getElementById("clp-mask")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    const layer = layers[_activeLayerIdx];
+    pushLayerUndo("Edit visibility mask");
+    openLayerMaskEditor(layer, () => {
+      saveLayersToStorage();
+      refreshCompositePreview();
+      _markInputChanged();
+    });
+  });
+
+  document.getElementById("clp-inpaint")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    const layer = layers[_activeLayerIdx];
+    pushLayerUndo("Edit inpaint mask");
+    openLayerInpaintEditor(layer, () => {
+      saveLayersToStorage();
+      refreshCompositePreview();
+      _markInputChanged();
+    });
+  });
+
+  document.getElementById("clp-redraw")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    const layer = layers[_activeLayerIdx];
+    openLayerRedrawModal(layer);
+  });
+
+  document.getElementById("clp-delete")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    pushLayerUndo("Remove layer");
+    layers.splice(_activeLayerIdx, 1);
+    if (_activeLayerIdx >= layers.length && layers.length > 0) _activeLayerIdx = layers.length - 1;
+    renderLayerList();
+    saveLayersToStorage();
+    refreshCompositePreview();
+  });
+
+  // ── Thumb click — load image onto layer ──────────────────
+  document.getElementById("clp-thumb")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    const layer = layers[_activeLayerIdx];
+    const fi = document.createElement("input");
+    fi.type = "file";
+    fi.accept = "image/*";
+    fi.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        layer.imageBase64 = ev.target.result.split(",")[1];
+        renderLayerList();
+        saveLayersToStorage();
+        refreshCompositePreview();
+        _markInputChanged();
+      };
+      reader.readAsDataURL(file);
+    });
+    fi.click();
+  });
+}
+
+/* ── Input/Output toggle ──────────────────────────────────── */
+
+function _markInputChanged() {
+  // If we're on the Output view, mark the Input button with a dot
+  if (_canvasView === "output") {
+    const inputBtn = document.getElementById("cvt-input");
+    if (inputBtn) inputBtn.classList.add("cvt-btn--changed");
+  }
+}
+
+function setupCanvasViewToggle() {
+  const inputBtn  = document.getElementById("cvt-input");
+  const outputBtn = document.getElementById("cvt-output");
+  if (!inputBtn || !outputBtn) return;
+
+  function applyView(view) {
+    _canvasView = view;
+    localStorage.setItem("nai-canvas-view", view);
+    inputBtn.classList.toggle("cvt-btn--active", view === "input");
+    outputBtn.classList.toggle("cvt-btn--active", view === "output");
+    if (view === "input") {
+      inputBtn.classList.remove("cvt-btn--changed");
+      // Show composite preview
+      refreshCompositePreview();
+    } else {
+      // Show the last generated image
+      if (state.lastGeneratedImageBase64) {
+        const output = document.getElementById("output");
+        if (output) {
+          const img = document.createElement("img");
+          img.src = "data:image/png;base64," + state.lastGeneratedImageBase64;
+          img.alt = "Generated image";
+          output.innerHTML = "";
+          output.appendChild(img);
+          renderCharacterMarkers();
+        }
+      }
+    }
+  }
+
+  inputBtn.addEventListener("click",  () => applyView("input"));
+  outputBtn.addEventListener("click", () => applyView("output"));
+
+  // Restore saved view (default to output)
+  const saved = localStorage.getItem("nai-canvas-view") || "output";
+  inputBtn.classList.toggle("cvt-btn--active", saved === "input");
+  outputBtn.classList.toggle("cvt-btn--active", saved === "output");
 }
 
 /* ═══════════════════════════════════════════════════════════
