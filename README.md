@@ -59,6 +59,8 @@ You generated something great but you're not sure which tags mattered. Was it `d
 
 When the main prompt field isn't enough space, press **Cmd+E** (or Ctrl+E on Windows/Linux) to open a centered full-screen editor. Tabs switch between Prompt and Undesired Content. A live token counter shows how much of your budget you're using. Close with Done or Escape — changes sync back to the main field instantly.
 
+![Prompt Focus Mode — centered editor with monospace font and token counter](docs/screenshots/prompt-focus.png)
+
 ### Compare variations systematically, not one at a time
 
 **Variation Dial** — pick a dimension (lighting / art style / composition / mood), hit one button, get 4 systematic variants side by side. Instead of "would neon lighting look good?" you just *see* warm vs dramatic vs neon vs moonlit in one grid.
@@ -78,6 +80,8 @@ Here you get a **visual 2D canvas** — click where each character goes, write i
 ### Layers — a full compositing workspace
 
 Stack images as layers and send the merged result to the model as img2img input. The canvas becomes your workspace — a floating control panel at the bottom-left gives you direct access to every layer operation without touching the sidebar.
+
+![Layers system with canvas panel, sidebar list, and Input/Output toggle](docs/screenshots/layers.png)
 
 **Canvas layer panel:**
 - **Layer navigation** — prev/next buttons cycle through layers; click sidebar rows to select
@@ -124,6 +128,8 @@ Or **Cmd+V** a clipboard image directly.
 
 ### Switch between NovelAI and Grok with one click
 
+![Grok mode with canvas field, reference images, and video controls](docs/screenshots/grok-mode.png)
+
 Same prompt field, same gallery, same workflow. Grok adds:
 - Image generation and image editing (modify existing images with text)
 - **Up to 5 reference images** — attach multiple reference images to guide Grok edits
@@ -134,6 +140,8 @@ Same prompt field, same gallery, same workflow. Grok adds:
 ### Sidebar collapse
 
 Click the toggle button or press **Tab** to collapse the left sidebar and give your canvas more room. The collapsed state persists across sessions.
+
+![Sidebar collapsed — full-width canvas workspace](docs/screenshots/sidebar-collapsed.png)
 
 ---
 
