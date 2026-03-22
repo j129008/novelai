@@ -4305,6 +4305,7 @@ function openLayerInpaintEditor(layer, onConfirm) {
   const titleEl    = document.getElementById("layer-redraw-title");
   const previewImg = document.getElementById("layer-redraw-preview");
   const promptEl   = document.getElementById("layer-redraw-prompt");
+  if (promptEl && typeof _tagAC !== "undefined") _tagAC.attach(promptEl);
   const strengthEl = document.getElementById("layer-redraw-strength");
   const strengthVal = document.getElementById("layer-redraw-strength-val");
   const submitBtn  = document.getElementById("layer-redraw-submit");
