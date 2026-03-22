@@ -2216,54 +2216,99 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 }
 .vibe-remove-btn:hover { color: var(--danger); background: var(--danger-bg); }
 
-/* ── Grok Reference Images ── */
-.grok-ref-list {
+/* ── Grok Images — unified source + references panel ── */
+.grok-images-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.grok-ref-empty-hint {
-  font-size: 0.75rem;
-  color: var(--text-tertiary);
-  line-height: 1.5;
-}
-
-.grok-ref-slot {
+.grok-image-slot {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--bg-overlay);
+  padding: 8px;
+  background: var(--bg-deep);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  padding: 6px 8px;
+  position: relative;
 }
 
-.grok-ref-slot .vibe-remove-btn {
-  margin-left: auto;
-}
-
-.grok-ref-number {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
+.grok-image-slot--source {
+  border-color: var(--accent);
   background: var(--accent-dim);
-  border: 1px solid rgba(124, 92, 252, 0.4);
-  color: var(--accent-bright);
-  font-size: 0.68rem;
-  font-weight: 700;
-  flex-shrink: 0;
 }
 
-.grok-ref-thumb {
+.grok-slot-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+.grok-image-slot--source .grok-slot-label {
+  color: var(--accent-bright);
+}
+
+.grok-slot-thumb {
   width: 40px;
   height: 40px;
   object-fit: cover;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-muted);
+  flex-shrink: 0;
+}
+
+.grok-slot-drop {
+  flex: 1;
+  padding: 10px 12px;
+  text-align: center;
+  border: 1px dashed var(--border-muted);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.grok-slot-drop:hover {
+  border-color: var(--accent);
+  color: var(--text-secondary);
+}
+
+.grok-slot-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 2px 5px;
+  border-radius: var(--radius-sm);
+  line-height: 1;
+  transition: color 0.15s, background 0.15s;
+}
+
+.grok-slot-remove:hover {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.grok-images-list.drag-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+.grok-images-hint {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+  line-height: 1.4;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -2925,34 +2970,6 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 .grok-source-remove:hover {
   background: rgba(239,68,68,0.8);
   color: #fff;
-}
-/* Reference thumbnail chip in image-actions bar */
-.ref-source-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--bg-float);
-  border: 1px solid var(--border-muted);
-  border-radius: var(--radius-sm);
-  padding: 3px 8px 3px 4px;
-  font-size: 0.72rem;
-  color: var(--text-tertiary);
-  flex-shrink: 0;
-}
-.ref-source-thumb {
-  width: 22px;
-  height: 22px;
-  object-fit: cover;
-  border-radius: 3px;
-  display: block;
-  flex-shrink: 0;
-}
-.ref-source-label {
-  font-size: 0.68rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-tertiary);
 }
 
 

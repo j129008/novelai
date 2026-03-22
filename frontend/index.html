@@ -530,18 +530,26 @@
           </div>
         </details>
 
-        <!-- 2. Grok Reference Images accordion (Grok only) -->
+        <!-- 2. Grok Images accordion (Grok only) — source + references unified -->
         <details class="accordion grok-only" id="grok-refs-accordion" style="display:none">
           <summary class="accordion-header">
             <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
-            Reference Images
-            <span id="grok-refs-badge" class="accordion-badge" style="display:none">0</span>
+            Images
+            <span id="grok-images-badge" class="accordion-badge" style="display:none">0</span>
           </summary>
           <div class="accordion-body">
-            <div id="grok-ref-list" class="grok-ref-list"></div>
-            <button id="btn-add-grok-ref" class="btn-action btn-action--primary" type="button" style="width:100%; justify-content:center; margin-top:4px">
+            <div id="grok-images-list" class="grok-images-list">
+              <!-- Source slot (always present) -->
+              <div id="grok-source-slot" class="grok-image-slot grok-image-slot--source">
+                <div class="grok-slot-label">Source · Image 1</div>
+                <div class="grok-slot-drop" id="grok-source-drop">Drop or click to set source</div>
+              </div>
+              <!-- Reference slots rendered by JS -->
+            </div>
+            <p class="grok-images-hint" id="grok-images-hint">Add a source or reference image to guide Grok</p>
+            <button id="btn-add-grok-ref" class="btn-action" type="button" style="width:100%; justify-content:center; margin-top:4px">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Add Image
+              Add Reference
             </button>
           </div>
         </details>
@@ -870,18 +878,14 @@
 
           <div id="image-actions" class="image-actions" style="display:none">
             <span id="info-seed" class="seed-badge"></span>
-            <div class="ref-source-chip" id="ref-source-chip" style="display:none">
-              <img id="ref-source-thumb-chip" class="ref-source-thumb" src="" alt="Source">
-              <span class="ref-source-label">Source</span>
-            </div>
             <div class="action-group">
               <button id="btn-reuse-seed" class="btn-action" type="button">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.84"/></svg>
                 Reuse Seed
               </button>
-              <button id="btn-use-as-source" class="btn-action btn-action--iterate grok-only" type="button" title="Use this output as the source image for editing" style="display:none">
+              <button id="btn-set-as-source" class="btn-action btn-action--iterate grok-only" type="button" title="Set this output as the source image in the Images panel" style="display:none">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                Use as Source
+                Set as Source
               </button>
               <button id="btn-send-to-layer" class="btn-action novelai-only" type="button" title="Send this image to a new layer in the Layers panel" style="display:none">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M9 10l3 3 3-3"/></svg>

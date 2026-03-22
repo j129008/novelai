@@ -408,19 +408,15 @@ async function init() {
   $("#btn-reuse-seed").addEventListener("click", reuseSeed);
   $("#btn-download").addEventListener("click", downloadImage);
 
-  // Grok: Use as Source — set the current output as img2img source
-  const useAsSourceBtn = document.getElementById("btn-use-as-source");
-  if (useAsSourceBtn) {
-    useAsSourceBtn.addEventListener("click", () => {
+  // Grok: Set as Source — move current output into the source slot in the Images panel
+  const setAsSourceBtn = document.getElementById("btn-set-as-source");
+  if (setAsSourceBtn) {
+    setAsSourceBtn.addEventListener("click", () => {
       if (!state.lastGeneratedImageBase64) return;
       state.img2img = state.lastGeneratedImageBase64;
-      state.canvasImageBase64 = state.lastGeneratedImageBase64;
-      // Update source chip thumbnail
-      const chip = document.getElementById("ref-source-chip");
-      const chipImg = document.getElementById("ref-source-thumb-chip");
-      if (chip) chip.style.display = "";
-      if (chipImg) chipImg.src = "data:image/png;base64," + state.lastGeneratedImageBase64;
-      showStatus("Output set as source — edit with your next prompt");
+      renderGrokImagesList();
+      syncInpaintButtonVisibility();
+      showStatus("Output set as source — describe your next edit");
     });
   }
 
@@ -438,11 +434,8 @@ async function init() {
     if (outputToggle) outputToggle.value = outputType;
     applyProvider("grok");
     localStorage.setItem("nai-provider", "grok");
-    // Update source chip
-    const chip = document.getElementById("ref-source-chip");
-    const chipImg = document.getElementById("ref-source-thumb-chip");
-    if (chip) chip.style.display = "";
-    if (chipImg) chipImg.src = "data:image/png;base64," + state.lastGeneratedImageBase64;
+    // Reflect new source in the Images panel
+    renderGrokImagesList();
     // Clear and focus prompt
     const promptEl = document.getElementById("prompt");
     if (promptEl) { promptEl.value = ""; promptEl.focus(); }
@@ -817,6 +810,7 @@ function loadImageFile(file) {
           state.canvasImageBase64 = state.img2img;
           state.canvasImageWidth = img.naturalWidth;
           state.canvasImageHeight = img.naturalHeight;
+          renderGrokImagesList();
         } else {
           // Specific aspect ratio: open crop overlay
           openCropOverlay(img);
@@ -1174,6 +1168,7 @@ function confirmCrop() {
     state.canvasImageWidth = crop.targetW;
     state.canvasImageHeight = crop.targetH;
     showGrokSourceOnCanvas(dataUrl);
+    renderGrokImagesList();
   } else {
     // NovelAI: add cropped image as a new layer
     if (layers.length < MAX_LAYERS) {
@@ -2137,98 +2132,192 @@ function buildVibeEntry(vibe, idx) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   GROK REFERENCE IMAGES
+   GROK IMAGES — unified source + references panel
    ═══════════════════════════════════════════════════════════ */
+
+// Pending target for the file picker: "source" | "ref"
+let _grokFilePickerTarget = "ref";
 
 function setupGrokRefs() {
   const addBtn = $("#btn-add-grok-ref");
   const fileInput = $("#grok-ref-file-input");
-  if (!addBtn || !fileInput) return;
+  const imagesList = $("#grok-images-list");
+  if (!fileInput || !imagesList) return;
 
-  addBtn.addEventListener("click", () => {
-    if (grokRefs.length >= MAX_GROK_REFS) return;
-    fileInput.value = "";
-    fileInput.click();
-  });
-
-  fileInput.addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const base64 = ev.target.result.split(",")[1];
-      grokRefs.push({ base64 });
-      renderGrokRefList();
-    };
-    reader.readAsDataURL(file);
-    fileInput.value = "";
-  });
-
-  renderGrokRefList();
-}
-
-function renderGrokRefList() {
-  const list = $("#grok-ref-list");
-  const addBtn = $("#btn-add-grok-ref");
-  const badge = $("#grok-refs-badge");
-  if (!list) return;
-
-  list.innerHTML = "";
-
-  if (grokRefs.length === 0) {
-    const hint = document.createElement("p");
-    hint.className = "grok-ref-empty-hint";
-    hint.textContent = 'Add reference images. Mention them in your prompt: \'in the style of the second image\'';
-    list.appendChild(hint);
-  } else {
-    grokRefs.forEach((ref, idx) => {
-      list.appendChild(buildGrokRefSlot(ref, idx));
+  // ── Add Reference button ────────────────────────────────
+  if (addBtn) {
+    addBtn.addEventListener("click", () => {
+      if (grokRefs.length >= MAX_GROK_REFS) return;
+      _grokFilePickerTarget = "ref";
+      fileInput.value = "";
+      fileInput.click();
     });
   }
 
-  if (addBtn) addBtn.disabled = grokRefs.length >= MAX_GROK_REFS;
+  // ── Source slot: click to pick ──────────────────────────
+  imagesList.addEventListener("click", (e) => {
+    const drop = e.target.closest("#grok-source-drop");
+    if (drop) {
+      _grokFilePickerTarget = "source";
+      fileInput.value = "";
+      fileInput.click();
+    }
+  });
 
+  // ── Source slot: clear button ───────────────────────────
+  imagesList.addEventListener("click", (e) => {
+    const btn = e.target.closest(".grok-slot-remove[data-role='source']");
+    if (btn) {
+      state.img2img = null;
+      renderGrokImagesList();
+      syncInpaintButtonVisibility();
+    }
+  });
+
+  // ── Ref slot: remove button ─────────────────────────────
+  imagesList.addEventListener("click", (e) => {
+    const btn = e.target.closest(".grok-slot-remove[data-role='ref']");
+    if (btn) {
+      const idx = parseInt(btn.dataset.idx, 10);
+      grokRefs.splice(idx, 1);
+      renderGrokImagesList();
+    }
+  });
+
+  // ── File picker result ──────────────────────────────────
+  fileInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    readImageFile(file, (base64) => {
+      if (_grokFilePickerTarget === "source") {
+        state.img2img = base64;
+        renderGrokImagesList();
+        syncInpaintButtonVisibility();
+      } else {
+        if (grokRefs.length < MAX_GROK_REFS) {
+          grokRefs.push({ base64 });
+          renderGrokImagesList();
+        }
+      }
+    });
+    fileInput.value = "";
+  });
+
+  // ── Drag-and-drop on the list panel ────────────────────
+  imagesList.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    imagesList.classList.add("drag-over");
+  });
+  imagesList.addEventListener("dragleave", (e) => {
+    if (!imagesList.contains(e.relatedTarget)) {
+      imagesList.classList.remove("drag-over");
+    }
+  });
+  imagesList.addEventListener("drop", (e) => {
+    e.preventDefault();
+    imagesList.classList.remove("drag-over");
+    const file = e.dataTransfer.files[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    readImageFile(file, (base64) => {
+      if (!state.img2img) {
+        state.img2img = base64;
+        renderGrokImagesList();
+        syncInpaintButtonVisibility();
+      } else if (grokRefs.length < MAX_GROK_REFS) {
+        grokRefs.push({ base64 });
+        renderGrokImagesList();
+      }
+    });
+  });
+
+  renderGrokImagesList();
+}
+
+function readImageFile(file, callback) {
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const base64 = ev.target.result.split(",")[1];
+    callback(base64);
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderGrokImagesList() {
+  const imagesList = $("#grok-images-list");
+  const addBtn = $("#btn-add-grok-ref");
+  const badge = $("#grok-images-badge");
+  const hint = $("#grok-images-hint");
+  if (!imagesList) return;
+
+  // Rebuild everything after the source slot
+  // Keep source slot element, remove any previously-rendered ref slots
+  const sourceSlot = document.getElementById("grok-source-slot");
+  // Clear all children except the source slot
+  while (imagesList.lastChild && imagesList.lastChild !== sourceSlot) {
+    imagesList.removeChild(imagesList.lastChild);
+  }
+
+  // ── Update source slot ──────────────────────────────────
+  if (sourceSlot) {
+    if (state.img2img) {
+      // Filled: show thumb + × button
+      sourceSlot.innerHTML = `
+        <div class="grok-slot-label">Source · Image 1</div>
+        <img class="grok-slot-thumb" src="data:image/png;base64,${state.img2img}" alt="Source image">
+        <button type="button" class="grok-slot-remove" data-role="source" aria-label="Remove source image" title="Remove source">×</button>
+      `;
+    } else {
+      // Empty: drop zone
+      sourceSlot.innerHTML = `
+        <div class="grok-slot-label">Source · Image 1</div>
+        <div class="grok-slot-drop" id="grok-source-drop">Drop or click to set source</div>
+      `;
+    }
+  }
+
+  // ── Render ref slots (numbered from 2) ──────────────────
+  grokRefs.forEach((ref, idx) => {
+    const imageNumber = idx + 2; // source is 1
+    const slot = document.createElement("div");
+    slot.className = "grok-image-slot";
+    slot.innerHTML = `
+      <div class="grok-slot-label">Ref ${idx + 1} · Image ${imageNumber}</div>
+      <img class="grok-slot-thumb" src="data:image/png;base64,${ref.base64}" alt="Reference image ${imageNumber}">
+      <button type="button" class="grok-slot-remove" data-role="ref" data-idx="${idx}" aria-label="Remove reference ${idx + 1}" title="Remove reference">×</button>
+    `;
+    imagesList.appendChild(slot);
+  });
+
+  // ── Add Reference button visibility ─────────────────────
+  const totalImages = (state.img2img ? 1 : 0) + grokRefs.length;
+  if (addBtn) addBtn.style.display = grokRefs.length >= MAX_GROK_REFS ? "none" : "";
+
+  // ── Badge ───────────────────────────────────────────────
   if (badge) {
-    if (grokRefs.length > 0) {
-      badge.textContent = String(grokRefs.length);
+    if (totalImages > 0) {
+      badge.textContent = String(totalImages);
       badge.style.display = "";
     } else {
       badge.style.display = "none";
     }
   }
-}
 
-function buildGrokRefSlot(ref, idx) {
-  const slot = document.createElement("div");
-  slot.className = "grok-ref-slot";
-
-  // Number badge
-  const num = document.createElement("span");
-  num.className = "grok-ref-number";
-  num.textContent = String(idx + 1);
-  num.setAttribute("aria-hidden", "true");
-  slot.appendChild(num);
-
-  // Thumbnail
-  const thumb = document.createElement("img");
-  thumb.className = "grok-ref-thumb";
-  thumb.src = `data:image/png;base64,${ref.base64}`;
-  thumb.alt = `Reference image ${idx + 1}`;
-  slot.appendChild(thumb);
-
-  // Remove button
-  const removeBtn = document.createElement("button");
-  removeBtn.type = "button";
-  removeBtn.className = "vibe-remove-btn";
-  removeBtn.setAttribute("aria-label", `Remove reference image ${idx + 1}`);
-  removeBtn.textContent = "×";
-  removeBtn.addEventListener("click", () => {
-    grokRefs.splice(idx, 1);
-    renderGrokRefList();
-  });
-  slot.appendChild(removeBtn);
-
-  return slot;
+  // ── Hint text ───────────────────────────────────────────
+  if (hint) {
+    const hasSource = !!state.img2img;
+    const hasRefs = grokRefs.length > 0;
+    if (!hasSource && !hasRefs) {
+      hint.textContent = "Add a source or reference image to guide Grok";
+    } else if (hasSource && !hasRefs) {
+      hint.textContent = "Source is image 1. Describe what to edit in your prompt";
+    } else if (hasSource && hasRefs) {
+      const refNums = grokRefs.map((_, i) => i + 2).join(", ");
+      hint.textContent = `Source is image 1. References are images ${refNums}. Mention by position in prompt`;
+    } else {
+      const refNums = grokRefs.map((_, i) => i + 1).join(", ");
+      hint.textContent = `References are images ${refNums}. Add a source to edit a specific image`;
+    }
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -4115,10 +4204,10 @@ function syncInpaintButtonVisibility() {
       ? "Send this image to a new layer in the Layers panel"
       : "Generate an image first to send it to a layer";
   }
-  // Grok: Use as Source button
-  const useBtn = document.getElementById("btn-use-as-source");
-  if (useBtn) {
-    useBtn.style.display = (hasGenerated && !isNovelAI) ? "" : "none";
+  // Grok: Set as Source button — only shown after generation in Grok mode
+  const setBtn = document.getElementById("btn-set-as-source");
+  if (setBtn) {
+    setBtn.style.display = (hasGenerated && !isNovelAI) ? "" : "none";
   }
   // NovelAI → Grok handoff buttons
   const editGrokBtn = document.getElementById("btn-edit-in-grok");
@@ -4745,12 +4834,6 @@ async function generateGrokImage() {
     const cvtOutput = document.getElementById("cvt-output");
     if (cvtInput) { cvtInput.classList.remove("cvt-btn--active"); cvtInput.classList.remove("cvt-btn--changed"); }
     if (cvtOutput) cvtOutput.classList.add("cvt-btn--active");
-
-    // Hide source chip if not editing (will be shown by Use as Source)
-    if (!state.img2img) {
-      const chip = document.getElementById("ref-source-chip");
-      if (chip) chip.style.display = "none";
-    }
 
     loadGallery();
     if (window._savePromptToHistory) window._savePromptToHistory();
@@ -7001,6 +7084,7 @@ function setupExplorePanel() {
           state.canvasImageBase64 = b64;
           state.canvasImageWidth = null;
           state.canvasImageHeight = null;
+          renderGrokImagesList();
         } else {
           // NovelAI: add to layers
           if (layers.length < MAX_LAYERS) {
