@@ -3,6 +3,7 @@ import csv
 import io
 import ipaddress
 import json
+import logging
 import os
 import re
 import socket
@@ -14,6 +15,8 @@ from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
 from fastapi import APIRouter, HTTPException, Query
+
+log = logging.getLogger("app")
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -218,6 +221,7 @@ async def search_tags(q: str = Query(min_length=1), limit: int = Query(default=1
 async def generate(req: GenerateRequest):
     if not TOKEN:
         raise HTTPException(status_code=503, detail="NOVELAI_TOKEN not configured")
+    log.info(f"generate: {req.width}x{req.height} steps={req.steps} has_image={req.image is not None} has_mask={req.mask is not None}")
 
     try:
         image_data, seed = await generate_image(
@@ -245,6 +249,7 @@ async def generate(req: GenerateRequest):
             mask=req.mask,
         )
     except Exception as e:
+        log.error(f"NovelAI API error: {e}")
         raise HTTPException(status_code=502, detail=f"NovelAI API error: {e}")
 
     # Auto-save to output/
@@ -263,34 +268,59 @@ async def generate(req: GenerateRequest):
 async def layer_redraw(req: LayerRedrawRequest):
     if not TOKEN:
         raise HTTPException(status_code=503, detail="NOVELAI_TOKEN not configured")
+    log.info(f"layer-redraw: {req.width}x{req.height} strength={req.strength}")
 
     try:
         from PIL import Image
+        import numpy as np
 
         raw = base64.b64decode(req.image)
         original = Image.open(io.BytesIO(raw)).convert("RGBA")
+        orig_w, orig_h = original.size
 
-        # Extract alpha before sending to NAI (NAI only accepts RGB).
-        # We always convert to RGBA first so the split is always valid;
-        # if the source had no alpha, the channel will be fully opaque (255).
+        # Extract alpha channel
         alpha = original.split()[3]
-        # Treat fully-opaque alpha as "no transparency" — skip re-application
-        if alpha.getextrema() == (255, 255):
-            alpha = None
+        alpha_arr = np.array(alpha)
 
-        white_bg = Image.new("RGB", original.size, (255, 255, 255))
-        white_bg.paste(original, mask=alpha)
+        # Find bounding box of non-transparent pixels (with padding)
+        non_zero = np.argwhere(alpha_arr > 10)
+        if non_zero.size == 0:
+            raise ValueError("Sketch is empty — draw something first")
 
-        # Resize to requested dimensions if different
-        if white_bg.size != (req.width, req.height):
-            white_bg = white_bg.resize((req.width, req.height), Image.LANCZOS)
-            if alpha is not None:
-                alpha = alpha.resize((req.width, req.height), Image.LANCZOS)
+        y_min, x_min = non_zero.min(axis=0)
+        y_max, x_max = non_zero.max(axis=0)
+
+        # Add padding (10% of bbox size, min 20px)
+        pad_x = max(int((x_max - x_min) * 0.1), 20)
+        pad_y = max(int((y_max - y_min) * 0.1), 20)
+        x_min = max(0, x_min - pad_x)
+        y_min = max(0, y_min - pad_y)
+        x_max = min(orig_w - 1, x_max + pad_x)
+        y_max = min(orig_h - 1, y_max + pad_y)
+
+        # Crop to bounding box
+        bbox = (x_min, y_min, x_max + 1, y_max + 1)
+        cropped = original.crop(bbox)
+        cropped_alpha = alpha.crop(bbox)
+
+        # Composite cropped sketch onto white background for NAI
+        white_bg = Image.new("RGB", cropped.size, (255, 255, 255))
+        white_bg.paste(cropped, mask=cropped_alpha)
+
+        # Resize to a valid NAI resolution (snap to nearest 64px multiple)
+        crop_w, crop_h = white_bg.size
+        gen_w = max(64, min(2048, ((crop_w + 31) // 64) * 64))
+        gen_h = max(64, min(2048, ((crop_h + 31) // 64) * 64))
+        if white_bg.size != (gen_w, gen_h):
+            white_bg = white_bg.resize((gen_w, gen_h), Image.LANCZOS)
 
         img_buf = io.BytesIO()
         white_bg.save(img_buf, format="PNG")
         img_b64 = base64.b64encode(img_buf.getvalue()).decode()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        log.error(f"Image pre-processing error: {e}")
         raise HTTPException(status_code=400, detail=f"Image pre-processing error: {e}")
 
     try:
@@ -299,8 +329,8 @@ async def layer_redraw(req: LayerRedrawRequest):
             prompt=req.prompt,
             negative_prompt=req.negative_prompt,
             action="img2img",
-            width=req.width,
-            height=req.height,
+            width=gen_w,
+            height=gen_h,
             steps=req.steps,
             scale=req.scale,
             sampler=req.sampler,
@@ -309,21 +339,40 @@ async def layer_redraw(req: LayerRedrawRequest):
             image=img_b64,
         )
     except Exception as e:
+        log.error(f"NovelAI API error: {e}")
         raise HTTPException(status_code=502, detail=f"NovelAI API error: {e}")
 
     try:
-        result = Image.open(io.BytesIO(image_data)).convert("RGBA")
+        result_cropped = Image.open(io.BytesIO(image_data)).convert("RGB")
 
-        if alpha is not None:
-            # Resize alpha to match result if NAI returned a different size
-            if alpha.size != result.size:
-                alpha = alpha.resize(result.size, Image.LANCZOS)
-            result.putalpha(alpha)
+        # Resize result back to cropped bbox size
+        crop_size = (bbox[2] - bbox[0], bbox[3] - bbox[1])
+        result_cropped = result_cropped.resize(crop_size, Image.LANCZOS)
+
+        # Remove white background: pixels close to white become transparent.
+        # Use a threshold to handle near-white from JPEG compression artifacts.
+        result_arr = np.array(result_cropped)
+        r, g, b = result_arr[:,:,0], result_arr[:,:,1], result_arr[:,:,2]
+        # Pixels where all channels > 240 are considered background
+        white_mask = (r > 240) & (g > 240) & (b > 240)
+        # Create alpha: 0 for white bg, 255 for content
+        alpha_arr = np.where(white_mask, 0, 255).astype(np.uint8)
+        # Smooth the alpha edge slightly to avoid hard cutoff
+        from PIL import ImageFilter
+        alpha_img = Image.fromarray(alpha_arr).filter(ImageFilter.GaussianBlur(radius=1))
+
+        result_rgba = result_cropped.convert("RGBA")
+        result_rgba.putalpha(alpha_img)
+
+        # Paste back into a full-size transparent canvas at the original position
+        full_result = Image.new("RGBA", (orig_w, orig_h), (0, 0, 0, 0))
+        full_result.paste(result_rgba, (bbox[0], bbox[1]))
 
         out_buf = io.BytesIO()
-        result.save(out_buf, format="PNG")
+        full_result.save(out_buf, format="PNG")
         out_b64 = base64.b64encode(out_buf.getvalue()).decode()
     except Exception as e:
+        log.error(f"Image post-processing error: {e}")
         raise HTTPException(status_code=500, detail=f"Image post-processing error: {e}")
 
     return LayerRedrawResponse(image=out_b64)

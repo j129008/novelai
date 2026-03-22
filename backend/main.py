@@ -1,9 +1,17 @@
+import logging
 import os
 from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+
+# Logging — no sensitive data (prompts, images, tokens)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 # Load .env from project root
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")

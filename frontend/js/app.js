@@ -47,6 +47,7 @@ const MAX_GROK_REFS = 5;
 const layers = [];
 const MAX_LAYERS = 8;
 let _movingLayer = null;
+let _openLayerRedraw = null;
 let _moveCleanup = null;
 let _activeLayerIdx = 0;   // index into layers[] of the currently-selected layer
 let _canvasView = localStorage.getItem("nai-canvas-view") || "output"; // "input" | "output"
@@ -3038,7 +3039,12 @@ function setupCanvasLayerPanel() {
   document.getElementById("clp-redraw")?.addEventListener("click", () => {
     if (layers.length === 0) return;
     const layer = layers[_activeLayerIdx];
-    openLayerRedrawModal(layer);
+    if (!layer || !layer.imageBase64) { showStatus("Draw something on this layer first"); return; }
+    if (_openLayerRedraw) {
+      _openLayerRedraw(layer);
+    } else {
+      showStatus("AI Redraw not ready");
+    }
   });
 
   document.getElementById("clp-delete")?.addEventListener("click", () => {
@@ -4241,8 +4247,10 @@ function openLayerInpaintEditor(layer, onConfirm) {
   const strengthEl = document.getElementById("layer-redraw-strength");
   const strengthVal = document.getElementById("layer-redraw-strength-val");
   const submitBtn  = document.getElementById("layer-redraw-submit");
+  const acceptBtn  = document.getElementById("layer-redraw-accept");
   const cancelBtn  = document.getElementById("layer-redraw-cancel");
   const closeBtn   = document.getElementById("layer-redraw-close");
+  let _lastRedrawResult = null;
 
   if (!modal) return;
 
@@ -4250,6 +4258,7 @@ function openLayerInpaintEditor(layer, onConfirm) {
 
   function openLayerRedrawModal(layer) {
     _activeLayer = layer;
+    _lastRedrawResult = null;
     titleEl.textContent = "AI Redraw — " + layer.name;
     previewImg.src = "data:image/png;base64," + layer.imageBase64;
     promptEl.value = "";
@@ -4257,6 +4266,7 @@ function openLayerInpaintEditor(layer, onConfirm) {
     strengthVal.textContent = "0.70";
     submitBtn.disabled = false;
     submitBtn.textContent = "Redraw";
+    if (acceptBtn) acceptBtn.style.display = "none";
     modal.style.display = "flex";
     // Force animation replay
     modal.style.animation = "none";
@@ -4284,12 +4294,11 @@ function openLayerInpaintEditor(layer, onConfirm) {
       return;
     }
 
+    // Only use the user's description — don't mix in global prompt
+    // which would add unrelated scene/character content
     const useQualityTags = document.getElementById("quality-tags")?.checked;
-    const qualityTagStr  = ", very aesthetic, masterpiece, no text";
-    const globalPrompt   = document.getElementById("prompt")?.value.trim() || "";
     let fullPrompt = desc;
-    if (globalPrompt) fullPrompt += ", " + globalPrompt;
-    if (useQualityTags) fullPrompt += qualityTagStr;
+    if (useQualityTags) fullPrompt += ", very aesthetic, masterpiece";
 
     const resVal   = document.getElementById("resolution")?.value || "832x1216";
     const [width, height] = resVal.split("x").map(Number);
@@ -4321,13 +4330,14 @@ function openLayerInpaintEditor(layer, onConfirm) {
         throw new Error(err.detail || "Redraw failed");
       }
       const data = await resp.json();
-      pushLayerUndo("AI Redraw");
-      layer.imageBase64 = data.image;
-      closeModal();
-      renderLayerList();
-      saveLayersToStorage();
-      refreshCompositePreview();
-      showStatus("AI Redraw applied to " + layer.name);
+      _lastRedrawResult = data.image;
+      // Show result in preview — stay in modal
+      previewImg.src = "data:image/png;base64," + data.image;
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Retry";
+      // Show accept button
+      acceptBtn.style.display = "";
+      showStatus("Preview ready — Accept or adjust and Retry");
     } catch (err) {
       showStatus("Redraw error: " + err.message);
       submitBtn.disabled = false;
@@ -4336,6 +4346,17 @@ function openLayerInpaintEditor(layer, onConfirm) {
   }
 
   submitBtn.addEventListener("click", doRedraw);
+  if (acceptBtn) acceptBtn.addEventListener("click", () => {
+    if (!_lastRedrawResult || !_activeLayer) return;
+    pushLayerUndo("AI Redraw");
+    _activeLayer.imageBase64 = _lastRedrawResult;
+    closeModal();
+    renderLayerList();
+    saveLayersToStorage();
+    refreshCompositePreview();
+    updateCanvasPanel();
+    showStatus("AI Redraw applied to " + _activeLayer.name);
+  });
   cancelBtn.addEventListener("click", closeModal);
   closeBtn.addEventListener("click", closeModal);
 
@@ -4353,17 +4374,9 @@ function openLayerInpaintEditor(layer, onConfirm) {
     }
   });
 
-  // Expose open function
-  setupLayerRedraw._open = openLayerRedrawModal;
+  // Expose open function via module-level variable
+  _openLayerRedraw = openLayerRedrawModal;
 })();
-
-function openLayerRedrawModal(layer) {
-  if (!setupLayerRedraw._open) {
-    showStatus("AI Redraw not ready — please wait.");
-    return;
-  }
-  setupLayerRedraw._open(layer);
-}
 
 function reuseSeed() {
   if (state.lastSeed !== null) {
