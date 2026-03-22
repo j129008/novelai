@@ -288,6 +288,27 @@ async function init() {
   // Load recent characters at startup so autocomplete is populated immediately
   loadRecentCharacters();
 
+  // Sidebar toggle
+  const sidebarToggle = document.getElementById("sidebar-toggle");
+  const sidebar = document.getElementById("sidebar");
+  if (sidebarToggle && sidebar) {
+    const workspace = sidebar.closest(".workspace");
+    const savedCollapsed = localStorage.getItem("nai-sidebar-collapsed") === "true";
+    if (savedCollapsed) { sidebar.classList.add("collapsed"); if (workspace) workspace.classList.add("sidebar-collapsed"); }
+    sidebarToggle.addEventListener("click", () => {
+      sidebar.classList.toggle("collapsed");
+      if (workspace) workspace.classList.toggle("sidebar-collapsed");
+      localStorage.setItem("nai-sidebar-collapsed", sidebar.classList.contains("collapsed"));
+    });
+    // Tab key toggles sidebar
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Tab" && !e.target.matches("input, textarea, [contenteditable]")) {
+        e.preventDefault();
+        sidebarToggle.click();
+      }
+    });
+  }
+
   // ── Provider switching ────────────────────────────────────
   const providerEl = document.getElementById("provider");
   if (providerEl) {
@@ -2052,8 +2073,9 @@ async function generate() {
     use_coords: characters.some((c) => !c.positionAuto),
   };
 
-  // Layers take priority over manual img2img source
-  if (layers.some((l) => l.visible && l.imageBase64)) {
+  // Layers take priority over manual img2img source (when enabled)
+  const layersEnabled = document.getElementById("layers-enabled");
+  if (layersEnabled && layersEnabled.checked && layers.some((l) => l.visible && l.imageBase64)) {
     state.img2img = await compositeLayersToBase64(width, height);
   }
 
@@ -2209,7 +2231,8 @@ function loadLayersFromStorage() {
 let _previewDebounceTimer = null;
 
 async function refreshCompositePreview() {
-  const hasVisibleLayer = layers.some((l) => l.visible && l.imageBase64);
+  const layersEnabled = document.getElementById("layers-enabled");
+  const hasVisibleLayer = (layersEnabled && layersEnabled.checked) && layers.some((l) => l.visible && l.imageBase64);
   const previewBadge = document.getElementById("composite-preview-badge");
   const output = $("#output");
 
@@ -2683,6 +2706,40 @@ function setupLayers() {
     });
   }
 
+  // Drag-and-drop image files onto the layers panel to create new layers
+  const layersList = document.getElementById("layers-list");
+  const accordion = document.getElementById("layers-accordion");
+  const dropTargets = [layersList, accordion].filter(Boolean);
+  dropTargets.forEach((el) => {
+    el.addEventListener("dragover", (e) => {
+      if (_layerDrag.active) return; // layer reorder, not file drop
+      if (!e.dataTransfer.types.includes("Files")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = "copy";
+    });
+    el.addEventListener("drop", (e) => {
+      if (_layerDrag.active) return;
+      if (!e.dataTransfer.files.length) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const file = e.dataTransfer.files[0];
+      if (!file.type.startsWith("image/")) return;
+      if (layers.length >= MAX_LAYERS) { showStatus("Maximum of " + MAX_LAYERS + " layers reached."); return; }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const b64 = ev.target.result.split(",")[1];
+        const n = layers.length + 1;
+        layers.push({ id: Date.now(), name: file.name.replace(/\.[^.]+$/, "") || "Layer " + n, imageBase64: b64, maskBase64: null, opacity: 1.0, visible: true });
+        renderLayerList();
+        saveLayersToStorage();
+        refreshCompositePreview();
+        if (accordion && !accordion.open) accordion.open = true;
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+
   if (sendToLayer) {
     sendToLayer.addEventListener("click", () => {
       if (!state.lastGeneratedImageBase64) return;
@@ -2707,6 +2764,12 @@ function setupLayers() {
 
       showStatus("Canvas image sent to layer \"" + name + "\"");
     });
+  }
+
+  // Toggle layers on/off — update preview immediately
+  const layersToggle = document.getElementById("layers-enabled");
+  if (layersToggle) {
+    layersToggle.addEventListener("change", () => refreshCompositePreview());
   }
 }
 
@@ -3800,6 +3863,10 @@ async function generateGrokImage() {
     model: quality === "pro" ? "grok-imagine-image-pro" : "grok-imagine-image",
   };
 
+  // Color disguise (shared with video)
+  const disguise = document.getElementById("grok-color-disguise")?.value;
+  if (disguise && disguise !== "none") body.color_disguise = disguise;
+
   // Include reference images if any are provided (replaces single img2img for Grok)
   if (grokRefs.length > 0) {
     body.images = grokRefs.map((r) => r.base64);
@@ -3894,6 +3961,11 @@ async function generateGrokVideo() {
     resolution: document.getElementById("grok-video-resolution")?.value || "720p",
     duration: parseInt(document.getElementById("grok-duration")?.value) || 5,
   };
+
+  const colorDisguise = document.getElementById("grok-video-color-disguise")?.value;
+  if (colorDisguise && colorDisguise !== "none") {
+    body.color_disguise = colorDisguise;
+  }
 
   // Include source image for image-to-video: prefer explicit img2img source,
   // fall back to whatever is currently on the canvas
@@ -5564,6 +5636,24 @@ let _lightboxOverlay = null;
 let _lightboxData = [];
 let _lightboxIndex = 0;
 let _lightboxKeyHandler = null;
+let _slideshowTimer = null;
+let _slideshowActive = false;
+function slideshowNext() {
+  if (!_slideshowActive) return;
+  navigateLightbox(1);
+  // Schedule is called from renderLightboxFrame after content is ready
+}
+function scheduleSlideshowAdvance() {
+  if (_slideshowTimer) { clearTimeout(_slideshowTimer); _slideshowTimer = null; }
+  if (!_slideshowActive) return;
+  const video = _lightboxOverlay ? _lightboxOverlay.querySelector("video") : null;
+  if (video) {
+    video.loop = false;
+    video.onended = () => slideshowNext();
+  } else {
+    _slideshowTimer = setTimeout(() => slideshowNext(), 3000);
+  }
+}
 
 function setupLightbox() {
   const overlay = document.createElement("div");
@@ -5600,6 +5690,14 @@ function setupLightbox() {
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
           Iterate
         </button>
+        <button class="btn-action" id="lb-slideshow" type="button" title="Auto-play slideshow (3s per image)">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Play
+        </button>
+        <button class="btn-action" id="lb-fullscreen" type="button" title="Toggle fullscreen">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          Fullscreen
+        </button>
       </div>
     </div>
   `;
@@ -5635,6 +5733,33 @@ function setupLightbox() {
     closeLightbox();
     $("#tab-canvas").click();
   });
+
+  // Slideshow — images show for 3s, videos play to completion
+  const slideshowBtn = overlay.querySelector("#lb-slideshow");
+
+  slideshowBtn.addEventListener("click", () => {
+    if (_slideshowActive) {
+      _slideshowActive = false;
+      if (_slideshowTimer) { clearTimeout(_slideshowTimer); _slideshowTimer = null; }
+      slideshowBtn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Play';
+      slideshowBtn.classList.remove("btn-action--primary");
+    } else {
+      _slideshowActive = true;
+      slideshowBtn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Pause';
+      slideshowBtn.classList.add("btn-action--primary");
+      if (!document.fullscreenElement) overlay.requestFullscreen().catch(() => {});
+      scheduleSlideshowAdvance();
+    }
+  });
+
+  // Fullscreen
+  overlay.querySelector("#lb-fullscreen").addEventListener("click", () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      overlay.requestFullscreen().catch(() => {});
+    }
+  });
 }
 
 function openLightbox(data, index) {
@@ -5659,9 +5784,17 @@ function openLightbox(data, index) {
 
 function closeLightbox() {
   if (!_lightboxOverlay) return;
-  // Stop any playing video and release media resources
-  const video = _lightboxOverlay.querySelector("video");
-  if (video) { video.pause(); video.src = ""; video.load(); }
+  // Stop slideshow
+  _slideshowActive = false;
+  if (_slideshowTimer) { clearTimeout(_slideshowTimer); _slideshowTimer = null; }
+  // Stop ALL videos (including any in the DOM)
+  _lightboxOverlay.querySelectorAll("video").forEach((v) => {
+    v.pause();
+    v.removeAttribute("src");
+    v.load();
+  });
+  // Exit fullscreen if active
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   _lightboxOverlay.style.display = "none";
   if (_lightboxKeyHandler) {
     document.removeEventListener("keydown", _lightboxKeyHandler);
@@ -5729,12 +5862,13 @@ function renderLightboxFrame() {
     video.className = "lightbox-img";
     video.src = galleryFileUrl(file.name);
     video.autoplay = true;
-    video.loop = true;
+    video.loop = !_slideshowActive;
     video.muted = false;
     video.controls = true;
     video.onloadeddata = () => {
       imgWrap.innerHTML = "";
       imgWrap.appendChild(video);
+      if (_slideshowActive) scheduleSlideshowAdvance();
     };
     video.onerror = () => {
       imgWrap.innerHTML = "";
@@ -5742,6 +5876,7 @@ function renderLightboxFrame() {
       err.style.cssText = "color:var(--text-tertiary);font-size:0.83rem";
       err.textContent = "Failed to load video";
       imgWrap.appendChild(err);
+      if (_slideshowActive) _slideshowTimer = setTimeout(() => slideshowNext(), 3000);
     };
   } else {
 
@@ -5752,6 +5887,7 @@ function renderLightboxFrame() {
   img.onload = () => {
     imgWrap.innerHTML = "";
     imgWrap.appendChild(img);
+    if (_slideshowActive) scheduleSlideshowAdvance();
   };
   img.onerror = () => {
     imgWrap.innerHTML = "";

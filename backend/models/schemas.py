@@ -141,12 +141,16 @@ class AnalyzeImageResponse(BaseModel):
 
 VALID_GROK_IMAGE_MODELS = Literal["grok-imagine-image", "grok-imagine-image-pro"]
 
+VALID_COLOR_DISGUISE = Literal["channel_swap", "invert", "channel_rotate", "negate_rg", "scramble"]
+
+
 class GrokImageRequest(BaseModel):
     prompt: str = Field(min_length=1)
     aspect_ratio: VALID_GROK_ASPECT_RATIOS = "1:1"
     resolution: VALID_GROK_IMAGE_RESOLUTIONS = "1k"
     model: VALID_GROK_IMAGE_MODELS = "grok-imagine-image"
-    images: Optional[list[Annotated[str, Field(min_length=1)]]] = Field(default=None, max_length=5)  # base64 source images for editing
+    images: Optional[list[Annotated[str, Field(min_length=1)]]] = Field(default=None, max_length=5)
+    color_disguise: Optional[VALID_COLOR_DISGUISE] = None
 
 
 class GrokVideoRequest(BaseModel):
@@ -155,6 +159,7 @@ class GrokVideoRequest(BaseModel):
     resolution: VALID_GROK_VIDEO_RESOLUTIONS = "720p"
     duration: int = Field(default=5, ge=1, le=15)
     image: Optional[str] = None  # base64 source image for img2vid
+    color_disguise: Optional[VALID_COLOR_DISGUISE] = None  # "channel_swap" | "invert" | "channel_rotate"
 
 
 class GrokImageResponse(BaseModel):

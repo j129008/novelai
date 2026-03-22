@@ -205,10 +205,16 @@ body { font-family: -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-ser
 }
 
 /* Workspace */
-.workspace { display: grid; grid-template-columns: 340px 1fr; flex: 1; overflow: hidden; }
+.workspace { display: grid; grid-template-columns: 340px 1fr; flex: 1; overflow: hidden; transition: grid-template-columns 0.2s ease; }
+.workspace.sidebar-collapsed { grid-template-columns: 0px 1fr; }
 
 /* Controls */
-.controls { background: var(--bg-raised); border-right: 1px solid var(--border-subtle); height: calc(100vh - 52px); position: sticky; top: 52px; display: flex; flex-direction: column; gap: 0; overflow: hidden; padding: 0; }
+.controls { background: var(--bg-raised); border-right: 1px solid var(--border-subtle); height: calc(100vh - 52px); position: sticky; top: 52px; display: flex; flex-direction: column; gap: 0; overflow: hidden; padding: 0; transition: width 0.2s ease, min-width 0.2s ease, opacity 0.15s ease; }
+.controls.collapsed { width: 0 !important; min-width: 0 !important; border-right: none; opacity: 0; pointer-events: none; }
+
+/* Sidebar toggle */
+.sidebar-toggle { position: fixed; top: 60px; z-index: 90; background: var(--bg-overlay); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-secondary); cursor: pointer; padding: 6px; line-height: 0; transition: background 0.15s, color 0.15s; }
+.sidebar-toggle:hover { background: var(--bg-deep); color: var(--text-primary); }
 
 /* Field groups */
 .control-group { display: flex; flex-direction: column; gap: 7px; }
@@ -2507,6 +2513,20 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   display: block;
   animation: lightboxImgIn 0.18s var(--ease-out) both;
 }
+:fullscreen .lightbox-img {
+  max-width: 100vw;
+  max-height: 100vh;
+  width: 100vw;
+  height: 100vh;
+  object-fit: contain;
+  border-radius: 0;
+}
+:fullscreen .lightbox-topbar,
+:fullscreen .lightbox-footer { opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+:fullscreen .lightbox-topbar:hover,
+:fullscreen .lightbox-footer:hover { opacity: 1; pointer-events: auto; }
+:fullscreen .lightbox-arrow { opacity: 0; transition: opacity 0.3s; }
+:fullscreen .lightbox-arrow:hover { opacity: 1; }
 
 @keyframes lightboxImgIn {
   from { opacity: 0; transform: scale(0.97); }

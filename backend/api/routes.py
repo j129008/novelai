@@ -261,6 +261,15 @@ async def generate(req: GenerateRequest):
 async def grok_generate_image(req: GrokImageRequest):
     if not XAI_API_KEY:
         raise HTTPException(status_code=503, detail="XAI_API_KEY not configured")
+
+    disguise = req.color_disguise if req.color_disguise and req.color_disguise != "none" else None
+
+    # Apply forward color transform to source images before upload
+    images = req.images
+    if disguise and images:
+        from api.transforms import apply_image_transform
+        images = [apply_image_transform(img, disguise) for img in images]
+
     try:
         from api.grok import generate_image as grok_gen_image
         image_data = await grok_gen_image(
@@ -269,10 +278,17 @@ async def grok_generate_image(req: GrokImageRequest):
             aspect_ratio=req.aspect_ratio,
             resolution=req.resolution,
             model=req.model,
-            images=req.images,
+            images=images,
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Grok API error: {e}")
+
+    # Apply inverse color transform to the result image
+    if disguise:
+        from api.transforms import apply_image_transform
+        result_b64 = base64.b64encode(image_data).decode()
+        result_b64 = apply_image_transform(result_b64, disguise)
+        image_data = base64.b64decode(result_b64)
 
     timestamp = int(time.time())
     filename = f"{timestamp}-grok.png"
@@ -296,6 +312,18 @@ async def grok_generate_video(req: GrokVideoRequest):
 
     async def event_stream():
         from api.grok import generate_video as grok_gen_video
+        from api.transforms import apply_image_transform, apply_video_transform
+
+        disguise = req.color_disguise if req.color_disguise and req.color_disguise != "none" else None
+
+        # Apply forward color transform to source image before upload
+        source_image = req.image
+        if disguise and source_image:
+            try:
+                source_image = apply_image_transform(source_image, disguise)
+            except Exception as e:
+                yield f"data: {json.dumps({'status': 'error', 'detail': f'Image transform failed: {e}'})}\n\n"
+                return
 
         # Run generation in a background task so we can stream progress
         gen_task = asyncio.create_task(grok_gen_video(
@@ -304,7 +332,7 @@ async def grok_generate_video(req: GrokVideoRequest):
             aspect_ratio=req.aspect_ratio,
             resolution=req.resolution,
             duration=req.duration,
-            image=req.image,
+            image=source_image,
             on_progress=on_progress,
         ))
 
@@ -319,6 +347,15 @@ async def grok_generate_video(req: GrokVideoRequest):
         # Get result or error
         try:
             video_data = gen_task.result()
+
+            # Apply inverse color transform to restore original color space
+            if disguise:
+                try:
+                    video_data = apply_video_transform(video_data, disguise)
+                except Exception as e:
+                    yield f"data: {json.dumps({'status': 'error', 'detail': f'Video transform failed: {e}'})}\n\n"
+                    return
+
             timestamp = int(time.time())
             filename = f"{timestamp}-grok.mp4"
             filepath = _get_output_dir() / filename
