@@ -281,14 +281,21 @@ function applyProvider(provider) {
     }
   });
 
+  // Grok doesn't support negative prompts — hide the Undesired tab
+  const negativeTab = document.querySelector('[data-target="negative-prompt"]');
+  if (negativeTab) negativeTab.style.display = isGrok ? "none" : "";
+
   // When switching to Grok, ensure we're on the Prompt tab (not Undesired)
   if (isGrok) {
     const promptTab = document.querySelector('[data-target="prompt"]');
-    const negativeTab = document.querySelector('[data-target="negative-prompt"]');
     if (negativeTab && negativeTab.classList.contains("active")) {
       if (promptTab) promptTab.click();
     }
   }
+
+  // Hide NovelAI-only prompt controls in Grok mode
+  const qualityPill = document.getElementById("quality-tags-pill");
+  if (qualityPill) qualityPill.style.display = isGrok ? "none" : "";
 
   // Update Generate button label
   const generateBtn = document.getElementById("generate-btn");
