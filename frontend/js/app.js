@@ -424,6 +424,37 @@ async function init() {
     });
   }
 
+  // NovelAI → Grok handoff buttons
+  function sendToGrok(outputType) {
+    if (!state.lastGeneratedImageBase64) return;
+    state.img2img = state.lastGeneratedImageBase64;
+    grokRefs.length = 0; // clear refs for a clean edit
+    state.grokOutputType = outputType;
+    // Switch provider
+    const providerEl = document.getElementById("provider");
+    if (providerEl) providerEl.value = "grok";
+    // Set Grok output type toggle
+    const outputToggle = document.getElementById("grok-output-type");
+    if (outputToggle) outputToggle.value = outputType;
+    applyProvider("grok");
+    localStorage.setItem("nai-provider", "grok");
+    // Update source chip
+    const chip = document.getElementById("ref-source-chip");
+    const chipImg = document.getElementById("ref-source-thumb-chip");
+    if (chip) chip.style.display = "";
+    if (chipImg) chipImg.src = "data:image/png;base64," + state.lastGeneratedImageBase64;
+    // Clear and focus prompt
+    const promptEl = document.getElementById("prompt");
+    if (promptEl) { promptEl.value = ""; promptEl.focus(); }
+    showStatus(outputType === "video" ? "Image sent to Grok — describe the animation" : "Image sent to Grok — describe your edit");
+  }
+
+  const editInGrokBtn = document.getElementById("btn-edit-in-grok");
+  if (editInGrokBtn) editInGrokBtn.addEventListener("click", () => sendToGrok("image"));
+
+  const animateInGrokBtn = document.getElementById("btn-animate-in-grok");
+  if (animateInGrokBtn) animateInGrokBtn.addEventListener("click", () => sendToGrok("video"));
+
   setupTagBrowser();
   setupGuide();
   setupSettings();
@@ -3927,6 +3958,11 @@ function syncInpaintButtonVisibility() {
   if (useBtn) {
     useBtn.style.display = (hasGenerated && !isNovelAI) ? "" : "none";
   }
+  // NovelAI → Grok handoff buttons
+  const editGrokBtn = document.getElementById("btn-edit-in-grok");
+  const animGrokBtn = document.getElementById("btn-animate-in-grok");
+  if (editGrokBtn) editGrokBtn.style.display = (hasGenerated && isNovelAI) ? "" : "none";
+  if (animGrokBtn) animGrokBtn.style.display = (hasGenerated && isNovelAI) ? "" : "none";
 }
 
 function setupInpaint() {
