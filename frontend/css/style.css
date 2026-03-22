@@ -3450,6 +3450,37 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   user-select: none;
 }
 
+/* ─── Inpaint mask canvas overlay (display-only red tint) ─── */
+#inpaint-mask-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+  border-radius: var(--radius-xl);
+}
+
+/* ─── Inpaint active badge ─── */
+.inpaint-active-badge {
+  position: absolute;
+  top: 40px;
+  left: 12px;
+  z-index: 10;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 3px 9px;
+  border-radius: 10px;
+  pointer-events: none;
+  user-select: none;
+}
+
 /* ═══════════════════════════════════════════════════════════
    LAYER MASK OVERLAY — full-screen mask-painting modal
    ═══════════════════════════════════════════════════════════ */
@@ -3786,6 +3817,123 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 /* Active state — accent colored to indicate "output goes here" */
 .layer-target-btn--active {
   color: var(--accent-bright);
+}
+
+/* ─── Layer overflow button (⋯) ─── */
+.layer-overflow-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.12s, background 0.12s;
+  min-width: 26px;
+  min-height: 26px;
+  font-size: 0.9rem;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  position: relative;
+}
+
+.layer-overflow-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-overlay);
+}
+
+.layer-overflow-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+/* Dot indicator: shown when any overflow action is active */
+.layer-overflow-btn--has-active::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent-bright);
+  border: 1px solid var(--bg-deep);
+}
+
+/* ─── Layer overflow menu (popover) ─── */
+.layer-overflow-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 50;
+  background: var(--bg-float);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  min-width: 148px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  padding: 4px 0;
+}
+
+.layer-overflow-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-family: inherit;
+  text-align: left;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  position: relative;
+}
+
+.layer-overflow-item:hover {
+  background: var(--bg-overlay);
+  color: var(--text-primary);
+}
+
+.layer-overflow-item:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent-dim);
+}
+
+/* Active indicator dot next to item label */
+.layer-overflow-item--active {
+  color: var(--accent-bright);
+}
+
+.layer-overflow-item--active::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent-bright);
+}
+
+.layer-overflow-item--danger {
+  color: var(--danger);
+}
+
+.layer-overflow-item--danger:hover {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.layer-overflow-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 4px 0;
 }
 
 /* Row-level indicator: accent left border when this layer is the output target */

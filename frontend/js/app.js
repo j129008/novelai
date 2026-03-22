@@ -97,6 +97,82 @@ function _disableCanvasMove() {
   if (_moveCleanup) { _moveCleanup(); _moveCleanup = null; }
 }
 
+// ── LAYER UNDO ────────────────────────────────────────────────
+// Snapshots metadata only — imageBase64 is intentionally excluded (too large).
+// Canonical metadata fields: id, name, opacity, visible, isOutputTarget, offsetX, offsetY, maskBase64, inpaintMaskBase64
+const _layerUndoStack = [];
+const _layerRedoStack = [];
+const MAX_LAYER_UNDO = 20;
+
+function _snapshotLayerMeta() {
+  return layers.map((l) => ({
+    id: l.id,
+    name: l.name,
+    opacity: l.opacity,
+    visible: l.visible,
+    isOutputTarget: l.isOutputTarget,
+    offsetX: l.offsetX,
+    offsetY: l.offsetY,
+    maskBase64: l.maskBase64,
+    inpaintMaskBase64: l.inpaintMaskBase64,
+  }));
+}
+
+function pushLayerUndo(label) {
+  _layerUndoStack.push({ label, meta: _snapshotLayerMeta() });
+  if (_layerUndoStack.length > MAX_LAYER_UNDO) _layerUndoStack.shift();
+  _layerRedoStack.length = 0;
+}
+
+function _applyLayerMeta(meta) {
+  // Apply metadata snapshot onto the existing layers array.
+  // Layers that no longer exist in meta are removed; new entries in meta
+  // that have no matching layer in the array are skipped (images are lost on remove — by spec).
+  const metaById = new Map(meta.map((m) => [m.id, m]));
+  // Remove layers not in snapshot
+  for (let i = layers.length - 1; i >= 0; i--) {
+    if (!metaById.has(layers[i].id)) layers.splice(i, 1);
+  }
+  // Reorder and update metadata
+  const layerById = new Map(layers.map((l) => [l.id, l]));
+  layers.length = 0;
+  for (const m of meta) {
+    const l = layerById.get(m.id);
+    if (!l) continue; // layer was removed (image gone) — skip per spec
+    l.name           = m.name;
+    l.opacity        = m.opacity;
+    l.visible        = m.visible;
+    l.isOutputTarget = m.isOutputTarget;
+    l.offsetX        = m.offsetX;
+    l.offsetY        = m.offsetY;
+    l.maskBase64     = m.maskBase64;
+    l.inpaintMaskBase64 = m.inpaintMaskBase64;
+    layers.push(l);
+  }
+}
+
+function undoLayer() {
+  if (_layerUndoStack.length === 0) return;
+  const entry = _layerUndoStack.pop();
+  _layerRedoStack.push({ label: entry.label, meta: _snapshotLayerMeta() });
+  _applyLayerMeta(entry.meta);
+  renderLayerList();
+  saveLayersToStorage();
+  refreshCompositePreview();
+  showStatus("Undid: " + entry.label);
+}
+
+function redoLayer() {
+  if (_layerRedoStack.length === 0) return;
+  const entry = _layerRedoStack.pop();
+  _layerUndoStack.push({ label: entry.label, meta: _snapshotLayerMeta() });
+  _applyLayerMeta(entry.meta);
+  renderLayerList();
+  saveLayersToStorage();
+  refreshCompositePreview();
+  showStatus("Redid: " + entry.label);
+}
+
 // ── CHARACTER SLOTS ──────────────────────────────────────────
 const characters = [];  // array of { prompt, x, y, positionAuto, interactions } — managed by setupCharacters()
 
@@ -475,6 +551,21 @@ async function init() {
         genPopover.style.display = "none";
         if (gearBtn) gearBtn.classList.remove("active");
       }
+    }
+  });
+
+  // Layer undo/redo: Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z
+  // Guard: skip if focus is in an editable field
+  document.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.key !== "z") return;
+    const tag = document.activeElement && document.activeElement.tagName.toLowerCase();
+    if (tag === "input" || tag === "textarea") return;
+    if (document.activeElement && document.activeElement.isContentEditable) return;
+    e.preventDefault();
+    if (e.shiftKey) {
+      redoLayer();
+    } else {
+      undoLayer();
     }
   });
 }
@@ -2213,6 +2304,7 @@ async function refreshCompositePreview() {
         output.appendChild(placeholder);
       }
       if (previewBadge) previewBadge.style.display = "none";
+      _clearInpaintMaskOverlay();
       return;
     }
     // No layers at all — fall back to last generated image
@@ -2229,6 +2321,7 @@ async function refreshCompositePreview() {
       }
     }
     if (previewBadge) previewBadge.style.display = "none";
+    _clearInpaintMaskOverlay();
     return;
   }
 
@@ -2250,6 +2343,7 @@ async function refreshCompositePreview() {
   const compositeBase64 = await compositeLayersToBase64(targetW, targetH);
   if (!compositeBase64) {
     if (previewBadge) previewBadge.style.display = "none";
+    _clearInpaintMaskOverlay();
     return;
   }
 
@@ -2271,6 +2365,71 @@ async function refreshCompositePreview() {
   }
 
   if (previewBadge) previewBadge.style.display = "";
+
+  // Draw inpaint mask overlay if any visible layer has one
+  const inpaintLayer = layers.find((l) => l.visible && l.inpaintMaskBase64);
+  if (inpaintLayer) {
+    _drawInpaintMaskOverlay(inpaintLayer.inpaintMaskBase64);
+  } else {
+    _clearInpaintMaskOverlay();
+  }
+}
+
+function _clearInpaintMaskOverlay() {
+  const canvas = document.getElementById("inpaint-mask-overlay");
+  const badge = document.getElementById("inpaint-active-badge");
+  if (canvas) {
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  if (badge) badge.style.display = "none";
+}
+
+async function _drawInpaintMaskOverlay(maskBase64) {
+  const canvas = document.getElementById("inpaint-mask-overlay");
+  const badge = document.getElementById("inpaint-active-badge");
+  if (!canvas) return;
+
+  const img = new Image();
+  await new Promise((resolve) => { img.onload = resolve; img.src = "data:image/png;base64," + maskBase64; });
+
+  // Use the canvas's layout dimensions (CSS width/height: 100%)
+  const w = canvas.offsetWidth  || img.naturalWidth;
+  const h = canvas.offsetHeight || img.naturalHeight;
+
+  // Guard against clearing content (learnings 2026-03-20)
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width  = w;
+    canvas.height = h;
+  }
+
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, w, h);
+
+  // Draw mask to an offscreen canvas to read pixel data
+  const offscreen = document.createElement("canvas");
+  offscreen.width  = w;
+  offscreen.height = h;
+  const octx = offscreen.getContext("2d");
+  octx.drawImage(img, 0, 0, w, h);
+  const imageData = octx.getImageData(0, 0, w, h);
+  const { data } = imageData;
+
+  // Build red overlay: where mask pixel > 128, paint rgba(240,80,80,0.35)
+  const overlayData = ctx.createImageData(w, h);
+  const od = overlayData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const luminance = data[i]; // mask is grayscale, R channel sufficient
+    if (luminance > 128) {
+      od[i]     = 240; // R
+      od[i + 1] = 80;  // G
+      od[i + 2] = 80;  // B
+      od[i + 3] = 89;  // A (~0.35 * 255)
+    }
+  }
+  ctx.putImageData(overlayData, 0, 0);
+
+  if (badge) badge.style.display = "";
 }
 
 async function compositeLayersToBase64(targetW, targetH) {
@@ -2370,6 +2529,7 @@ function updateLayersBadge() {
 function renderLayerList() {
   const list = document.getElementById("layers-list");
   if (!list) return;
+  _closeActiveOverflowMenu();
   list.innerHTML = "";
 
   if (layers.length === 0) {
@@ -2398,6 +2558,12 @@ function renderLayerList() {
 
 // Module-level drag state for layer reordering
 const _layerDrag = { active: false, fromId: null };
+
+// Module-level tracker so renderLayerList can close any open overflow menu
+let _activeOverflowCleanup = null;
+function _closeActiveOverflowMenu() {
+  if (_activeOverflowCleanup) { _activeOverflowCleanup(); _activeOverflowCleanup = null; }
+}
 
 function buildLayerRow(layer, realIdx) {
   const row = document.createElement("div");
@@ -2499,7 +2665,16 @@ function buildLayerRow(layer, realIdx) {
   opacitySlider.max = "1";
   opacitySlider.step = "0.05";
   opacitySlider.value = String(layer.opacity);
+  // Snapshot undo state on first interaction, not every tick
+  let _opacityUndoPushed = false;
+  opacitySlider.addEventListener("pointerdown", () => {
+    _opacityUndoPushed = false;
+  });
   opacitySlider.addEventListener("input", () => {
+    if (!_opacityUndoPushed) {
+      pushLayerUndo("Change opacity");
+      _opacityUndoPushed = true;
+    }
     layer.opacity = parseFloat(opacitySlider.value);
     opacityVal.textContent = Math.round(layer.opacity * 100) + "%";
     saveLayersToStorage();
@@ -2519,10 +2694,11 @@ function buildLayerRow(layer, realIdx) {
   mid.appendChild(nameSpan);
   mid.appendChild(opacityRow);
 
-  // ── Controls: eye + remove ────────────────────────────────
+  // ── Controls: eye + target + overflow ────────────────────
   const controls = document.createElement("div");
   controls.className = "layer-controls";
 
+  // Eye button — always visible
   const eyeBtn = document.createElement("button");
   eyeBtn.type = "button";
   eyeBtn.className = "layer-eye-btn" + (layer.visible ? "" : " layer-eye-off");
@@ -2533,6 +2709,7 @@ function buildLayerRow(layer, realIdx) {
     : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
 
   eyeBtn.addEventListener("click", () => {
+    pushLayerUndo("Toggle visibility");
     layer.visible = !layer.visible;
     // Update in-place to avoid re-render breaking double-click detection (learnings 2026-03-20)
     eyeBtn.classList.toggle("layer-eye-off", !layer.visible);
@@ -2546,97 +2723,7 @@ function buildLayerRow(layer, realIdx) {
     refreshCompositePreview();
   });
 
-  const removeBtn = document.createElement("button");
-  removeBtn.type = "button";
-  removeBtn.className = "vibe-remove-btn layer-remove-btn";
-  removeBtn.title = "Remove layer";
-  removeBtn.setAttribute("aria-label", "Remove layer");
-  removeBtn.innerHTML = '&times;';
-
-  removeBtn.addEventListener("click", () => {
-    layers.splice(realIdx, 1);
-    renderLayerList();
-    saveLayersToStorage();
-    refreshCompositePreview();
-  });
-
-  // ── Draw button ───────────────────────────────────────────
-  const drawBtn = document.createElement("button");
-  drawBtn.type = "button";
-  drawBtn.className = "layer-draw-btn" + (layer.imageBase64 ? " layer-draw-btn--active" : "");
-  drawBtn.title = "Draw on this layer";
-  drawBtn.setAttribute("aria-label", "Draw on this layer");
-  drawBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>';
-
-  drawBtn.addEventListener("click", () => {
-    openLayerDrawEditor(layer, (base64) => {
-      layer.imageBase64 = base64;
-      // Update draw button active state in-place
-      drawBtn.classList.add("layer-draw-btn--active");
-      refreshCompositePreview();
-      saveLayersToStorage();
-      // Refresh the row thumbnail without full re-render
-      const existingImg = thumbWrap.querySelector(".layer-thumb");
-      const existingPlaceholder = thumbWrap.querySelector(".layer-thumb-empty");
-      if (existingPlaceholder) existingPlaceholder.remove();
-      if (existingImg) {
-        existingImg.src = "data:image/png;base64," + base64;
-      } else {
-        const newImg = document.createElement("img");
-        newImg.className = "layer-thumb";
-        newImg.src = "data:image/png;base64," + base64;
-        newImg.alt = layer.name;
-        thumbWrap.appendChild(newImg);
-      }
-    });
-  });
-
-  // ── Mask button ───────────────────────────────────────────
-  const maskBtn = document.createElement("button");
-  maskBtn.type = "button";
-  maskBtn.className = "layer-mask-btn" + (layer.maskBase64 ? " layer-mask-btn--active" : "");
-  maskBtn.title = layer.maskBase64 ? "Edit layer mask (active)" : "Add layer mask";
-  maskBtn.setAttribute("aria-label", "Edit layer mask");
-  maskBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="4"/></svg>';
-
-  maskBtn.addEventListener("click", () => {
-    openLayerMaskEditor(layer, () => {
-      // On mask applied: update button state in-place
-      maskBtn.classList.toggle("layer-mask-btn--active", !!layer.maskBase64);
-      maskBtn.title = layer.maskBase64 ? "Edit layer mask (active)" : "Add layer mask";
-      saveLayersToStorage();
-      refreshCompositePreview();
-    });
-  });
-
-  // ── Inpaint mask button ───────────────────────────────────
-  const inpaintBtn = document.createElement("button");
-  inpaintBtn.type = "button";
-  inpaintBtn.className = "layer-inpaint-btn" + (layer.inpaintMaskBase64 ? " layer-inpaint-btn--active" : "");
-  inpaintBtn.title = layer.inpaintMaskBase64 ? "Edit inpaint mask (active)" : "Add inpaint mask";
-  inpaintBtn.setAttribute("aria-label", "Edit inpaint mask");
-  inpaintBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>';
-
-  inpaintBtn.addEventListener("click", () => {
-    // Right-click or long-press clears; regular click opens editor
-    openLayerInpaintEditor(layer, () => {
-      inpaintBtn.classList.toggle("layer-inpaint-btn--active", !!layer.inpaintMaskBase64);
-      inpaintBtn.title = layer.inpaintMaskBase64 ? "Edit inpaint mask (click to edit, right-click to clear)" : "Add inpaint mask";
-      saveLayersToStorage();
-    });
-  });
-  inpaintBtn.addEventListener("contextmenu", (e) => {
-    e.preventDefault();
-    if (layer.inpaintMaskBase64) {
-      layer.inpaintMaskBase64 = null;
-      inpaintBtn.classList.remove("layer-inpaint-btn--active");
-      inpaintBtn.title = "Add inpaint mask";
-      saveLayersToStorage();
-      showStatus("Inpaint mask cleared");
-    }
-  });
-
-  // ── Output target button ──────────────────────────────────
+  // Target button — always visible
   const targetBtn = document.createElement("button");
   targetBtn.type = "button";
   targetBtn.className = "layer-target-btn" + (layer.isOutputTarget ? " layer-target-btn--active" : "");
@@ -2645,6 +2732,7 @@ function buildLayerRow(layer, realIdx) {
   targetBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>';
 
   targetBtn.addEventListener("click", () => {
+    pushLayerUndo("Toggle output target");
     const wasTarget = layer.isOutputTarget;
     // Clear all other output targets first
     layers.forEach(l => { l.isOutputTarget = false; });
@@ -2664,35 +2752,188 @@ function buildLayerRow(layer, realIdx) {
     saveLayersToStorage();
   });
 
-  // ── Move button — drag layer position on canvas ──────────
-  const moveBtn = document.createElement("button");
-  moveBtn.type = "button";
-  moveBtn.className = "layer-move-btn";
-  moveBtn.title = "Move layer position — drag on canvas";
-  moveBtn.setAttribute("aria-label", "Move layer");
-  moveBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>';
+  // ── Overflow menu button (⋯) ──────────────────────────────
+  // Has active dot if move mode on, draw content, visibility mask, or inpaint mask
+  const _hasOverflowActive = () =>
+    (_movingLayer === layer) ||
+    !!layer.maskBase64 ||
+    !!layer.inpaintMaskBase64 ||
+    ((layer.offsetX || 0) !== 0 || (layer.offsetY || 0) !== 0);
 
-  moveBtn.addEventListener("click", () => {
-    // Toggle move mode for this layer
-    if (_movingLayer === layer) {
-      _movingLayer = null;
-      document.querySelectorAll(".layer-move-btn--active").forEach(b => b.classList.remove("layer-move-btn--active"));
-      _disableCanvasMove();
-    } else {
-      _movingLayer = layer;
-      document.querySelectorAll(".layer-move-btn--active").forEach(b => b.classList.remove("layer-move-btn--active"));
-      moveBtn.classList.add("layer-move-btn--active");
-      _enableCanvasMove(layer);
+  const overflowBtn = document.createElement("button");
+  overflowBtn.type = "button";
+  overflowBtn.className = "layer-overflow-btn" + (_hasOverflowActive() ? " layer-overflow-btn--has-active" : "");
+  overflowBtn.title = "More options";
+  overflowBtn.setAttribute("aria-label", "More layer options");
+  overflowBtn.setAttribute("aria-haspopup", "true");
+  overflowBtn.textContent = "⋯";
+
+  // Helper to sync the overflow dot indicator
+  function _syncOverflowDot() {
+    overflowBtn.classList.toggle("layer-overflow-btn--has-active", _hasOverflowActive());
+  }
+
+  // Helper to close this row's overflow menu
+  let _currentOverflowMenu = null;
+  function _closeOverflowMenu() {
+    if (_currentOverflowMenu) {
+      _currentOverflowMenu.remove();
+      _currentOverflowMenu = null;
     }
+    if (_activeOverflowCleanup === _closeOverflowMenu) _activeOverflowCleanup = null;
+  }
+
+  overflowBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    // Toggle: if already open, close it
+    if (_currentOverflowMenu) { _closeOverflowMenu(); return; }
+    // Close any previously open overflow menu from another row
+    _closeActiveOverflowMenu();
+    _activeOverflowCleanup = _closeOverflowMenu;
+
+    const menu = document.createElement("div");
+    menu.className = "layer-overflow-menu";
+    _currentOverflowMenu = menu;
+
+    // Helper to create a menu item
+    function makeItem(label, isActive, isDanger, onClick) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "layer-overflow-item" +
+        (isActive ? " layer-overflow-item--active" : "") +
+        (isDanger ? " layer-overflow-item--danger" : "");
+      btn.textContent = label;
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        _closeOverflowMenu();
+        onClick();
+      });
+      return btn;
+    }
+
+    // Move
+    const isMoveActive = _movingLayer === layer;
+    const hasMoveOffset = (layer.offsetX || 0) !== 0 || (layer.offsetY || 0) !== 0;
+    menu.appendChild(makeItem(
+      isMoveActive ? "Move (active — click canvas)" : (hasMoveOffset ? "Move (offset set)" : "Move"),
+      isMoveActive || hasMoveOffset, false, () => {
+        if (_movingLayer === layer) {
+          _movingLayer = null;
+          _disableCanvasMove();
+          _syncOverflowDot();
+        } else {
+          _movingLayer = layer;
+          _enableCanvasMove(layer);
+          _syncOverflowDot();
+        }
+      }
+    ));
+
+    // Draw
+    const isDrawActive = !!layer.imageBase64;
+    menu.appendChild(makeItem(
+      isDrawActive ? "Draw (has content)" : "Draw",
+      isDrawActive, false, () => {
+        openLayerDrawEditor(layer, (base64) => {
+          layer.imageBase64 = base64;
+          refreshCompositePreview();
+          saveLayersToStorage();
+          // Refresh thumbnail without full re-render
+          const existingImg = thumbWrap.querySelector(".layer-thumb");
+          const existingPlaceholder = thumbWrap.querySelector(".layer-thumb-empty");
+          if (existingPlaceholder) existingPlaceholder.remove();
+          if (existingImg) {
+            existingImg.src = "data:image/png;base64," + base64;
+          } else {
+            const newImg = document.createElement("img");
+            newImg.className = "layer-thumb";
+            newImg.src = "data:image/png;base64," + base64;
+            newImg.alt = layer.name;
+            thumbWrap.appendChild(newImg);
+          }
+          _syncOverflowDot();
+        });
+      }
+    ));
+
+    // Visibility Mask
+    menu.appendChild(makeItem(
+      layer.maskBase64 ? "Visibility Mask (active)" : "Visibility Mask",
+      !!layer.maskBase64, false, () => {
+        pushLayerUndo("Edit visibility mask");
+        openLayerMaskEditor(layer, () => {
+          saveLayersToStorage();
+          refreshCompositePreview();
+          _syncOverflowDot();
+        });
+      }
+    ));
+
+    // Inpaint Mask
+    menu.appendChild(makeItem(
+      layer.inpaintMaskBase64 ? "Inpaint Mask (active)" : "Inpaint Mask",
+      !!layer.inpaintMaskBase64, false, () => {
+        pushLayerUndo("Edit inpaint mask");
+        openLayerInpaintEditor(layer, () => {
+          saveLayersToStorage();
+          refreshCompositePreview();
+          _syncOverflowDot();
+        });
+      }
+    ));
+
+    // Clear Inpaint Mask (only if active)
+    if (layer.inpaintMaskBase64) {
+      menu.appendChild(makeItem("Clear Inpaint Mask", false, false, () => {
+        pushLayerUndo("Clear inpaint mask");
+        layer.inpaintMaskBase64 = null;
+        saveLayersToStorage();
+        refreshCompositePreview();
+        _syncOverflowDot();
+        showStatus("Inpaint mask cleared");
+      }));
+    }
+
+    // Divider
+    const divider = document.createElement("div");
+    divider.className = "layer-overflow-divider";
+    menu.appendChild(divider);
+
+    // Remove
+    menu.appendChild(makeItem("Remove", false, true, () => {
+      pushLayerUndo("Remove layer");
+      layers.splice(realIdx, 1);
+      renderLayerList();
+      saveLayersToStorage();
+      refreshCompositePreview();
+    }));
+
+    overflowBtn.appendChild(menu);
+
+    // Close on outside click or Escape
+    function onOutsideClick(ev) {
+      if (!overflowBtn.contains(ev.target)) {
+        _closeOverflowMenu();
+        document.removeEventListener("click", onOutsideClick, true);
+        document.removeEventListener("keydown", onEscape);
+      }
+    }
+    function onEscape(ev) {
+      if (ev.key === "Escape") {
+        ev.stopImmediatePropagation();
+        _closeOverflowMenu();
+        document.removeEventListener("click", onOutsideClick, true);
+        document.removeEventListener("keydown", onEscape);
+        overflowBtn.focus();
+      }
+    }
+    document.addEventListener("click", onOutsideClick, true);
+    document.addEventListener("keydown", onEscape);
   });
 
-  controls.appendChild(moveBtn);
   controls.appendChild(eyeBtn);
-  controls.appendChild(drawBtn);
-  controls.appendChild(maskBtn);
-  controls.appendChild(inpaintBtn);
   controls.appendChild(targetBtn);
-  controls.appendChild(removeBtn);
+  controls.appendChild(overflowBtn);
 
   row.appendChild(thumbWrap);
   row.appendChild(mid);
@@ -2739,6 +2980,7 @@ function buildLayerRow(layer, realIdx) {
     const toIdx   = layers.indexOf(layer);
     console.log("[layer drop]", fromIdx, "->", toIdx, "ids:", _layerDrag.fromId, layer.id);
     if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+    pushLayerUndo("Reorder layers");
     const [moved] = layers.splice(fromIdx, 1);
     layers.splice(toIdx, 0, moved);
     _layerDrag.active = false;
@@ -2764,6 +3006,7 @@ function setupLayers() {
         showStatus("Maximum of " + MAX_LAYERS + " layers reached.");
         return;
       }
+      pushLayerUndo("Add layer");
       const n = layers.length + 1;
       layers.push({ id: Date.now(), name: "Layer " + n, imageBase64: null, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0 });
       renderLayerList();
@@ -2794,6 +3037,7 @@ function setupLayers() {
       const reader = new FileReader();
       reader.onload = (ev) => {
         const b64 = ev.target.result.split(",")[1];
+        pushLayerUndo("Add layer from file");
         const n = layers.length + 1;
         layers.push({ id: Date.now(), name: file.name.replace(/\.[^.]+$/, "") || "Layer " + n, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0 });
         renderLayerList();
@@ -2809,6 +3053,7 @@ function setupLayers() {
     sendToLayer.addEventListener("click", () => {
       if (!state.lastGeneratedImageBase64) return;
       if (layers.length >= MAX_LAYERS) return;
+      pushLayerUndo("Send to layer");
       const outputLayers = layers.filter((l) => l.name.startsWith("Output"));
       const n = outputLayers.length;
       const name = n === 0 ? "Output" : "Output " + (n + 1);
