@@ -979,6 +979,25 @@ function setupPromptAssist() {
     statusEl.style.display = "none";
     selected = [];
     renderSelected();
+
+    // Adapt buttons to current provider + mode
+    const provider = document.getElementById("provider")?.value || "novelai";
+    const hasSource = !!state.img2img;
+    if (provider === "grok") {
+      tagsBtn.style.display = "none";
+      if (hasSource) {
+        descBtn.textContent = "Edit Prompt";
+        if (dirInput) dirInput.placeholder = "What to change… e.g. change hair to blonde, add sunglasses";
+      } else {
+        descBtn.textContent = "Grok Description";
+        if (dirInput) dirInput.placeholder = "Describe what you want…";
+      }
+    } else {
+      tagsBtn.style.display = "";
+      descBtn.textContent = "Grok Description";
+      if (dirInput) dirInput.placeholder = "Describe what you want… e.g. girl at the beach, cyberpunk city";
+    }
+
     if (dirInput) dirInput.focus();
   }
 
@@ -1015,8 +1034,15 @@ function setupPromptAssist() {
     const direction = dirInput?.value.trim();
     if (!direction) { dirInput?.focus(); return; }
 
+    // Auto-detect edit mode for Grok with source image
+    const provider = document.getElementById("provider")?.value || "novelai";
+    if (mode === "description" && provider === "grok" && state.img2img) {
+      mode = "edit";
+    }
+
     statusEl.style.display = "block";
-    statusEl.textContent = mode === "tags" ? "Generating tags…" : "Generating description…";
+    const labels = { tags: "Generating tags…", description: "Generating description…", edit: "Generating edit prompt…" };
+    statusEl.textContent = labels[mode] || "Generating…";
 
     try {
       const resp = await fetch("/api/prompt-assist", {
@@ -1054,7 +1080,7 @@ function setupPromptAssist() {
         resultsEl.appendChild(section);
       }
 
-      if (mode === "description" && data.description) {
+      if ((mode === "description" || mode === "edit") && data.description) {
         const section = document.createElement("div");
         const label = document.createElement("div");
         label.className = "local-analysis-section-label";

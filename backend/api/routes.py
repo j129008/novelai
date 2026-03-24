@@ -1399,8 +1399,8 @@ class PromptAssistRequest(BaseModel):
 async def prompt_assist_endpoint(req: PromptAssistRequest):
     if not XAI_API_KEY:
         raise HTTPException(status_code=503, detail="XAI_API_KEY not configured")
-    if req.mode not in ("tags", "description"):
-        raise HTTPException(status_code=400, detail="Mode must be 'tags' or 'description'")
+    if req.mode not in ("tags", "description", "edit"):
+        raise HTTPException(status_code=400, detail="Mode must be 'tags', 'description', or 'edit'")
 
     from api.grok import prompt_assist
     try:

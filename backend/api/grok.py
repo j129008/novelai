@@ -231,12 +231,35 @@ If a current prompt is provided, expand and refine it into a better description.
 
 Return ONLY the JSON object, no markdown formatting."""
 
+_PROMPT_ASSIST_EDIT = """You are a prompt assistant for Grok Imagine's IMAGE EDITING mode.
+The user has a source image loaded and wants to modify it. Grok edit mode works best with SHORT, DIRECTIVE prompts that describe what to CHANGE, not what the whole image should look like.
+
+Effective edit prompt patterns:
+- "change [X] to [Y]" — e.g. "change hair color to blonde", "change background to beach"
+- "change [X] into [Y]" — e.g. "change dress into a red evening gown"
+- "add [X]" — e.g. "add sunglasses", "add cherry blossoms in background"
+- "remove [X]" — e.g. "remove background", "remove hat"
+- "make [X] more [Y]" — e.g. "make lighting more dramatic", "make expression more cheerful"
+
+BAD edit prompts (these destroy the original image):
+- Full scene descriptions like "a woman standing in a garden with flowers"
+- Too many changes at once
+- Describing what already exists in the image
+
+The user will describe what they want to change. Generate a JSON object with one field:
+- "description": a SHORT directive edit prompt (1 sentence max). Focus on ONE specific change.
+
+If the user asks for multiple changes, pick the most impactful one. They can run edits sequentially.
+
+Return ONLY the JSON object, no markdown formatting."""
+
 
 async def prompt_assist(api_key: str, direction: str, mode: str, current_prompt: str = "") -> dict:
     """Generate prompt suggestions. mode='tags' returns {"tags":[...]}, mode='description' returns {"description":"..."}."""
     import re
 
-    system = _PROMPT_ASSIST_TAGS if mode == "tags" else _PROMPT_ASSIST_DESC
+    systems = {"tags": _PROMPT_ASSIST_TAGS, "description": _PROMPT_ASSIST_DESC, "edit": _PROMPT_ASSIST_EDIT}
+    system = systems.get(mode, _PROMPT_ASSIST_DESC)
     user_msg = direction
     if current_prompt.strip():
         user_msg = f"Current prompt: {current_prompt.strip()}\n\nUser request: {direction}"
