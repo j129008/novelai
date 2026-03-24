@@ -7407,8 +7407,17 @@ function setupExplorePanel() {
       if (data.wd) renderWdTags(data.wd);
       if (data.grok) renderGrokAnalysis(data.grok);
 
-      // Refresh grid to show dot indicator
-      browseLocalFolder(localCurrentSubpath);
+      // Add dot indicator to the current image card (without refreshing the whole grid)
+      const fileName = currentAnalysisPath.split("/").pop();
+      const cards = localGrid.querySelectorAll(".explore-card");
+      for (const card of cards) {
+        const img = card.querySelector("img");
+        if (img && img.alt === fileName && !card.querySelector(".explore-card-analyzed-dot")) {
+          const dot = document.createElement("div");
+          dot.className = "explore-card-analyzed-dot";
+          card.appendChild(dot);
+        }
+      }
     } catch (err) {
       analysisStatus.style.display = "block";
       analysisStatus.textContent = "Error: " + err.message;
