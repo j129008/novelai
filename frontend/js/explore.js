@@ -563,13 +563,15 @@ function setupExplorePanel() {
         return;
       }
 
-      // Render image grid
+      // Render image grid (pre-filter tiny images < 150px)
       for (const img of data.images) {
+        if (img.width && img.height && (img.width < 150 || img.height < 150)) continue;
+
         const card = document.createElement("div");
         card.className = "explore-card";
+        card.dataset.src = img.src;
 
         const imgEl = document.createElement("img");
-        // Use proxy to avoid CORS
         imgEl.src = "/api/explore/image?url=" + encodeURIComponent(img.src);
         imgEl.alt = img.alt || "";
         imgEl.loading = "lazy";
@@ -626,14 +628,13 @@ function setupExplorePanel() {
     }
   }
 
-  // People filter
+  // People filter — batch mode
   const filterBtn = $("#explore-filter-people");
   let filterActive = false;
 
   if (filterBtn) {
     filterBtn.addEventListener("click", async () => {
       if (filterActive) {
-        // Toggle off — show all cards again
         filterActive = false;
         filterBtn.classList.remove("active");
         grid.querySelectorAll(".explore-card").forEach(c => { c.style.display = ""; });
@@ -647,63 +648,49 @@ function setupExplorePanel() {
       const cards = Array.from(grid.querySelectorAll(".explore-card"));
       if (cards.length === 0) return;
 
+      // Collect all image URLs for batch detection
+      const urls = cards.map(c => c.dataset.src).filter(Boolean);
+      if (urls.length === 0) return;
+
       if (status) {
         status.style.display = "block";
-        status.textContent = "Analyzing for people… (0/" + cards.length + ")";
+        status.textContent = "Analyzing " + urls.length + " images for people…";
       }
 
-      let done = 0;
-      // Process in parallel batches of 3 for speed
-      const batchSize = 3;
-      for (let i = 0; i < cards.length; i += batchSize) {
-        if (!filterActive) break; // user toggled off mid-scan
-        const batch = cards.slice(i, i + batchSize);
-        await Promise.all(batch.map(async (card) => {
-          const imgEl = card.querySelector("img");
-          if (!imgEl) { card.style.display = "none"; return; }
-          try {
-            // Fetch image as base64
-            const imgResp = await fetch(imgEl.src);
-            if (!imgResp.ok) { card.style.display = "none"; return; }
-            const blob = await imgResp.blob();
-            const b64 = await new Promise(resolve => {
-              const r = new FileReader();
-              r.onload = () => resolve(r.result.split(",")[1]);
-              r.readAsDataURL(blob);
-            });
+      try {
+        const resp = await fetch("/api/explore/has-person-batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ urls }),
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.detail || "Analysis failed");
+        }
+        const result = await resp.json();
+        // result.results = { url: true/false, ... }
 
-            // Check for person
-            const checkResp = await fetch("/api/explore/has-person", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ image: b64 }),
-            });
-            if (!checkResp.ok) { card.style.display = "none"; return; }
-            const result = await checkResp.json();
-
-            if (result.status === "downloading") {
-              // Model still downloading — show status and retry after delay
-              if (status) status.textContent = "Downloading analysis model (first use)… " + (result.progress || 0) + "%";
-              await new Promise(r => setTimeout(r, 3000));
-              // Don't hide, leave for next pass
-              return;
-            }
-
-            card.style.display = result.has_person ? "" : "none";
-          } catch {
+        let visible = 0;
+        for (const card of cards) {
+          const src = card.dataset.src;
+          if (src && result.results[src] === true) {
+            card.style.display = "";
+            visible++;
+          } else {
             card.style.display = "none";
           }
-          done++;
-          if (status && filterActive) {
-            status.textContent = "Analyzing for people… (" + done + "/" + cards.length + ")";
-          }
-        }));
-      }
+        }
 
-      if (status && filterActive) {
-        const visible = grid.querySelectorAll(".explore-card:not([style*='display: none'])").length;
-        status.textContent = "Filter complete: " + visible + " images with people";
-        if (visible === 0) status.textContent = "No images with people found";
+        if (status && filterActive) {
+          status.textContent = visible > 0
+            ? "Filter complete: " + visible + " images with people"
+            : "No images with people found";
+        }
+      } catch (err) {
+        if (status) {
+          status.style.display = "block";
+          status.textContent = "Filter error: " + err.message;
+        }
       }
     });
   }

@@ -1373,6 +1373,78 @@ async def explore_has_person(req: AnalyzeImageRequest):
     return {"has_person": False, "status": "ready"}
 
 
+_PERSON_KEYWORDS = frozenset([
+    "person", "people", "man", "woman", "girl", "boy", "child", "baby",
+    "face", "portrait", "selfie", "couple", "crowd", "human",
+])
+
+
+class HasPersonBatchRequest(BaseModel):
+    urls: list[str] = Field(min_length=1, max_length=100)
+
+
+@router.post("/explore/has-person-batch")
+async def explore_has_person_batch(req: HasPersonBatchRequest):
+    """Batch person detection using Florence-2 captions. Downloads + analyzes all images in parallel."""
+    from api.florence import ensure_model_loaded, get_model_status, run_inference
+
+    status = ensure_model_loaded()
+    if status in ("not_started", "downloading"):
+        _, progress = get_model_status()
+        raise HTTPException(status_code=202, detail=f"Model downloading: {progress}%")
+    if status == "failed":
+        raise HTTPException(status_code=503, detail="Florence model failed to load")
+
+    import httpx
+
+    results = {}
+    headers = {
+        "User-Agent": _BROWSER_UA,
+        "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
+    }
+
+    async with httpx.AsyncClient(timeout=_EXPLORE_TIMEOUT, follow_redirects=True, headers=headers) as client:
+        import asyncio
+        # Download all images concurrently
+        download_tasks = []
+        for url in req.urls:
+            async def _download(u=url):
+                try:
+                    validated = _validate_explore_url(u)
+                    resp = await client.get(validated)
+                    if resp.status_code != 200:
+                        return u, None
+                    ct = resp.headers.get("content-type", "")
+                    if not ct.startswith("image/"):
+                        return u, None
+                    return u, resp.content
+                except Exception:
+                    return u, None
+            download_tasks.append(_download())
+
+        downloaded = await asyncio.gather(*download_tasks)
+
+        # Analyze sequentially (Florence-2 is not thread-safe)
+        from PIL import Image as PILImage
+        for url, img_bytes in downloaded:
+            if img_bytes is None:
+                results[url] = False
+                continue
+            try:
+                img = PILImage.open(io.BytesIO(img_bytes))
+                if max(img.size) > 512:
+                    img.thumbnail((512, 512))
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=70)
+                result = run_inference(buf.getvalue())
+                caption = (result.get("caption", "") + " " + result.get("detail", "")).lower()
+                results[url] = any(kw in caption for kw in _PERSON_KEYWORDS)
+            except Exception:
+                results[url] = False
+
+    return {"results": results}
+
+
 @router.get("/explore/local", response_model=LocalBrowseResponse)
 async def list_local_folder(path: str = Query(default="")):
     root = _get_local_browse_root()
