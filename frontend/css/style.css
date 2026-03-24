@@ -3246,6 +3246,66 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 }
 .explore-mode { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border-muted) transparent; }
 
+/* ── Local folder tabs ─────────────────────────────────────── */
+.local-folder-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 12px 0;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.local-folder-tabs::-webkit-scrollbar { display: none; }
+.local-folder-tab-list { display: flex; gap: 2px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.local-folder-tab-list::-webkit-scrollbar { display: none; }
+.local-folder-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-muted);
+  background: var(--bg-deep);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.15s, border-color 0.15s;
+}
+.local-folder-tab:hover { border-color: var(--text-secondary); }
+.local-folder-tab.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.local-folder-tab-close {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 0 2px;
+  opacity: 0.6;
+  line-height: 1;
+}
+.local-folder-tab-close:hover { opacity: 1; }
+.local-folder-tab-add {
+  background: none;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 2px 8px;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+.local-folder-tab-add:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+
 /* ── Local breadcrumb ─────────────────────────────────────── */
 .local-breadcrumb {
   display: flex;

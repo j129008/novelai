@@ -27,19 +27,85 @@ function setupExplorePanel() {
     });
   });
 
-  // ── Local folder browser ──
+  // ── Local folder browser with multi-tab ──
   const localPathInput = $("#local-browse-path");
   const localBrowseBtn = $("#local-browse-btn");
   const localBreadcrumb = $("#local-breadcrumb");
   const localStatus = $("#local-status");
   const localGrid = $("#local-grid");
+  const folderTabList = $("#local-folder-tab-list");
+  const folderTabAdd = $("#local-folder-tab-add");
 
-  let localRootPath = localStorage.getItem("local_browse_root") || "";
-  let localCurrentSubpath = "";
+  // Tab state: array of { root, subpath, name }
+  let folderTabs = JSON.parse(localStorage.getItem("local_folder_tabs") || "[]");
+  let activeTabIdx = parseInt(localStorage.getItem("local_folder_active_tab") || "0", 10);
 
-  if (localPathInput && localRootPath) {
-    localPathInput.value = localRootPath;
+  // Migrate old single-root to first tab
+  const oldRoot = localStorage.getItem("local_browse_root") || "";
+  if (folderTabs.length === 0 && oldRoot) {
+    folderTabs.push({ root: oldRoot, subpath: "", name: oldRoot.split("/").pop() || "Local" });
   }
+
+  function saveFolderTabs() {
+    localStorage.setItem("local_folder_tabs", JSON.stringify(folderTabs));
+    localStorage.setItem("local_folder_active_tab", String(activeTabIdx));
+  }
+
+  function renderFolderTabs() {
+    if (!folderTabList) return;
+    folderTabList.innerHTML = "";
+    folderTabs.forEach((tab, i) => {
+      const el = document.createElement("div");
+      el.className = "local-folder-tab" + (i === activeTabIdx ? " active" : "");
+      const label = document.createElement("span");
+      label.textContent = tab.name || tab.root.split("/").pop() || "Local";
+      label.style.overflow = "hidden";
+      label.style.textOverflow = "ellipsis";
+      el.appendChild(label);
+
+      if (folderTabs.length > 1) {
+        const closeBtn = document.createElement("button");
+        closeBtn.className = "local-folder-tab-close";
+        closeBtn.textContent = "\u00d7";
+        closeBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          folderTabs.splice(i, 1);
+          if (activeTabIdx >= folderTabs.length) activeTabIdx = Math.max(0, folderTabs.length - 1);
+          saveFolderTabs();
+          renderFolderTabs();
+          switchToTab(activeTabIdx);
+        });
+        el.appendChild(closeBtn);
+      }
+
+      el.addEventListener("click", () => {
+        // Save current subpath before switching
+        if (folderTabs[activeTabIdx]) folderTabs[activeTabIdx].subpath = localCurrentSubpath;
+        activeTabIdx = i;
+        saveFolderTabs();
+        renderFolderTabs();
+        switchToTab(i);
+      });
+      folderTabList.appendChild(el);
+    });
+  }
+
+  function switchToTab(idx) {
+    const tab = folderTabs[idx];
+    if (!tab) return;
+    localRootPath = tab.root;
+    localCurrentSubpath = tab.subpath || "";
+    if (localPathInput) localPathInput.value = tab.root;
+    // Set server-side root
+    fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ local_browse_root: tab.root }),
+    }).then(() => browseLocalFolder(localCurrentSubpath)).catch(() => browseLocalFolder(localCurrentSubpath));
+  }
+
+  let localRootPath = "";
+  let localCurrentSubpath = "";
 
   async function setLocalRoot(fullPath) {
     // Save to server settings for security enforcement
@@ -56,12 +122,26 @@ function setupExplorePanel() {
     localRootPath = fullPath;
     localStorage.setItem("local_browse_root", fullPath);
     localCurrentSubpath = "";
+
+    // Update or add tab
+    if (folderTabs[activeTabIdx]) {
+      folderTabs[activeTabIdx].root = fullPath;
+      folderTabs[activeTabIdx].subpath = "";
+      folderTabs[activeTabIdx].name = fullPath.split("/").pop() || "Local";
+    } else {
+      folderTabs.push({ root: fullPath, subpath: "", name: fullPath.split("/").pop() || "Local" });
+      activeTabIdx = folderTabs.length - 1;
+    }
+    saveFolderTabs();
+    renderFolderTabs();
     browseLocalFolder("");
   }
 
   async function browseLocalFolder(subpath) {
     if (!localRootPath) return;
     localCurrentSubpath = subpath;
+    // Keep tab state in sync
+    if (folderTabs[activeTabIdx]) folderTabs[activeTabIdx].subpath = subpath;
     localGrid.innerHTML = "";
     localStatus.style.display = "block";
     localStatus.textContent = "Loading…";
@@ -528,9 +608,32 @@ function setupExplorePanel() {
     });
   }
 
-  // Auto-load saved root on init — just browse, don't re-save to server
-  if (localRootPath) {
-    browseLocalFolder("");
+  // "+" button — add new folder tab
+  if (folderTabAdd) {
+    folderTabAdd.addEventListener("click", async () => {
+      try {
+        const resp = await fetch("/api/settings/browse", { method: "POST" });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (data.path) {
+          // Save current subpath
+          if (folderTabs[activeTabIdx]) folderTabs[activeTabIdx].subpath = localCurrentSubpath;
+          folderTabs.push({ root: data.path, subpath: "", name: data.path.split("/").pop() || "Local" });
+          activeTabIdx = folderTabs.length - 1;
+          saveFolderTabs();
+          renderFolderTabs();
+          switchToTab(activeTabIdx);
+        }
+      } catch (err) {
+        showError("Browse failed: " + err.message);
+      }
+    });
+  }
+
+  // Init: render tabs and load active tab
+  renderFolderTabs();
+  if (folderTabs.length > 0 && folderTabs[activeTabIdx]) {
+    switchToTab(activeTabIdx);
   }
 
   async function explorePage(url) {
