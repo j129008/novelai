@@ -55,7 +55,7 @@ function setupHistoryTabs() {
     tabHistory.classList.add("canvas-tab--active");
     panelHistory.style.display = "flex";
     const bc = $("#gallery-breadcrumb");
-    if (bc) bc.style.display = "flex";
+    if (bc) bc.style.display = bc.children.length ? "flex" : "none";
     searchWrap.style.display = "flex";
     searchInput.focus();
     localStorage.setItem("nai-active-tab", "history");
