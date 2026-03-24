@@ -3272,7 +3272,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.95);
   display: flex;
   align-items: center;
   justify-content: center;
