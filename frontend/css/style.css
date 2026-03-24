@@ -3201,28 +3201,28 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 /* ── Explore sub-tabs ─────────────────────────────────────── */
 .explore-sub-tabs {
   display: flex;
-  gap: 2px;
-  padding: 8px 12px 0;
+  gap: 6px;
+  padding: 10px 12px 0;
   flex-shrink: 0;
 }
 .explore-sub-tab {
-  padding: 4px 14px;
-  font-size: 0.78rem;
+  padding: 6px 20px;
+  font-size: 0.82rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
   border: 1px solid var(--border-muted);
-  border-bottom: none;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border-radius: var(--radius-sm);
   background: var(--bg-deep);
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.explore-sub-tab:hover { color: var(--text-primary); }
+.explore-sub-tab:hover { color: var(--text-primary); border-color: var(--text-secondary); }
 .explore-sub-tab.active {
-  background: var(--bg-surface);
-  color: var(--text-primary);
+  background: var(--accent);
+  color: #fff;
   border-color: var(--accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .explore-mode { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
 
