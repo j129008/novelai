@@ -229,3 +229,36 @@ class LocalBrowseResponse(BaseModel):
     directories: list[LocalBrowseItem]
     files: list[LocalBrowseItem]
 
+
+# ---------------------------------------------------------------------------
+# Explore Tag Analysis
+# ---------------------------------------------------------------------------
+
+class LocalAnalyzeRequest(BaseModel):
+    path: str = Field(min_length=1)
+    method: Literal["wd", "grok"]
+
+
+class WdTag(BaseModel):
+    name: str
+    score: float
+    category: str
+
+
+class GrokAnalysis(BaseModel):
+    tags: list[str]
+    description: str
+
+
+class LocalAnalyzeResponse(BaseModel):
+    wd: Optional[list[WdTag]] = None
+    grok: Optional[GrokAnalysis] = None
+
+
+class LocalTagsCacheResponse(BaseModel):
+    wd: Optional[list[WdTag]] = None
+    grok: Optional[GrokAnalysis] = None
+
+
+class LocalTagsBatchResponse(BaseModel):
+    analyzed: dict[str, list[str]]  # filename -> ["wd", "grok"]

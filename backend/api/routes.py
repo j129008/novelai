@@ -34,18 +34,24 @@ from models.schemas import (
     GalleryListResponse,
     GenerateRequest,
     GenerateResponse,
+    GrokAnalysis,
     GrokImageRequest,
     GrokImageResponse,
     GrokVideoRequest,
     GrokVideoResponse,
     LayerRedrawRequest,
     LayerRedrawResponse,
+    LocalAnalyzeRequest,
+    LocalAnalyzeResponse,
     LocalBrowseItem,
     LocalBrowseResponse,
+    LocalTagsBatchResponse,
+    LocalTagsCacheResponse,
     RecordCharactersRequest,
     SuggestTagsRequest,
     SuggestTagsResponse,
     TagSuggestion,
+    WdTag,
 )
 from api.novelai import generate_image
 
@@ -738,6 +744,7 @@ async def get_settings():
     return {
         "output_dir": settings.get("output_dir", str(_default_output)),
         "local_browse_root": settings.get("local_browse_root", ""),
+        "xai_api_configured": bool(XAI_API_KEY),
     }
 
 
