@@ -74,8 +74,8 @@ function applyProvider(provider) {
   // Sync inpaint button visibility (NovelAI + has image)
   syncInpaintButtonVisibility();
 
-  // Fetch Grok usage when switching to Grok
-  if (isGrok) fetchGrokUsage();
+  // Always fetch Grok usage (API is used in both modes now)
+  fetchGrokUsage();
 
   // Update canvas layer panel visibility for new provider
   updateCanvasPanel();
@@ -109,6 +109,9 @@ async function fetchGrokUsage() {
     fill.classList.remove("warning", "danger");
     if (pct < 0.1) fill.classList.add("danger");
     else if (pct < 0.3) fill.classList.add("warning");
+
+    // Show bar regardless of provider
+    if (bar) bar.style.display = "";
   } catch {
     label.textContent = "—";
   }

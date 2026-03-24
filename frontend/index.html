@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=111">
+  <link rel="stylesheet" href="css/style.css?v=112">
 </head>
 <body>
   <div class="app">
@@ -17,10 +17,6 @@
         <span>NovelAI</span>
       </div>
       <span class="app-tagline">Image Generator</span>
-      <button id="guide-btn" class="header-btn" type="button" title="Prompt Guide">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        <span>Prompt Guide</span>
-      </button>
       <button id="settings-btn" class="header-btn" type="button" title="Settings">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
@@ -46,6 +42,12 @@
             <button id="settings-open-folder" class="btn-action btn-action--primary" type="button">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
               Open in Finder
+            </button>
+          </section>
+          <section class="guide-section">
+            <button id="guide-btn" class="btn-action" type="button" style="width:100%;justify-content:center">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              Prompt Guide
             </button>
           </section>
         </div>
@@ -532,7 +534,7 @@
       <aside class="controls" id="sidebar" role="form" aria-label="Generation controls">
 
         <!-- Grok quota HP bar -->
-        <div class="grok-quota-bar grok-only" id="grok-quota-bar" style="display:none" title="Click to refresh">
+        <div class="grok-quota-bar" id="grok-quota-bar" style="display:none" title="Click to refresh — xAI API quota">
           <div class="grok-quota-track">
             <div class="grok-quota-fill" id="grok-quota-fill"></div>
           </div>
@@ -1124,16 +1126,16 @@
     </div>
   </div>
 
-  <script src="js/state.js?v=111"></script>
-  <script src="js/provider.js?v=111"></script>
-  <script src="js/crop.js?v=111"></script>
-  <script src="js/tags.js?v=111"></script>
-  <script src="js/layers.js?v=111"></script>
-  <script src="js/generate.js?v=111"></script>
-  <script src="js/craft.js?v=111"></script>
-  <script src="js/gallery.js?v=111"></script>
-  <script src="js/explore.js?v=111"></script>
-  <script src="js/characters.js?v=111"></script>
-  <script src="js/app.js?v=111"></script>
+  <script src="js/state.js?v=112"></script>
+  <script src="js/provider.js?v=112"></script>
+  <script src="js/crop.js?v=112"></script>
+  <script src="js/tags.js?v=112"></script>
+  <script src="js/layers.js?v=112"></script>
+  <script src="js/generate.js?v=112"></script>
+  <script src="js/craft.js?v=112"></script>
+  <script src="js/gallery.js?v=112"></script>
+  <script src="js/explore.js?v=112"></script>
+  <script src="js/characters.js?v=112"></script>
+  <script src="js/app.js?v=112"></script>
 </body>
 </html>
