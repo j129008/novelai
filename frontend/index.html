@@ -991,16 +991,35 @@
         </div>
 
         <div id="panel-explore" class="tab-panel explore-panel" style="display:none">
-          <div class="explore-url-bar">
-            <input type="text" id="explore-url" class="explore-url-input" placeholder="Enter a URL to browse images from any page…" spellcheck="false">
-            <button id="explore-go" class="btn-action btn-action--primary" type="button">Go</button>
-            <button id="explore-filter-people" class="btn-action explore-filter-btn" type="button" title="Show only images with people (local AI analysis)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
+          <div class="explore-sub-tabs">
+            <button class="explore-sub-tab active" data-explore-mode="url">URL</button>
+            <button class="explore-sub-tab" data-explore-mode="local">Local</button>
           </div>
-          <div id="explore-status" class="explore-status" style="display:none"></div>
-          <div id="explore-grid" class="explore-grid"></div>
-          <div id="explore-links" class="explore-links" style="display:none">
-            <div class="explore-links-header">Related Links</div>
-            <div id="explore-links-list" class="explore-links-list"></div>
+
+          <!-- URL mode (existing) -->
+          <div id="explore-mode-url" class="explore-mode">
+            <div class="explore-url-bar">
+              <input type="text" id="explore-url" class="explore-url-input" placeholder="Enter a URL to browse images from any page…" spellcheck="false">
+              <button id="explore-go" class="btn-action btn-action--primary" type="button">Go</button>
+              <button id="explore-filter-people" class="btn-action explore-filter-btn" type="button" title="Show only images with people (local AI analysis)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
+            </div>
+            <div id="explore-status" class="explore-status" style="display:none"></div>
+            <div id="explore-grid" class="explore-grid"></div>
+            <div id="explore-links" class="explore-links" style="display:none">
+              <div class="explore-links-header">Related Links</div>
+              <div id="explore-links-list" class="explore-links-list"></div>
+            </div>
+          </div>
+
+          <!-- Local mode (new) -->
+          <div id="explore-mode-local" class="explore-mode" style="display:none">
+            <div class="explore-url-bar">
+              <input type="text" id="local-browse-path" class="explore-url-input" placeholder="Enter folder path or click Browse…" spellcheck="false">
+              <button id="local-browse-btn" class="btn-action btn-action--primary" type="button">Browse</button>
+            </div>
+            <div id="local-breadcrumb" class="local-breadcrumb"></div>
+            <div id="local-status" class="explore-status" style="display:none"></div>
+            <div id="local-grid" class="explore-grid"></div>
           </div>
         </div>
 

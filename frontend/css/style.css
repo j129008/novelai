@@ -3197,6 +3197,74 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   background: var(--bg-deep);
   object-fit: cover;
 }
+
+/* ── Explore sub-tabs ─────────────────────────────────────── */
+.explore-sub-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 12px 0;
+  flex-shrink: 0;
+}
+.explore-sub-tab {
+  padding: 4px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border-muted);
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: var(--bg-deep);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.explore-sub-tab:hover { color: var(--text-primary); }
+.explore-sub-tab.active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+.explore-mode { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+/* ── Local breadcrumb ─────────────────────────────────────── */
+.local-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.local-breadcrumb-seg {
+  cursor: pointer;
+  color: var(--accent);
+  text-decoration: none;
+}
+.local-breadcrumb-seg:hover { text-decoration: underline; }
+.local-breadcrumb-sep { color: var(--text-tertiary); }
+.local-breadcrumb-current { color: var(--text-primary); font-weight: 600; }
+
+/* ── Folder cards ─────────────────────────────────────────── */
+.local-folder-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-muted);
+  background: var(--bg-deep);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.local-folder-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-surface);
+}
+.local-folder-card svg { flex-shrink: 0; color: var(--text-secondary); }
+.local-folder-card span { font-size: 0.82rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .explore-links {
   padding: 8px 12px;
   border-top: 1px solid var(--border-muted);
