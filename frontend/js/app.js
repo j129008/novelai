@@ -7528,7 +7528,7 @@ function setupExplorePanel() {
         const reader = new FileReader();
         reader.onload = (ev) => {
           const img = new Image();
-          img.onload = () => { openCropOverlay(img); };
+          img.onload = () => { closeAnalysisPanel(); openCropOverlay(img); };
           img.src = ev.target.result;
         };
         reader.readAsDataURL(blob);
