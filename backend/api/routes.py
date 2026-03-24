@@ -710,6 +710,7 @@ async def create_gallery_folder(req: MoveFileRequest):
 
 class SettingsUpdate(BaseModel):
     output_dir: str | None = None
+    local_browse_root: str | None = None
 
 
 @router.get("/settings")
@@ -717,6 +718,7 @@ async def get_settings():
     settings = _load_settings()
     return {
         "output_dir": settings.get("output_dir", str(_default_output)),
+        "local_browse_root": settings.get("local_browse_root", ""),
     }
 
 
@@ -726,6 +728,11 @@ async def update_settings(req: SettingsUpdate):
         p = Path(req.output_dir).expanduser().resolve()
         p.mkdir(parents=True, exist_ok=True)
         _save_settings({"output_dir": str(p)})
+    if req.local_browse_root is not None:
+        p = Path(req.local_browse_root).expanduser().resolve()
+        if not p.is_dir():
+            raise HTTPException(status_code=400, detail="Directory does not exist")
+        _save_settings({"local_browse_root": str(p)})
     return await get_settings()
 
 
