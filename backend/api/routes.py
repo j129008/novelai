@@ -84,6 +84,25 @@ def _get_output_dir() -> Path:
     return p
 
 
+_IMAGE_EXTENSIONS = frozenset((".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff"))
+
+
+def _natural_sort_key(name: str):
+    """Sort key that handles numeric segments naturally: 'Ch 2' < 'Ch 10'."""
+    return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', name)]
+
+
+def _get_local_browse_root() -> Path:
+    settings = _load_settings()
+    root = settings.get("local_browse_root", "")
+    if not root:
+        raise HTTPException(status_code=400, detail="Local browse root not configured")
+    p = Path(root)
+    if not p.is_dir():
+        raise HTTPException(status_code=400, detail="Local browse root does not exist")
+    return p
+
+
 def _load_characters() -> list[CharacterUsage]:
     if _characters_file.exists():
         try:
@@ -1317,3 +1336,24 @@ async def explore_has_person(req: AnalyzeImageRequest):
         if t["name"] in _PERSON_TAGS and t["score"] >= 0.4:
             return {"has_person": True, "status": "ready"}
     return {"has_person": False, "status": "ready"}
+
+
+@router.get("/explore/local", response_model=LocalBrowseResponse)
+async def list_local_folder(path: str = Query(default="")):
+    root = _get_local_browse_root()
+    current = _resolve_gallery_path(root, path)
+    if not current.is_dir():
+        raise HTTPException(status_code=404, detail="Directory not found")
+
+    directories = sorted(
+        (LocalBrowseItem(name=d.name) for d in current.iterdir()
+         if d.is_dir() and not d.name.startswith(".")),
+        key=lambda x: _natural_sort_key(x.name),
+    )
+    files = sorted(
+        (LocalBrowseItem(name=f.name) for f in current.iterdir()
+         if f.is_file() and f.suffix.lower() in _IMAGE_EXTENSIONS
+         and not f.name.startswith(".")),
+        key=lambda x: _natural_sort_key(x.name),
+    )
+    return LocalBrowseResponse(path=path, directories=directories, files=files)
