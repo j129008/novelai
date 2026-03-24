@@ -340,17 +340,43 @@ function setupHdEnhancement() {
    AUTO-SAVE PROMPT
    ═══════════════════════════════════════════════════════════ */
 
+function _promptKey() {
+  const provider = document.getElementById("provider")?.value || "novelai";
+  return "nai-prompt-" + provider;
+}
+function _negativeKey() {
+  return "nai-negative-novelai"; // only NovelAI uses negative prompt
+}
+
+/** Called on provider switch to save current + restore other provider's prompt */
+function swapPromptForProvider() {
+  const prompt = $("#prompt");
+  const negative = $("#negative-prompt");
+  if (!prompt) return;
+
+  // Restore the new provider's saved prompt
+  const saved = localStorage.getItem(_promptKey());
+  prompt.value = saved !== null ? saved : "";
+  prompt.dispatchEvent(new Event("input", { bubbles: true }));
+
+  if (negative) {
+    const savedNeg = localStorage.getItem(_negativeKey());
+    negative.value = savedNeg !== null ? savedNeg : "";
+  }
+}
+
 function setupAutoSavePrompt() {
   const prompt = $("#prompt");
   const negative = $("#negative-prompt");
 
-  const savedPrompt = localStorage.getItem("nai-prompt");
-  const savedNegative = localStorage.getItem("nai-negative");
+  // Load initial prompt for current provider
+  const savedPrompt = localStorage.getItem(_promptKey());
+  const savedNegative = localStorage.getItem(_negativeKey());
   if (savedPrompt !== null) prompt.value = savedPrompt;
   if (savedNegative !== null) negative.value = savedNegative;
 
   prompt.addEventListener("input", () => {
-    localStorage.setItem("nai-prompt", prompt.value);
+    localStorage.setItem(_promptKey(), prompt.value);
     _checkImageMention(prompt);
   });
 
@@ -443,7 +469,7 @@ function setupAutoSavePrompt() {
     _mentionTarget = null;
   }
   negative.addEventListener("input", () => {
-    localStorage.setItem("nai-negative", negative.value);
+    localStorage.setItem(_negativeKey(), negative.value);
   });
 
   // ── Prompt History — Spotlight style (separated by provider) ──

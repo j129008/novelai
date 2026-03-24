@@ -3,6 +3,15 @@
    ═══════════════════════════════════════════════════════════ */
 
 function applyProvider(provider) {
+  // Save current prompt before switching
+  const prompt = document.getElementById("prompt");
+  const negative = document.getElementById("negative-prompt");
+  const prevProvider = document.getElementById("provider")?.dataset.prevProvider || "novelai";
+  if (prompt) localStorage.setItem("nai-prompt-" + prevProvider, prompt.value);
+  if (negative) localStorage.setItem("nai-negative-novelai", negative.value);
+  const providerEl = document.getElementById("provider");
+  if (providerEl) providerEl.dataset.prevProvider = provider;
+
   const isGrok = provider === "grok";
 
   // NovelAI-only sidebar elements to hide when Grok is active
@@ -79,6 +88,9 @@ function applyProvider(provider) {
 
   // Update canvas layer panel visibility for new provider
   updateCanvasPanel();
+
+  // Swap prompt content for the new provider
+  if (typeof swapPromptForProvider === "function") swapPromptForProvider();
 }
 
 async function fetchGrokUsage() {
