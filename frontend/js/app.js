@@ -7254,9 +7254,11 @@ function setupExplorePanel() {
   const analysisResults = $("#local-analysis-results");
   const analysisStatus = $("#local-analysis-status");
   const analyzeWdBtn = $("#local-analyze-wd");
+  const analyzeFlorenceBtn = $("#local-analyze-florence");
   const analyzeGrokBtn = $("#local-analyze-grok");
   const analysisSendBtn = $("#local-analysis-send");
   const reanalyzeWdBtn = $("#local-analysis-reanalyze-wd");
+  const reanalyzeFlorenceBtn = $("#local-analysis-reanalyze-florence");
   const reanalyzeGrokBtn = $("#local-analysis-reanalyze-grok");
   let currentAnalysisPath = "";
 
@@ -7274,6 +7276,7 @@ function setupExplorePanel() {
     analysisStatus.style.display = "none";
     analysisPanel.style.display = "flex";
     reanalyzeWdBtn.style.display = "none";
+    reanalyzeFlorenceBtn.style.display = "none";
     reanalyzeGrokBtn.style.display = "none";
 
     // Show preview
@@ -7283,6 +7286,7 @@ function setupExplorePanel() {
     fetch("/api/explore/local/tags?path=" + encodeURIComponent(imgPath))
       .then(r => r.json())
       .then(data => {
+        if (data.wd) renderWdTags(data.wd);
         if (data.florence) renderFlorenceResults(data.florence);
         if (data.grok) renderGrokAnalysis(data.grok);
       })
@@ -7301,6 +7305,34 @@ function setupExplorePanel() {
     analysisPanel.addEventListener("click", (e) => {
       if (e.target === analysisPanel) closeAnalysisPanel(); // click backdrop
     });
+  }
+
+  function renderWdTags(tags) {
+    const existing = analysisResults.querySelector(".wd-section");
+    if (existing) existing.remove();
+
+    const section = document.createElement("div");
+    section.className = "wd-section";
+
+    const label = document.createElement("div");
+    label.className = "local-analysis-section-label";
+    label.textContent = "WD Tagger (danbooru tags)";
+    section.appendChild(label);
+
+    const container = document.createElement("div");
+    container.className = "local-analysis-tags";
+    for (const tag of tags) {
+      const pill = document.createElement("button");
+      pill.type = "button";
+      pill.className = "local-analysis-tag";
+      pill.textContent = tag.name.replace(/_/g, " ");
+      pill.title = tag.name + " (" + (tag.score * 100).toFixed(0) + "%)";
+      pill.addEventListener("click", () => insertTagIntoPrompt(tag.name.replace(/_/g, " ")));
+      container.appendChild(pill);
+    }
+    section.appendChild(container);
+    analysisResults.appendChild(section);
+    reanalyzeWdBtn.style.display = "";
   }
 
   function renderFlorenceResults(florence) {
@@ -7370,7 +7402,7 @@ function setupExplorePanel() {
     section.appendChild(detailActions);
 
     analysisResults.appendChild(section);
-    reanalyzeWdBtn.style.display = "";
+    reanalyzeFlorenceBtn.style.display = "";
   }
 
   function renderGrokAnalysis(grok) {
@@ -7440,7 +7472,8 @@ function setupExplorePanel() {
   async function runAnalysis(method) {
     if (!currentAnalysisPath) return;
     analysisStatus.style.display = "block";
-    analysisStatus.textContent = method === "florence" ? "Running Florence-2..." : "Analyzing with Grok Vision...";
+    const labels = { wd: "Running WD Tagger...", florence: "Running Florence-2...", grok: "Analyzing with Grok Vision..." };
+    analysisStatus.textContent = labels[method] || "Analyzing...";
 
     try {
       const resp = await fetch("/api/explore/local/analyze", {
@@ -7455,6 +7488,7 @@ function setupExplorePanel() {
       const data = await resp.json();
       analysisStatus.style.display = "none";
 
+      if (data.wd) renderWdTags(data.wd);
       if (data.florence) renderFlorenceResults(data.florence);
       if (data.grok) renderGrokAnalysis(data.grok);
 
@@ -7476,9 +7510,11 @@ function setupExplorePanel() {
   }
 
   // Wire up buttons
-  if (analyzeWdBtn) analyzeWdBtn.addEventListener("click", () => runAnalysis("florence"));
+  if (analyzeWdBtn) analyzeWdBtn.addEventListener("click", () => runAnalysis("wd"));
+  if (analyzeFlorenceBtn) analyzeFlorenceBtn.addEventListener("click", () => runAnalysis("florence"));
   if (analyzeGrokBtn) analyzeGrokBtn.addEventListener("click", () => runAnalysis("grok"));
-  if (reanalyzeWdBtn) reanalyzeWdBtn.addEventListener("click", () => runAnalysis("florence"));
+  if (reanalyzeWdBtn) reanalyzeWdBtn.addEventListener("click", () => runAnalysis("wd"));
+  if (reanalyzeFlorenceBtn) reanalyzeFlorenceBtn.addEventListener("click", () => runAnalysis("florence"));
   if (reanalyzeGrokBtn) reanalyzeGrokBtn.addEventListener("click", () => runAnalysis("grok"));
 
   // Send to Canvas button

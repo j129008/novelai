@@ -236,7 +236,13 @@ class LocalBrowseResponse(BaseModel):
 
 class LocalAnalyzeRequest(BaseModel):
     path: str = Field(min_length=1)
-    method: Literal["florence", "grok"]
+    method: Literal["wd", "florence", "grok"]
+
+
+class WdTag(BaseModel):
+    name: str
+    score: float
+    category: str
 
 
 class FlorenceAnalysis(BaseModel):
@@ -250,11 +256,13 @@ class GrokAnalysis(BaseModel):
 
 
 class LocalAnalyzeResponse(BaseModel):
+    wd: Optional[list[WdTag]] = None
     florence: Optional[FlorenceAnalysis] = None
     grok: Optional[GrokAnalysis] = None
 
 
 class LocalTagsCacheResponse(BaseModel):
+    wd: Optional[list[WdTag]] = None
     florence: Optional[FlorenceAnalysis] = None
     grok: Optional[GrokAnalysis] = None
 
