@@ -7099,6 +7099,195 @@ function setupExplorePanel() {
 
   if (!urlInput || !goBtn) return;
 
+  // ── Sub-tab switching ──
+  const subTabs = document.querySelectorAll(".explore-sub-tab");
+  const modeUrl = $("#explore-mode-url");
+  const modeLocal = $("#explore-mode-local");
+
+  subTabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      subTabs.forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      const mode = tab.dataset.exploreMode;
+      if (modeUrl) modeUrl.style.display = mode === "url" ? "" : "none";
+      if (modeLocal) modeLocal.style.display = mode === "local" ? "" : "none";
+    });
+  });
+
+  // ── Local folder browser ──
+  const localPathInput = $("#local-browse-path");
+  const localBrowseBtn = $("#local-browse-btn");
+  const localBreadcrumb = $("#local-breadcrumb");
+  const localStatus = $("#local-status");
+  const localGrid = $("#local-grid");
+
+  let localRootPath = localStorage.getItem("local_browse_root") || "";
+  let localCurrentSubpath = "";
+
+  if (localPathInput && localRootPath) {
+    localPathInput.value = localRootPath;
+  }
+
+  async function setLocalRoot(fullPath) {
+    // Save to server settings for security enforcement
+    try {
+      await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ local_browse_root: fullPath }),
+      });
+    } catch (err) {
+      showError("Failed to save browse root: " + err.message);
+      return;
+    }
+    localRootPath = fullPath;
+    localStorage.setItem("local_browse_root", fullPath);
+    localCurrentSubpath = "";
+    browseLocalFolder("");
+  }
+
+  async function browseLocalFolder(subpath) {
+    if (!localRootPath) return;
+    localCurrentSubpath = subpath;
+    localGrid.innerHTML = "";
+    localStatus.style.display = "block";
+    localStatus.textContent = "Loading…";
+
+    try {
+      const resp = await fetch("/api/explore/local?path=" + encodeURIComponent(subpath));
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to browse folder");
+      }
+      const data = await resp.json();
+
+      localStatus.style.display = "none";
+      renderLocalBreadcrumb(subpath);
+
+      // Render folders
+      for (const dir of data.directories) {
+        const card = document.createElement("div");
+        card.className = "local-folder-card";
+        card.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span></span>';
+        card.querySelector("span").textContent = dir.name;
+        const childPath = subpath ? subpath + "/" + dir.name : dir.name;
+        card.addEventListener("click", () => browseLocalFolder(childPath));
+        localGrid.appendChild(card);
+      }
+
+      // Render images
+      for (const file of data.files) {
+        const card = document.createElement("div");
+        card.className = "explore-card";
+        const imgEl = document.createElement("img");
+        const imgPath = subpath ? subpath + "/" + file.name : file.name;
+        imgEl.src = "/api/explore/local/image?path=" + encodeURIComponent(imgPath) + "&thumbnail=true";
+        imgEl.alt = file.name;
+        imgEl.loading = "lazy";
+        imgEl.addEventListener("click", () => useLocalImage(imgPath));
+        card.appendChild(imgEl);
+        localGrid.appendChild(card);
+      }
+
+      if (data.directories.length === 0 && data.files.length === 0) {
+        localStatus.style.display = "block";
+        localStatus.textContent = "Empty folder";
+      }
+    } catch (err) {
+      localStatus.style.display = "block";
+      localStatus.textContent = "Error: " + err.message;
+    }
+  }
+
+  function renderLocalBreadcrumb(subpath) {
+    if (!localBreadcrumb) return;
+    localBreadcrumb.innerHTML = "";
+
+    // Root segment
+    const rootSeg = document.createElement("a");
+    rootSeg.className = "local-breadcrumb-seg";
+    rootSeg.textContent = "\uD83D\uDCC1";
+    rootSeg.addEventListener("click", () => browseLocalFolder(""));
+    localBreadcrumb.appendChild(rootSeg);
+
+    if (!subpath) return;
+
+    const parts = subpath.split("/");
+    for (let i = 0; i < parts.length; i++) {
+      const sep = document.createElement("span");
+      sep.className = "local-breadcrumb-sep";
+      sep.textContent = " / ";
+      localBreadcrumb.appendChild(sep);
+
+      if (i === parts.length - 1) {
+        const cur = document.createElement("span");
+        cur.className = "local-breadcrumb-current";
+        cur.textContent = parts[i];
+        localBreadcrumb.appendChild(cur);
+      } else {
+        const seg = document.createElement("a");
+        seg.className = "local-breadcrumb-seg";
+        seg.textContent = parts[i];
+        const segPath = parts.slice(0, i + 1).join("/");
+        seg.addEventListener("click", () => browseLocalFolder(segPath));
+        localBreadcrumb.appendChild(seg);
+      }
+    }
+  }
+
+  async function useLocalImage(imgPath) {
+    try {
+      const resp = await fetch("/api/explore/local/image?path=" + encodeURIComponent(imgPath));
+      if (!resp.ok) throw new Error("Failed to load image");
+      const blob = await resp.blob();
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target.result;
+        // Create temp Image element for crop overlay
+        const img = new Image();
+        img.onload = () => {
+          openCropOverlay(img);
+        };
+        img.src = dataUrl;
+      };
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      showError("Failed to load image: " + err.message);
+    }
+  }
+
+  // Browse button — macOS folder picker
+  if (localBrowseBtn) {
+    localBrowseBtn.addEventListener("click", async () => {
+      try {
+        const resp = await fetch("/api/settings/browse", { method: "POST" });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (data.path) {
+          localPathInput.value = data.path;
+          setLocalRoot(data.path);
+        }
+      } catch (err) {
+        showError("Browse failed: " + err.message);
+      }
+    });
+  }
+
+  // Path input — Enter key
+  if (localPathInput) {
+    localPathInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        const val = localPathInput.value.trim();
+        if (val) setLocalRoot(val);
+      }
+    });
+  }
+
+  // Auto-load saved root on init — just browse, don't re-save to server
+  if (localRootPath) {
+    browseLocalFolder("");
+  }
+
   async function explorePage(url) {
     // Normalize URL
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
