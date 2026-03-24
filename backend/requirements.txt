@@ -19,4 +19,6 @@ pandas==2.2.3
 
 # Florence-2 — local image captioning
 torch
-transformers
+transformers==4.46.3
+timm
+einops
