@@ -654,8 +654,17 @@ function setupExplorePanel() {
 
       if (status) {
         status.style.display = "block";
-        status.textContent = "Analyzing " + urls.length + " images for people…";
+        status.textContent = "Analyzing 0/" + urls.length + " images…";
       }
+
+      // Build URL→card lookup
+      const cardMap = {};
+      for (const card of cards) {
+        if (card.dataset.src) cardMap[card.dataset.src] = card;
+      }
+
+      // Hide all cards initially, show as we find people
+      cards.forEach(c => { c.style.display = "none"; });
 
       try {
         const resp = await fetch("/api/explore/has-person-batch", {
@@ -667,17 +676,36 @@ function setupExplorePanel() {
           const err = await resp.json().catch(() => ({}));
           throw new Error(err.detail || "Analysis failed");
         }
-        const result = await resp.json();
-        const resultMap = result.results || {};
 
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
         let visible = 0;
-        for (const card of cards) {
-          const src = card.dataset.src;
-          if (src && resultMap[src] === true) {
-            card.style.display = "";
-            visible++;
-          } else {
-            card.style.display = "none";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          // Parse SSE lines
+          const lines = buffer.split("\n");
+          buffer = lines.pop(); // keep incomplete line
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.complete) break;
+
+              if (data.url && cardMap[data.url]) {
+                if (data.has_person) {
+                  cardMap[data.url].style.display = "";
+                  visible++;
+                }
+              }
+              if (status && filterActive) {
+                status.textContent = "Analyzing " + data.done + "/" + data.total + " — " + visible + " with people";
+              }
+            } catch (_) {}
           }
         }
 

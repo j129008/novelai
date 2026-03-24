@@ -1385,64 +1385,48 @@ class HasPersonBatchRequest(BaseModel):
 
 @router.post("/explore/has-person-batch")
 async def explore_has_person_batch(req: HasPersonBatchRequest):
-    """Batch person detection using Florence-2 captions. Downloads + analyzes all images in parallel."""
-    from api.florence import ensure_model_loaded, get_model_status, run_inference
+    """Batch person detection using WD Tagger. Returns SSE stream with per-image progress."""
+    from api.tagger import ensure_model_loaded, get_model_status, run_inference
 
     status = ensure_model_loaded()
     if status in ("not_started", "downloading"):
         _, progress = get_model_status()
         raise HTTPException(status_code=202, detail=f"Model downloading: {progress}%")
     if status == "failed":
-        raise HTTPException(status_code=503, detail="Florence model failed to load")
+        raise HTTPException(status_code=503, detail="Tagger model failed to load")
 
     import httpx
 
-    results = {}
-    headers = {
-        "User-Agent": _BROWSER_UA,
-        "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
-    }
+    async def generate_events():
+        headers = {
+            "User-Agent": _BROWSER_UA,
+            "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
+        }
+        total = len(req.urls)
+        done = 0
 
-    async with httpx.AsyncClient(timeout=_EXPLORE_TIMEOUT, follow_redirects=True, headers=headers) as client:
-        import asyncio
-        # Download all images concurrently
-        download_tasks = []
-        for url in req.urls:
-            async def _download(u=url):
+        async with httpx.AsyncClient(timeout=_EXPLORE_TIMEOUT, follow_redirects=True, headers=headers) as client:
+            for url in req.urls:
+                has_person = False
                 try:
-                    validated = _validate_explore_url(u)
+                    validated = _validate_explore_url(url)
                     resp = await client.get(validated)
-                    if resp.status_code != 200:
-                        return u, None
-                    ct = resp.headers.get("content-type", "")
-                    if not ct.startswith("image/"):
-                        return u, None
-                    return u, resp.content
+                    if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("image/"):
+                        image_b64 = base64.b64encode(resp.content).decode()
+                        raw_tags = run_inference(image_b64)
+                        for t in raw_tags:
+                            if t["name"] in _PERSON_TAGS and t["score"] >= 0.4:
+                                has_person = True
+                                break
                 except Exception:
-                    return u, None
-            download_tasks.append(_download())
+                    pass
 
-        downloaded = await asyncio.gather(*download_tasks)
+                done += 1
+                yield f"data: {json.dumps({'url': url, 'has_person': has_person, 'done': done, 'total': total})}\n\n"
 
-        # Analyze sequentially (Florence-2 is not thread-safe)
-        from PIL import Image as PILImage
-        for url, img_bytes in downloaded:
-            if img_bytes is None:
-                results[url] = False
-                continue
-            try:
-                img = PILImage.open(io.BytesIO(img_bytes))
-                if max(img.size) > 512:
-                    img.thumbnail((512, 512))
-                buf = io.BytesIO()
-                img.save(buf, format="JPEG", quality=70)
-                result = run_inference(buf.getvalue())
-                caption = (result.get("caption", "") + " " + result.get("detail", "")).lower()
-                results[url] = any(kw in caption for kw in _PERSON_KEYWORDS)
-            except Exception:
-                results[url] = False
+        yield "data: {\"complete\": true}\n\n"
 
-    return {"results": results}
+    return StreamingResponse(generate_events(), media_type="text/event-stream")
 
 
 @router.get("/explore/local", response_model=LocalBrowseResponse)
