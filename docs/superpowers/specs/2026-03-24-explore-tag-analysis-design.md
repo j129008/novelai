@@ -12,6 +12,10 @@ On-demand image tag analysis in the Explore Local tab. Users click an image to e
 - **Local mode only** (first iteration). URL mode images are transient with no stable path for sidecar files.
 - **On-demand only.** No automatic or batch analysis. User explicitly clicks to analyze.
 
+## Security
+
+All new endpoints must use `_resolve_gallery_path(root, path)` for path resolution — the same helper used by gallery and local browse endpoints. This applies to both read and write operations. The `.tags/` directory creation and file writes must be verified to reside within the browse root. Writing files is more dangerous than reading, so path validation is critical on the analyze endpoint.
+
 ## UI: Analysis Panel
 
 ### Interaction Flow
@@ -21,7 +25,7 @@ On-demand image tag analysis in the Explore Local tab. Users click an image to e
 3. User clicks "WD Tagger" or "Grok Vision" → loading spinner → results appear
 4. If cached results exist, they display immediately — no API call
 5. Click any tag → inserts at cursor position in prompt textarea (reuse existing `insertTagIntoPrompt()`)
-6. "Send to Canvas" button (primary/dominant visual weight) → opens crop overlay
+6. "Send to Canvas" button (primary/dominant visual weight) → opens crop overlay via existing `openCropOverlay()`
 7. Click another image or click outside → panel collapses
 
 ### Panel Layout
@@ -42,11 +46,14 @@ On-demand image tag analysis in the Explore Local tab. Users click an image to e
 │                   │  "A girl with long black..." │
 │                   │  [Copy]                      │
 │                   │                              │
-│                   │  [Re-analyze ↻]              │
+│                   │  [Re-analyze WD ↻]           │
+│                   │  [Re-analyze Grok ↻]         │
 ├──────────────────────────────────────────────────┤
 │                        [Send to Canvas]          │
 └──────────────────────────────────────────────────┘
 ```
+
+Re-analyze buttons appear per-method next to cached results. Each re-runs only that specific method.
 
 ### Grid Indicator
 
@@ -84,7 +91,8 @@ comics/Chapter-01/
 
 - `wd` and `grok` are independent — either can be present or absent
 - `.tags/` directory is hidden (already filtered by Local browser's `.` prefix filter)
-- Cache persists forever; "Re-analyze" button allows manual refresh
+- Cache persists forever; per-method "Re-analyze" buttons allow manual refresh
+- **Write safety:** Backend uses read-modify-write pattern — read existing cache, merge the new method's data, write back. This prevents a WD write from clobbering a previously cached Grok result.
 
 ## Backend API
 
@@ -98,39 +106,79 @@ Request:
 }
 ```
 
-Response: the analysis result (same format as cache file, but only the requested method's section).
+Response for `method=wd`:
+```json
+{
+  "wd": [
+    { "name": "1girl", "score": 0.95, "category": "general" },
+    { "name": "long_hair", "score": 0.88, "category": "general" }
+  ]
+}
+```
 
-**WD Tagger path:** Reuse existing `tagger.py` `run_inference()`. Read image from local browse root, run inference, save to `.tags/`, return result.
+Response for `method=grok`:
+```json
+{
+  "grok": {
+    "tags": ["1girl", "long_hair", "black_dress", "sitting", "window"],
+    "description": "A girl with long black hair wearing a black dress, sitting by a window with soft natural lighting."
+  }
+}
+```
 
-**Grok Vision path:** Call xAI chat completions API with `grok-2-vision`. System prompt instructs structured JSON output:
+**WD Tagger path:** Read image from disk as raw bytes. The existing `run_inference()` in `tagger.py` accepts base64, so either: (a) read file bytes → base64-encode → pass to `run_inference()`, or (b) add a `run_inference_from_bytes()` variant. Option (a) is simpler for a first iteration. Save result to `.tags/` (read-modify-write), return.
+
+**Grok Vision path:** Call xAI chat completions API with `grok-2-vision`. Resize image to max 1024px before encoding (saves API tokens on large images). System prompt:
 
 ```
-System: You are an image analysis assistant. Analyze the provided image and return a JSON object with exactly two fields:
+You are an image analysis assistant. Analyze the provided image and return a JSON object with exactly two fields:
 - "tags": an array of danbooru-style tags (lowercase, underscored, e.g. "1girl", "long_hair", "black_dress"). Include tags for: characters, hair, clothing, pose, expression, setting, lighting, art style. Order by relevance. Maximum 30 tags.
 - "description": a single paragraph natural language description of the image, suitable as an image generation prompt. 2-3 sentences, descriptive and specific.
 
 Return ONLY the JSON object, no markdown formatting.
 ```
 
-Parse the JSON response on the backend. Save to `.tags/`. Return result.
+Parse the JSON response on the backend. Strip markdown code fences (` ```json ... ``` `) defensively before parsing. Save to `.tags/` (read-modify-write). Return result.
 
 ### `GET /api/explore/local/tags`
 
 Query: `?path=Chapter-01/page01.jpg`
 
-Returns cached tags if they exist, or `null`/empty if not yet analyzed. Used by frontend to check cache status (for the grid dot indicator) and to display cached results instantly.
+Returns the full cached tags file if it exists:
+```json
+{
+  "wd": [...],
+  "grok": { "tags": [...], "description": "..." }
+}
+```
+Returns `{}` if not yet analyzed.
 
 ### `GET /api/explore/local/tags/batch`
 
 Query: `?path=Chapter-01` (directory path)
 
-Returns a list of filenames that have cached tags in the `.tags/` directory. Used by the grid to render dot indicators without N+1 requests.
+Returns a dict of filenames to their cached method types:
+```json
+{
+  "page01.jpg": ["wd"],
+  "page02.jpg": ["wd", "grok"],
+  "page03.jpg": ["grok"]
+}
+```
+
+Used by the grid to render dot indicators without N+1 requests.
+
+### API Key Availability
+
+The frontend checks whether Grok Vision is available by looking at the existing provider-switching logic. Add a field to the `GET /api/settings` response: `"xai_api_configured": true/false`. Frontend disables "Grok Vision" button with tooltip when false.
 
 ## Tag Insertion
 
 Reuse existing `insertTagIntoPrompt()` function (app.js). Clicking a tag pill calls this function to insert the tag at the current cursor position in the prompt textarea, with proper comma separation.
 
-For natural language descriptions, a "Copy" button copies to clipboard, and a "Use as Prompt" button replaces the entire prompt text.
+For natural language descriptions:
+- "Copy" button → copies to clipboard
+- "Use as Prompt" button → replaces entire prompt text
 
 ## Error Handling
 
@@ -142,7 +190,7 @@ For natural language descriptions, a "Copy" button copies to clipboard, and a "U
 ## Files to Modify
 
 **Backend:**
-- `backend/api/routes.py` — Add analyze, tags, and tags/batch endpoints
+- `backend/api/routes.py` — Add analyze, tags, tags/batch endpoints; add `xai_api_configured` to settings response
 - `backend/api/grok.py` — Add `analyze_image_vision()` function for chat completions
 
 **Frontend:**
