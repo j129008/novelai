@@ -648,7 +648,7 @@ function setupExplorePanel() {
       const cards = Array.from(grid.querySelectorAll(".explore-card"));
       if (cards.length === 0) return;
 
-      // Collect all image URLs for batch detection
+      // Collect original image URLs for batch detection
       const urls = cards.map(c => c.dataset.src).filter(Boolean);
       if (urls.length === 0) return;
 

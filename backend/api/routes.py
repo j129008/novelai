@@ -1401,6 +1401,7 @@ async def explore_has_person_batch(req: HasPersonBatchRequest):
         headers = {
             "User-Agent": _BROWSER_UA,
             "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
+            "Referer": "",
         }
         total = len(req.urls)
         done = 0
@@ -1410,7 +1411,10 @@ async def explore_has_person_batch(req: HasPersonBatchRequest):
                 has_person = False
                 try:
                     validated = _validate_explore_url(url)
-                    resp = await client.get(validated)
+                    # Set Referer to the image's origin (some CDNs require it)
+                    from urllib.parse import urlparse as _up
+                    origin = f"{_up(validated).scheme}://{_up(validated).netloc}"
+                    resp = await client.get(validated, headers={"Referer": origin})
                     if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("image/"):
                         # Resize for speed
                         from PIL import Image as PILImage
