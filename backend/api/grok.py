@@ -213,11 +213,15 @@ The user will describe what they want. Generate a JSON object with one field:
 Return ONLY the JSON object, no markdown formatting."""
 
 
-async def prompt_assist(api_key: str, direction: str, mode: str) -> dict:
+async def prompt_assist(api_key: str, direction: str, mode: str, current_prompt: str = "") -> dict:
     """Generate prompt suggestions. mode='tags' returns {"tags":[...]}, mode='description' returns {"description":"..."}."""
     import re
 
     system = _PROMPT_ASSIST_TAGS if mode == "tags" else _PROMPT_ASSIST_DESC
+    user_msg = direction
+    if current_prompt.strip():
+        user_msg = f"Current prompt: {current_prompt.strip()}\n\nUser request: {direction}"
+
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -226,7 +230,7 @@ async def prompt_assist(api_key: str, direction: str, mode: str) -> dict:
         "model": "grok-4-1-fast-non-reasoning",
         "messages": [
             {"role": "system", "content": system},
-            {"role": "user", "content": direction},
+            {"role": "user", "content": user_msg},
         ],
         "temperature": 0.7,
     }

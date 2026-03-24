@@ -996,7 +996,7 @@ function setupPromptAssist() {
       const resp = await fetch("/api/prompt-assist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ direction, mode }),
+        body: JSON.stringify({ direction, mode, current_prompt: $("#prompt")?.value || "" }),
       });
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));

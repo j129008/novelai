@@ -1392,6 +1392,7 @@ _PERSON_KEYWORDS = frozenset([
 class PromptAssistRequest(BaseModel):
     direction: str = PydanticField(min_length=1)
     mode: str  # "tags" or "description"
+    current_prompt: str = ""
 
 
 @router.post("/prompt-assist")
@@ -1403,7 +1404,7 @@ async def prompt_assist_endpoint(req: PromptAssistRequest):
 
     from api.grok import prompt_assist
     try:
-        result = await prompt_assist(XAI_API_KEY, req.direction, req.mode)
+        result = await prompt_assist(XAI_API_KEY, req.direction, req.mode, req.current_prompt)
         return result
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
