@@ -3180,6 +3180,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   padding: 0 12px 12px;
 }
 .explore-card {
+  position: relative;
   border-radius: var(--radius-sm);
   overflow: hidden;
   cursor: pointer;
@@ -3265,6 +3266,113 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 }
 .local-folder-card svg { flex-shrink: 0; color: var(--text-secondary); }
 .local-folder-card span { font-size: 0.82rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Analysis panel ───────────────────────────────────────── */
+.local-analysis-panel {
+  border-top: 1px solid var(--border-muted);
+  padding: 12px;
+  flex-shrink: 0;
+}
+.local-analysis-content {
+  display: flex;
+  gap: 12px;
+}
+.local-analysis-preview {
+  width: 200px;
+  flex-shrink: 0;
+}
+.local-analysis-preview img {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  display: block;
+}
+.local-analysis-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.local-analysis-actions {
+  display: flex;
+  gap: 6px;
+}
+.local-analysis-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  max-height: 250px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-muted) transparent;
+}
+.local-analysis-section-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.local-analysis-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.local-analysis-tag {
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-muted);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.local-analysis-tag:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.local-analysis-description {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  padding: 8px;
+  background: var(--bg-deep);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-muted);
+}
+.local-analysis-desc-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.local-analysis-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-muted);
+}
+.local-analysis-reanalyze {
+  font-size: 0.72rem;
+  padding: 2px 10px;
+  opacity: 0.7;
+}
+
+/* ── Grid analyzed dot indicator ──────────────────────────── */
+.explore-card-analyzed-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  pointer-events: none;
+}
+
 .explore-links {
   padding: 8px 12px;
   border-top: 1px solid var(--border-muted);
