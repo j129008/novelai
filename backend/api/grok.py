@@ -200,15 +200,34 @@ async def analyze_image_vision(api_key: str, image_b64: str) -> dict:
     return result
 
 
-_PROMPT_ASSIST_TAGS = """You are a prompt tag assistant for NovelAI (an anime image generator that uses danbooru-style tags).
-The user will describe what they want. Generate a JSON object with one field:
-- "tags": an array of 15-30 danbooru-style tags (lowercase, underscored). Include tags for: characters, hair, clothing, pose, expression, setting, lighting, composition, art style. Order by importance.
+_NOVELAI_GUIDE = """NovelAI V4.5 Prompt Guide:
+- Tag order: Count → Character/Series → Appearance → Action/Expression → Scene → Style
+- Example: 1girl, character name, blonde hair, blue eyes, smile, garden, soft lighting
+- Emphasis: {text} = boost x1.05, {{text}} = boost x1.10, [text] = weaken x0.95, 1.5::text:: = exact weight
+- Multi-character: separate with | — base prompt | character 1 | character 2
+  - Base: count (2girls), scene (park), style (watercolor, year 2024), composition (from above)
+  - Character: use girl/boy only (no number), appearance, expression, character name
+  - Interactions: source#hug (initiator), target#hug (receiver), mutual#holding hands (both)
+- Special: "fur dataset," prefix for furry, "background dataset," for scenery, "year 2024" for style era
+- Quality tags (auto-appended): location, very aesthetic, masterpiece, no text
+- Tags earlier = stronger influence. Limit ~512 tokens. No unicode/emoji."""
+
+_PROMPT_ASSIST_TAGS = f"""You are a prompt tag assistant for NovelAI (an anime image generator that uses danbooru-style tags).
+
+{_NOVELAI_GUIDE}
+
+The user will describe what they want (and may include their current prompt for context). Generate a JSON object with one field:
+- "tags": an array of 15-30 danbooru-style tags following the guide's tag order. Use lowercase, underscored format. Include tags for: characters, hair, clothing, pose, expression, setting, lighting, composition, art style. Order by importance.
+
+If a current prompt is provided, suggest COMPLEMENTARY tags that enhance it — do not repeat tags already in the prompt.
 
 Return ONLY the JSON object, no markdown formatting."""
 
-_PROMPT_ASSIST_DESC = """You are a prompt assistant for an AI image generator that uses natural language descriptions.
-The user will describe what they want. Generate a JSON object with one field:
-- "description": a detailed natural language description (2-4 sentences) suitable as an image generation prompt. Be specific about visual details: subject, pose, clothing, setting, lighting, mood, camera angle.
+_PROMPT_ASSIST_DESC = """You are a prompt assistant for Grok Imagine (an AI image generator that uses natural language descriptions).
+The user will describe what they want (and may include their current prompt for context). Generate a JSON object with one field:
+- "description": a detailed natural language description (2-4 sentences) suitable as an image generation prompt. Be specific about visual details: subject, pose, clothing, setting, lighting, mood, camera angle, art style.
+
+If a current prompt is provided, expand and refine it into a better description.
 
 Return ONLY the JSON object, no markdown formatting."""
 
