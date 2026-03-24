@@ -16,3 +16,7 @@ numpy==2.2.3
 huggingface_hub==0.29.3
 onnxruntime==1.21.0
 pandas==2.2.3
+
+# Florence-2 — local image captioning
+torch
+transformers

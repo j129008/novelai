@@ -51,7 +51,7 @@ from models.schemas import (
     SuggestTagsRequest,
     SuggestTagsResponse,
     TagSuggestion,
-    WdTag,
+    FlorenceAnalysis,
 )
 from api.novelai import generate_image
 
@@ -1448,7 +1448,7 @@ async def get_local_tags_batch(path: str = Query(default="")):
                 original_name = f.name[:-5]  # remove ".json" -> "page01.jpg"
                 try:
                     data = json.loads(f.read_text(encoding="utf-8"))
-                    methods = [k for k in ("wd", "grok") if k in data]
+                    methods = [k for k in ("florence", "grok") if k in data]
                     if methods:
                         analyzed[original_name] = methods
                 except (json.JSONDecodeError, OSError):
@@ -1467,24 +1467,22 @@ async def analyze_local_image(req: LocalAnalyzeRequest):
 
     cache_path = _get_tags_cache_path(root, req.path)
 
-    if req.method == "wd":
-        from api.tagger import ensure_model_loaded, get_model_status, run_inference
+    if req.method == "florence":
+        from api.florence import ensure_model_loaded, get_model_status, run_inference
 
         status = ensure_model_loaded()
         if status in ("not_started", "downloading"):
             _, progress = get_model_status()
             raise HTTPException(status_code=202, detail=f"Model downloading: {progress}%")
         if status == "failed":
-            raise HTTPException(status_code=503, detail="Tagger model failed to load")
+            raise HTTPException(status_code=503, detail="Florence model failed to load")
 
-        # Read file, base64-encode, run inference
         image_bytes = image_file.read_bytes()
-        image_b64 = base64.b64encode(image_bytes).decode()
-        raw_tags = run_inference(image_b64)
+        result = run_inference(image_bytes)
 
-        wd_data = [{"name": t["name"], "score": t["score"], "category": t["category"]} for t in raw_tags]
-        _write_tags_cache(cache_path, "wd", wd_data)
-        return LocalAnalyzeResponse(wd=[WdTag(**t) for t in wd_data])
+        florence_data = {"caption": result["caption"], "detail": result["detail"]}
+        _write_tags_cache(cache_path, "florence", florence_data)
+        return LocalAnalyzeResponse(florence=FlorenceAnalysis(**florence_data))
 
     elif req.method == "grok":
         if not XAI_API_KEY:

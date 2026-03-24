@@ -7283,7 +7283,7 @@ function setupExplorePanel() {
     fetch("/api/explore/local/tags?path=" + encodeURIComponent(imgPath))
       .then(r => r.json())
       .then(data => {
-        if (data.wd) renderWdTags(data.wd);
+        if (data.florence) renderFlorenceResults(data.florence);
         if (data.grok) renderGrokAnalysis(data.grok);
       })
       .catch(() => {});
@@ -7303,30 +7303,72 @@ function setupExplorePanel() {
     });
   }
 
-  function renderWdTags(tags) {
-    const existing = analysisResults.querySelector(".wd-section");
+  function renderFlorenceResults(florence) {
+    const existing = analysisResults.querySelector(".florence-section");
     if (existing) existing.remove();
 
     const section = document.createElement("div");
-    section.className = "wd-section";
+    section.className = "florence-section";
 
-    const label = document.createElement("div");
-    label.className = "local-analysis-section-label";
-    label.textContent = "WD Tagger";
-    section.appendChild(label);
+    // Short caption
+    const captionLabel = document.createElement("div");
+    captionLabel.className = "local-analysis-section-label";
+    captionLabel.textContent = "Florence-2 Caption";
+    section.appendChild(captionLabel);
 
-    const container = document.createElement("div");
-    container.className = "local-analysis-tags";
-    for (const tag of tags) {
-      const pill = document.createElement("button");
-      pill.type = "button";
-      pill.className = "local-analysis-tag";
-      pill.textContent = tag.name.replace(/_/g, " ");
-      pill.title = tag.name + " (" + (tag.score * 100).toFixed(0) + "%)";
-      pill.addEventListener("click", () => insertTagIntoPrompt(tag.name.replace(/_/g, " ")));
-      container.appendChild(pill);
-    }
-    section.appendChild(container);
+    const caption = document.createElement("div");
+    caption.className = "local-analysis-description";
+    caption.textContent = florence.caption;
+    section.appendChild(caption);
+
+    const captionActions = document.createElement("div");
+    captionActions.className = "local-analysis-desc-actions";
+
+    const useCaptionBtn = document.createElement("button");
+    useCaptionBtn.type = "button";
+    useCaptionBtn.className = "btn-action";
+    useCaptionBtn.textContent = "Insert";
+    useCaptionBtn.addEventListener("click", () => insertTagIntoPrompt(florence.caption));
+    captionActions.appendChild(useCaptionBtn);
+    section.appendChild(captionActions);
+
+    // Detailed description
+    const detailLabel = document.createElement("div");
+    detailLabel.className = "local-analysis-section-label";
+    detailLabel.textContent = "Detailed Description";
+    detailLabel.style.marginTop = "8px";
+    section.appendChild(detailLabel);
+
+    const detail = document.createElement("div");
+    detail.className = "local-analysis-description";
+    detail.textContent = florence.detail;
+    section.appendChild(detail);
+
+    const detailActions = document.createElement("div");
+    detailActions.className = "local-analysis-desc-actions";
+
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "btn-action";
+    copyBtn.textContent = "Copy";
+    copyBtn.addEventListener("click", () => {
+      navigator.clipboard.writeText(florence.detail);
+      copyBtn.textContent = "Copied!";
+      setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
+    });
+    detailActions.appendChild(copyBtn);
+
+    const useDetailBtn = document.createElement("button");
+    useDetailBtn.type = "button";
+    useDetailBtn.className = "btn-action";
+    useDetailBtn.textContent = "Use as Prompt";
+    useDetailBtn.addEventListener("click", () => {
+      const el = $("#prompt");
+      if (el) { el.value = florence.detail; el.dispatchEvent(new Event("input", { bubbles: true })); }
+    });
+    detailActions.appendChild(useDetailBtn);
+    section.appendChild(detailActions);
+
     analysisResults.appendChild(section);
     reanalyzeWdBtn.style.display = "";
   }
@@ -7398,7 +7440,7 @@ function setupExplorePanel() {
   async function runAnalysis(method) {
     if (!currentAnalysisPath) return;
     analysisStatus.style.display = "block";
-    analysisStatus.textContent = method === "wd" ? "Running WD Tagger..." : "Analyzing with Grok Vision...";
+    analysisStatus.textContent = method === "florence" ? "Running Florence-2..." : "Analyzing with Grok Vision...";
 
     try {
       const resp = await fetch("/api/explore/local/analyze", {
@@ -7413,7 +7455,7 @@ function setupExplorePanel() {
       const data = await resp.json();
       analysisStatus.style.display = "none";
 
-      if (data.wd) renderWdTags(data.wd);
+      if (data.florence) renderFlorenceResults(data.florence);
       if (data.grok) renderGrokAnalysis(data.grok);
 
       // Add dot indicator to the current image card (without refreshing the whole grid)
@@ -7434,9 +7476,9 @@ function setupExplorePanel() {
   }
 
   // Wire up buttons
-  if (analyzeWdBtn) analyzeWdBtn.addEventListener("click", () => runAnalysis("wd"));
+  if (analyzeWdBtn) analyzeWdBtn.addEventListener("click", () => runAnalysis("florence"));
   if (analyzeGrokBtn) analyzeGrokBtn.addEventListener("click", () => runAnalysis("grok"));
-  if (reanalyzeWdBtn) reanalyzeWdBtn.addEventListener("click", () => runAnalysis("wd"));
+  if (reanalyzeWdBtn) reanalyzeWdBtn.addEventListener("click", () => runAnalysis("florence"));
   if (reanalyzeGrokBtn) reanalyzeGrokBtn.addEventListener("click", () => runAnalysis("grok"));
 
   // Send to Canvas button
