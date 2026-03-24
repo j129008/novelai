@@ -1454,3 +1454,60 @@ async def get_local_tags_batch(path: str = Query(default="")):
                 except (json.JSONDecodeError, OSError):
                     pass
     return LocalTagsBatchResponse(analyzed=analyzed)
+
+
+@router.post("/explore/local/analyze", response_model=LocalAnalyzeResponse)
+async def analyze_local_image(req: LocalAnalyzeRequest):
+    root = _get_local_browse_root()
+    image_file = _resolve_gallery_path(root, req.path)
+    if not image_file.is_file():
+        raise HTTPException(status_code=404, detail="Image not found")
+    if image_file.suffix.lower() not in _IMAGE_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Not a recognized image file")
+
+    cache_path = _get_tags_cache_path(root, req.path)
+
+    if req.method == "wd":
+        from api.tagger import ensure_model_loaded, get_model_status, run_inference
+
+        status = ensure_model_loaded()
+        if status in ("not_started", "downloading"):
+            _, progress = get_model_status()
+            raise HTTPException(status_code=202, detail=f"Model downloading: {progress}%")
+        if status == "failed":
+            raise HTTPException(status_code=503, detail="Tagger model failed to load")
+
+        # Read file, base64-encode, run inference
+        image_bytes = image_file.read_bytes()
+        image_b64 = base64.b64encode(image_bytes).decode()
+        raw_tags = run_inference(image_b64)
+
+        wd_data = [{"name": t["name"], "score": t["score"], "category": t["category"]} for t in raw_tags]
+        _write_tags_cache(cache_path, "wd", wd_data)
+        return LocalAnalyzeResponse(wd=[WdTag(**t) for t in wd_data])
+
+    elif req.method == "grok":
+        if not XAI_API_KEY:
+            raise HTTPException(status_code=503, detail="XAI_API_KEY not configured")
+
+        from api.grok import analyze_image_vision
+        from PIL import Image as PILImage
+
+        # Resize to max 1024px to save API tokens
+        img = PILImage.open(image_file)
+        if max(img.size) > 1024:
+            img.thumbnail((1024, 1024))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        image_b64 = base64.b64encode(buf.getvalue()).decode()
+
+        try:
+            result = await analyze_image_vision(XAI_API_KEY, image_b64)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+
+        grok_data = {"tags": result["tags"], "description": result["description"]}
+        _write_tags_cache(cache_path, "grok", grok_data)
+        return LocalAnalyzeResponse(grok=GrokAnalysis(**grok_data))
+
+    raise HTTPException(status_code=400, detail="Invalid method")
