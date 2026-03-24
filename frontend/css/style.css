@@ -414,6 +414,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 
 /* Gallery breadcrumb */
 #gallery-breadcrumb { display: none; align-items: center; gap: 4px; padding: 8px 0; font-size: 0.78rem; color: var(--text-tertiary); flex-wrap: wrap; flex-shrink: 0; }
+#gallery-breadcrumb:empty { display: none !important; }
 .gallery-breadcrumb-item { cursor: pointer; color: var(--text-secondary); transition: color 0.12s; background: none; border: none; font-family: inherit; font-size: inherit; padding: 0; }
 .gallery-breadcrumb-item:hover { color: var(--accent); }
 .gallery-breadcrumb-sep { color: var(--text-tertiary); user-select: none; }
