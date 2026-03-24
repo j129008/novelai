@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=114">
+  <link rel="stylesheet" href="css/style.css?v=115">
 </head>
 <body>
   <div class="app">
@@ -1075,12 +1075,12 @@
 
         <div id="panel-explore" class="tab-panel explore-panel" style="display:none">
           <div class="explore-sub-tabs">
-            <button class="explore-sub-tab active" data-explore-mode="url">URL</button>
-            <button class="explore-sub-tab" data-explore-mode="local">Local</button>
+            <button class="explore-sub-tab" data-explore-mode="url">URL</button>
+            <button class="explore-sub-tab active" data-explore-mode="local">Local</button>
           </div>
 
           <!-- URL mode (existing) -->
-          <div id="explore-mode-url" class="explore-mode">
+          <div id="explore-mode-url" class="explore-mode" style="display:none">
             <div class="explore-url-bar">
               <input type="text" id="explore-url" class="explore-url-input" placeholder="Enter a URL to browse images from any page…" spellcheck="false">
               <button id="explore-go" class="btn-action btn-action--primary" type="button">Go</button>
@@ -1095,7 +1095,7 @@
           </div>
 
           <!-- Local mode (new) -->
-          <div id="explore-mode-local" class="explore-mode" style="display:none">
+          <div id="explore-mode-local" class="explore-mode">
             <div class="explore-url-bar">
               <input type="text" id="local-browse-path" class="explore-url-input" placeholder="Enter folder path or click Browse…" spellcheck="false">
               <button id="local-browse-btn" class="btn-action btn-action--primary" type="button">Browse</button>
@@ -1126,16 +1126,16 @@
     </div>
   </div>
 
-  <script src="js/state.js?v=114"></script>
-  <script src="js/provider.js?v=114"></script>
-  <script src="js/crop.js?v=114"></script>
-  <script src="js/tags.js?v=114"></script>
-  <script src="js/layers.js?v=114"></script>
-  <script src="js/generate.js?v=114"></script>
-  <script src="js/craft.js?v=114"></script>
-  <script src="js/gallery.js?v=114"></script>
-  <script src="js/explore.js?v=114"></script>
-  <script src="js/characters.js?v=114"></script>
-  <script src="js/app.js?v=114"></script>
+  <script src="js/state.js?v=115"></script>
+  <script src="js/provider.js?v=115"></script>
+  <script src="js/crop.js?v=115"></script>
+  <script src="js/tags.js?v=115"></script>
+  <script src="js/layers.js?v=115"></script>
+  <script src="js/generate.js?v=115"></script>
+  <script src="js/craft.js?v=115"></script>
+  <script src="js/gallery.js?v=115"></script>
+  <script src="js/explore.js?v=115"></script>
+  <script src="js/characters.js?v=115"></script>
+  <script src="js/app.js?v=115"></script>
 </body>
 </html>
