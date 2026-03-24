@@ -109,6 +109,33 @@ def _get_local_browse_root() -> Path:
     return p
 
 
+def _get_tags_cache_path(root: Path, image_path: str) -> Path:
+    """Get the .tags/ cache file path for an image. Validates path security."""
+    image_file = _resolve_gallery_path(root, image_path)
+    if not image_file.is_file():
+        raise HTTPException(status_code=404, detail="Image not found")
+    tags_dir = image_file.parent / ".tags"
+    return tags_dir / (image_file.name + ".json")
+
+
+def _read_tags_cache(cache_path: Path) -> dict:
+    """Read existing cache file, return empty dict if not found."""
+    if cache_path.exists():
+        try:
+            return json.loads(cache_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {}
+
+
+def _write_tags_cache(cache_path: Path, method: str, data: dict | list):
+    """Read-modify-write: merge new method data into existing cache."""
+    existing = _read_tags_cache(cache_path)
+    existing[method] = data
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def _load_characters() -> list[CharacterUsage]:
     if _characters_file.exists():
         try:
@@ -1396,3 +1423,34 @@ def serve_local_image(path: str = Query(min_length=1), thumbnail: bool = False):
         ".gif": "image/gif", ".webp": "image/webp", ".bmp": "image/bmp", ".tiff": "image/tiff",
     }
     return FileResponse(filepath, media_type=media_map.get(ext, "application/octet-stream"))
+
+
+@router.get("/explore/local/tags", response_model=LocalTagsCacheResponse)
+async def get_local_tags(path: str = Query(min_length=1)):
+    root = _get_local_browse_root()
+    cache_path = _get_tags_cache_path(root, path)
+    data = _read_tags_cache(cache_path)
+    return LocalTagsCacheResponse(**data)
+
+
+@router.get("/explore/local/tags/batch", response_model=LocalTagsBatchResponse)
+async def get_local_tags_batch(path: str = Query(default="")):
+    root = _get_local_browse_root()
+    current = _resolve_gallery_path(root, path)
+    if not current.is_dir():
+        raise HTTPException(status_code=404, detail="Directory not found")
+
+    tags_dir = current / ".tags"
+    analyzed: dict[str, list[str]] = {}
+    if tags_dir.is_dir():
+        for f in tags_dir.iterdir():
+            if f.suffix == ".json" and not f.name.startswith("."):
+                original_name = f.name[:-5]  # remove ".json" -> "page01.jpg"
+                try:
+                    data = json.loads(f.read_text(encoding="utf-8"))
+                    methods = [k for k in ("wd", "grok") if k in data]
+                    if methods:
+                        analyzed[original_name] = methods
+                except (json.JSONDecodeError, OSError):
+                    pass
+    return LocalTagsBatchResponse(analyzed=analyzed)
