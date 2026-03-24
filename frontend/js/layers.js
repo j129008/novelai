@@ -1,0 +1,2204 @@
+/* ═══════════════════════════════════════════════════════════
+   LAYERS — client-side image compositing
+   ═══════════════════════════════════════════════════════════ */
+
+function saveLayersToStorage() {
+  try {
+    const data = layers.map((l) => ({
+      id: l.id,
+      name: l.name,
+      imageBase64: l.imageBase64,
+      maskBase64: l.maskBase64 || null,
+      inpaintMaskBase64: l.inpaintMaskBase64 || null,
+      opacity: l.opacity,
+      visible: l.visible,
+      isOutputTarget: l.isOutputTarget || false,
+      offsetX: l.offsetX || 0,
+      offsetY: l.offsetY || 0,
+      scale: l.scale !== undefined ? l.scale : 1.0,
+    }));
+    localStorage.setItem("nai-layers", JSON.stringify(data));
+  } catch (e) {
+    console.warn("[layers] localStorage quota exceeded — skipping persistence:", e.message);
+  }
+}
+
+function loadLayersFromStorage() {
+  try {
+    const raw = localStorage.getItem("nai-layers");
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data)) return;
+    layers.length = 0;
+    data.forEach((l) => {
+      layers.push({
+        id: typeof l.id === "number" ? l.id : Date.now() + Math.random(),
+        name: l.name || "Layer",
+        imageBase64: l.imageBase64 || null,
+        maskBase64: l.maskBase64 || null,
+        inpaintMaskBase64: l.inpaintMaskBase64 || null,
+        opacity: typeof l.opacity === "number" ? l.opacity : 1.0,
+        visible: l.visible !== false,
+        isOutputTarget: l.isOutputTarget || false,
+        offsetX: l.offsetX || 0,
+        offsetY: l.offsetY || 0,
+        scale: typeof l.scale === "number" ? l.scale : 1.0,
+      });
+    });
+  } catch (_) { /* corrupt storage — ignore */ }
+}
+
+// Debounce timer for refreshCompositePreview opacity slider calls
+let _previewDebounceTimer = null;
+
+async function refreshCompositePreview() {
+  const layersEnabled = document.getElementById("layers-enabled");
+  const hasVisibleLayer = (layersEnabled && layersEnabled.checked) && layers.some((l) => l.visible && l.imageBase64);
+  const output = $("#output");
+
+  if (!hasVisibleLayer) {
+    // If layers exist but none have images, show blank canvas (not old generated image)
+    if (layers.length > 0 && layersEnabled && layersEnabled.checked) {
+      state.canvasImageBase64 = null;
+      if (output) {
+        output.innerHTML = "";
+        const placeholder = document.createElement("div");
+        placeholder.className = "placeholder";
+        placeholder.innerHTML = '<p class="placeholder-sub">Add images to layers to preview</p>';
+        output.appendChild(placeholder);
+      }
+      _clearInpaintMaskOverlay();
+      return;
+    }
+    // No layers at all — fall back to last generated image
+    if (state.lastGeneratedImageBase64) {
+      state.canvasImageBase64 = state.lastGeneratedImageBase64;
+      const existingImg = output ? output.querySelector("img") : null;
+      if (output && (!existingImg || existingImg.src !== `data:image/png;base64,${state.lastGeneratedImageBase64}`)) {
+        const img = document.createElement("img");
+        img.src = `data:image/png;base64,${state.lastGeneratedImageBase64}`;
+        img.alt = "Generated image";
+        output.innerHTML = "";
+        output.appendChild(img);
+        renderCharacterMarkers();
+      }
+    }
+    _clearInpaintMaskOverlay();
+    return;
+  }
+
+  // Read resolution from the dropdown
+  const resSel = document.getElementById("resolution");
+  let targetW = 832, targetH = 1216; // default
+  if (resSel && resSel.value) {
+    const parts = resSel.value.split("x");
+    if (parts.length === 2) {
+      const pw = parseInt(parts[0], 10);
+      const ph = parseInt(parts[1], 10);
+      if (!isNaN(pw) && !isNaN(ph) && pw > 0 && ph > 0) {
+        targetW = pw;
+        targetH = ph;
+      }
+    }
+  }
+
+  const compositeBase64 = await compositeLayersToBase64(targetW, targetH);
+  if (!compositeBase64) {
+    _clearInpaintMaskOverlay();
+    return;
+  }
+
+  state.canvasImageBase64 = compositeBase64;
+
+  if (output) {
+    const img = document.createElement("img");
+    img.src = `data:image/png;base64,${compositeBase64}`;
+    img.alt = "Layer composite preview";
+    output.innerHTML = "";
+    output.appendChild(img);
+    renderCharacterMarkers();
+
+    const actions = $("#image-actions");
+    if (actions) {
+      actions.style.display = "flex";
+      syncInpaintButtonVisibility();
+    }
+  }
+
+  // Draw inpaint mask overlay if any visible layer has one
+  const inpaintLayer = layers.find((l) => l.visible && l.inpaintMaskBase64);
+  if (inpaintLayer) {
+    _drawInpaintMaskOverlay(inpaintLayer.inpaintMaskBase64);
+  } else {
+    _clearInpaintMaskOverlay();
+  }
+}
+
+function _clearInpaintMaskOverlay() {
+  const canvas = document.getElementById("inpaint-mask-overlay");
+  const badge = document.getElementById("inpaint-active-badge");
+  if (canvas) {
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  if (badge) badge.style.display = "none";
+}
+
+async function _drawInpaintMaskOverlay(maskBase64) {
+  const canvas = document.getElementById("inpaint-mask-overlay");
+  const badge = document.getElementById("inpaint-active-badge");
+  if (!canvas) return;
+
+  const img = new Image();
+  await new Promise((resolve) => { img.onload = resolve; img.src = "data:image/png;base64," + maskBase64; });
+
+  // Use the canvas's layout dimensions (CSS width/height: 100%)
+  const w = canvas.offsetWidth  || img.naturalWidth;
+  const h = canvas.offsetHeight || img.naturalHeight;
+
+  // Guard against clearing content (learnings 2026-03-20)
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width  = w;
+    canvas.height = h;
+  }
+
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, w, h);
+
+  // Draw mask to an offscreen canvas to read pixel data
+  const offscreen = document.createElement("canvas");
+  offscreen.width  = w;
+  offscreen.height = h;
+  const octx = offscreen.getContext("2d");
+  octx.drawImage(img, 0, 0, w, h);
+  const imageData = octx.getImageData(0, 0, w, h);
+  const { data } = imageData;
+
+  // Build red overlay: where mask pixel > 128, paint rgba(240,80,80,0.35)
+  const overlayData = ctx.createImageData(w, h);
+  const od = overlayData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const luminance = data[i]; // mask is grayscale, R channel sufficient
+    if (luminance > 128) {
+      od[i]     = 240; // R
+      od[i + 1] = 80;  // G
+      od[i + 2] = 80;  // B
+      od[i + 3] = 89;  // A (~0.35 * 255)
+    }
+  }
+  ctx.putImageData(overlayData, 0, 0);
+
+  if (badge) badge.style.display = "";
+}
+
+async function compositeLayersToBase64(targetW, targetH) {
+  const visible = layers.filter((l) => l.visible && l.imageBase64);
+  if (visible.length === 0) return null;
+
+  // Pre-decode all images (and masks) to ensure naturalWidth/Height are available
+  const decoded = await Promise.all(visible.map((layer) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const ox = layer.offsetX || 0;
+      const oy = layer.offsetY || 0;
+      const scale = layer.scale !== undefined ? layer.scale : 1.0;
+      if (layer.maskBase64) {
+        const maskImg = new Image();
+        maskImg.onload = () => resolve({ img, maskImg, opacity: layer.opacity, ox, oy, scale });
+        maskImg.src = "data:image/png;base64," + layer.maskBase64;
+      } else {
+        resolve({ img, maskImg: null, opacity: layer.opacity, ox, oy, scale });
+      }
+    };
+    img.src = "data:image/png;base64," + layer.imageBase64;
+  })));
+
+  const offscreen = document.createElement("canvas");
+  offscreen.width  = targetW;
+  offscreen.height = targetH;
+  const ctx = offscreen.getContext("2d");
+
+  // Draw bottom-to-top: last in array = bottom layer, drawn first
+  for (const { img, maskImg, opacity, ox, oy, scale } of [...decoded].reverse()) {
+    // Offset in pixels (stored as fraction of target dimensions)
+    const pixOX = Math.round(ox * targetW);
+    const pixOY = Math.round(oy * targetH);
+
+    // object-fit: cover scaling
+    const imgAR   = img.naturalWidth / img.naturalHeight;
+    const canvasAR = targetW / targetH;
+    let sx, sy, sw, sh;
+    if (imgAR > canvasAR) {
+      sh = img.naturalHeight;
+      sw = sh * canvasAR;
+      sx = (img.naturalWidth - sw) / 2;
+      sy = 0;
+    } else {
+      sw = img.naturalWidth;
+      sh = sw / canvasAR;
+      sx = 0;
+      sy = (img.naturalHeight - sh) / 2;
+    }
+
+    // Destination rect: scale around center, then apply offset
+    const s  = scale !== undefined ? scale : 1.0;
+    const dw = targetW * s;
+    const dh = targetH * s;
+    const dx = (targetW - dw) / 2 + pixOX;
+    const dy = (targetH - dh) / 2 + pixOY;
+
+    if (maskImg) {
+      const maskCanvas = document.createElement("canvas");
+      maskCanvas.width  = targetW;
+      maskCanvas.height = targetH;
+      const maskCtx = maskCanvas.getContext("2d");
+      maskCtx.drawImage(maskImg, 0, 0, targetW, targetH);
+      const maskData = maskCtx.getImageData(0, 0, targetW, targetH);
+      const md = maskData.data;
+      for (let i = 0; i < md.length; i += 4) {
+        md[i + 3] = md[i];
+      }
+      maskCtx.putImageData(maskData, 0, 0);
+
+      const tmp = document.createElement("canvas");
+      tmp.width  = targetW;
+      tmp.height = targetH;
+      const tmpCtx = tmp.getContext("2d");
+      tmpCtx.drawImage(img, sx, sy, sw, sh, 0, 0, targetW, targetH);
+      tmpCtx.globalCompositeOperation = "destination-in";
+      tmpCtx.drawImage(maskCanvas, 0, 0);
+      tmpCtx.globalCompositeOperation = "source-over";
+
+      ctx.globalAlpha = opacity;
+      ctx.drawImage(tmp, 0, 0, targetW, targetH, dx, dy, dw, dh);
+      ctx.globalAlpha = 1.0;
+    } else {
+      ctx.globalAlpha = opacity;
+      ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+      ctx.globalAlpha = 1.0;
+    }
+  }
+
+  return offscreen.toDataURL("image/png").split(",")[1];
+}
+
+function updateLayersBadge() {
+  const badge = document.getElementById("layers-badge");
+  if (!badge) return;
+  const count = layers.filter((l) => l.imageBase64).length;
+  badge.textContent = String(count);
+  badge.style.display = count > 0 ? "" : "none";
+}
+
+function renderLayerList() {
+  const list = document.getElementById("layers-list");
+  if (!list) return;
+  list.innerHTML = "";
+
+  if (layers.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "layers-empty";
+    empty.textContent = "No layers yet. Add a layer to start compositing.";
+    list.appendChild(empty);
+    updateLayersBadge();
+    updateCanvasPanel();
+    return;
+  }
+
+  // Clamp active index to valid range
+  if (_activeLayerIdx >= layers.length) _activeLayerIdx = layers.length - 1;
+  if (_activeLayerIdx < 0) _activeLayerIdx = 0;
+
+  // Display order matches array order: index 0 = top of list = top layer
+  layers.forEach((layer, idx) => {
+    const row = buildLayerRow(layer, idx);
+    list.appendChild(row);
+  });
+
+  const layersHint = document.getElementById("layers-hint");
+  if (layersHint) {
+    const hasImages = layers.some((l) => !!l.imageBase64);
+    layersHint.style.display = hasImages ? "" : "none";
+  }
+
+  updateLayersBadge();
+  updateCanvasPanel();
+}
+
+// Module-level drag state for layer reordering
+const _layerDrag = { active: false, fromId: null };
+
+function buildLayerRow(layer, realIdx) {
+  const row = document.createElement("div");
+  row.className = "layer-row" +
+    (layer.isOutputTarget ? " layer-row--output-target" : "") +
+    (realIdx === _activeLayerIdx ? " layer-row--selected" : "");
+  row.dataset.layerId = String(layer.id);
+  row.draggable = true;
+
+  // ── Drag grip ─────────────────────────────────────────────
+  const grip = document.createElement("div");
+  grip.className = "layer-drag-grip";
+  grip.innerHTML = '<svg width="8" height="12" viewBox="0 0 8 12" fill="none" aria-hidden="true"><circle cx="2" cy="2" r="1" fill="currentColor"/><circle cx="6" cy="2" r="1" fill="currentColor"/><circle cx="2" cy="6" r="1" fill="currentColor"/><circle cx="6" cy="6" r="1" fill="currentColor"/><circle cx="2" cy="10" r="1" fill="currentColor"/><circle cx="6" cy="10" r="1" fill="currentColor"/></svg>';
+
+  // ── Thumbnail (compact, 28×28) ─────────────────────────────
+  const thumbWrap = document.createElement("div");
+  thumbWrap.className = "layer-thumb-wrap";
+  thumbWrap.title = "Click to select layer";
+
+  if (layer.imageBase64) {
+    const img = document.createElement("img");
+    img.className = "layer-thumb";
+    img.src = "data:image/png;base64," + layer.imageBase64;
+    img.alt = layer.name;
+    thumbWrap.appendChild(img);
+  } else {
+    const placeholder = document.createElement("div");
+    placeholder.className = "layer-thumb layer-thumb-empty";
+    placeholder.setAttribute("aria-label", "No image");
+    const plusSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    plusSvg.setAttribute("width", "12");
+    plusSvg.setAttribute("height", "12");
+    plusSvg.setAttribute("viewBox", "0 0 24 24");
+    plusSvg.setAttribute("fill", "none");
+    plusSvg.setAttribute("stroke", "currentColor");
+    plusSvg.setAttribute("stroke-width", "2");
+    plusSvg.setAttribute("stroke-linecap", "round");
+    plusSvg.setAttribute("stroke-linejoin", "round");
+    plusSvg.innerHTML = '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>';
+    placeholder.appendChild(plusSvg);
+    thumbWrap.appendChild(placeholder);
+  }
+
+  // ── Name label ─────────────────────────────────────────────
+  const nameSpan = document.createElement("span");
+  nameSpan.className = "layer-name";
+  nameSpan.contentEditable = "true";
+  nameSpan.spellcheck = false;
+  nameSpan.textContent = layer.name;
+  nameSpan.title = "Click to rename";
+  nameSpan.addEventListener("dragstart", (e) => e.stopPropagation());
+  nameSpan.addEventListener("blur", () => {
+    const trimmed = nameSpan.textContent.trim();
+    layer.name = trimmed || layer.name;
+    if (!trimmed) nameSpan.textContent = layer.name;
+    saveLayersToStorage();
+    // Sync name to CLP if this is the active layer
+    const clpName = document.getElementById("clp-name");
+    if (clpName && _activeLayerIdx === realIdx) clpName.value = layer.name;
+  });
+  nameSpan.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); nameSpan.blur(); }
+  });
+
+  // ── Row click: select this layer ──────────────────────────
+  row.addEventListener("click", (e) => {
+    // Don't steal clicks intended for contentEditable
+    if (e.target === nameSpan) return;
+    _activeLayerIdx = realIdx;
+    // Update selected class on all rows in-place
+    document.querySelectorAll(".layer-row").forEach((rowEl, i) => {
+      rowEl.classList.toggle("layer-row--selected", i === _activeLayerIdx);
+    });
+    updateCanvasPanel();
+  });
+
+  row.appendChild(grip);
+  row.appendChild(thumbWrap);
+  row.appendChild(nameSpan);
+
+  // ── HTML5 Drag-and-drop reorder ───────────────────────────
+  row.addEventListener("dragstart", (e) => {
+    _layerDrag.active = true;
+    _layerDrag.fromId = layer.id;
+    e.dataTransfer.effectAllowed = "move";
+    row.classList.add("layer-row--dragging");
+  });
+
+  row.addEventListener("dragend", () => {
+    _layerDrag.active = false;
+    _layerDrag.fromId = null;
+    // Clean up any lingering drag-over classes without full re-render
+    document.querySelectorAll(".layer-row--drag-over").forEach((el) => {
+      el.classList.remove("layer-row--drag-over");
+    });
+    row.classList.remove("layer-row--dragging");
+  });
+
+  row.addEventListener("dragover", (e) => {
+    if (!_layerDrag.active || _layerDrag.fromId === layer.id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+    document.querySelectorAll(".layer-row--drag-over").forEach((el) => {
+      if (el !== row) el.classList.remove("layer-row--drag-over");
+    });
+    row.classList.add("layer-row--drag-over");
+  });
+
+  row.addEventListener("dragleave", () => {
+    row.classList.remove("layer-row--drag-over");
+  });
+
+  row.addEventListener("drop", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!_layerDrag.active || _layerDrag.fromId === layer.id) return;
+    const fromIdx = layers.findIndex((l) => l.id === _layerDrag.fromId);
+    const toIdx   = layers.indexOf(layer);
+    console.log("[layer drop]", fromIdx, "->", toIdx, "ids:", _layerDrag.fromId, layer.id);
+    if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+    pushLayerUndo("Reorder layers");
+    const [moved] = layers.splice(fromIdx, 1);
+    layers.splice(toIdx, 0, moved);
+    _layerDrag.active = false;
+    _layerDrag.fromId = null;
+    renderLayerList();
+    saveLayersToStorage();
+    refreshCompositePreview();
+  });
+
+  return row;
+}
+
+function setupLayers() {
+  loadLayersFromStorage();
+  renderLayerList();
+
+  const addBtn      = document.getElementById("btn-add-layer");
+  const sendToLayer = document.getElementById("btn-send-to-layer");
+
+  if (addBtn) {
+    addBtn.addEventListener("click", (e) => {
+      // Prevent the button inside <summary> from toggling the accordion
+      e.stopPropagation();
+      if (layers.length >= MAX_LAYERS) {
+        showStatus("Maximum of " + MAX_LAYERS + " layers reached.");
+        return;
+      }
+      pushLayerUndo("Add layer");
+      const n = layers.length + 1;
+      // Auto-select the new layer
+      _activeLayerIdx = layers.length;
+      layers.push({ id: Date.now(), name: "Layer " + n, imageBase64: null, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0, scale: 1.0 });
+      renderLayerList();
+      saveLayersToStorage();
+    });
+  }
+
+  // Drag-and-drop image files onto the layers panel to create new layers
+  const layersList = document.getElementById("layers-list");
+  const accordion = document.getElementById("layers-accordion");
+  const dropTargets = [layersList, accordion].filter(Boolean);
+  dropTargets.forEach((el) => {
+    el.addEventListener("dragover", (e) => {
+      if (_layerDrag.active) return; // layer reorder, not file drop
+      if (!e.dataTransfer.types.includes("Files")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = "copy";
+    });
+    el.addEventListener("drop", (e) => {
+      if (_layerDrag.active) return;
+      if (!e.dataTransfer.files.length) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const file = e.dataTransfer.files[0];
+      if (!file.type.startsWith("image/")) return;
+      if (layers.length >= MAX_LAYERS) { showStatus("Maximum of " + MAX_LAYERS + " layers reached."); return; }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const b64 = ev.target.result.split(",")[1];
+        pushLayerUndo("Add layer from file");
+        const n = layers.length + 1;
+        layers.push({ id: Date.now(), name: file.name.replace(/\.[^.]+$/, "") || "Layer " + n, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0, scale: 1.0 });
+        renderLayerList();
+        saveLayersToStorage();
+        refreshCompositePreview();
+        if (accordion && !accordion.open) accordion.open = true;
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+
+  if (sendToLayer) {
+    sendToLayer.addEventListener("click", () => {
+      if (!state.lastGeneratedImageBase64) return;
+      if (layers.length >= MAX_LAYERS) return;
+      pushLayerUndo("Send to layer");
+      const outputLayers = layers.filter((l) => l.name.startsWith("Output"));
+      const n = outputLayers.length;
+      const name = n === 0 ? "Output" : "Output " + (n + 1);
+      _activeLayerIdx = layers.length;
+      layers.push({
+        id: Date.now(),
+        name,
+        imageBase64: state.lastGeneratedImageBase64,
+        maskBase64: null,
+        inpaintMaskBase64: null,
+        opacity: 1.0,
+        visible: true,
+        isOutputTarget: false,
+        offsetX: 0, offsetY: 0, scale: 1.0,
+      });
+      renderLayerList();
+      saveLayersToStorage();
+
+      // Open layers accordion if it's closed
+      const accordion = document.getElementById("layers-accordion");
+      if (accordion && !accordion.open) accordion.open = true;
+
+      showStatus("Canvas image sent to layer \"" + name + "\"");
+    });
+  }
+
+  // Toggle layers on/off — update preview immediately
+  const layersToggle = document.getElementById("layers-enabled");
+  if (layersToggle) {
+    layersToggle.addEventListener("change", () => refreshCompositePreview());
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CANVAS LAYER PANEL — floating panel for active layer controls
+   ═══════════════════════════════════════════════════════════ */
+
+function updateCanvasPanel() {
+  const panel     = document.getElementById("canvas-layer-panel");
+  const toggle    = document.getElementById("canvas-view-toggle");
+  const providerEl = document.getElementById("provider");
+  const provider  = providerEl ? providerEl.value : "novelai";
+
+  // Layer panel is only for NovelAI mode with at least one layer
+  if (!panel) return;
+  if (provider !== "novelai" || layers.length === 0) {
+    panel.style.display = "none";
+  }
+
+  // Input/Output toggle: show for NovelAI (with layers) OR Grok (with source image)
+  const showToggle = (provider === "novelai" && layers.length > 0) ||
+                     (provider === "grok" && !!state.img2img);
+  if (toggle) toggle.style.display = showToggle ? "" : "none";
+
+  if (provider !== "novelai" || layers.length === 0) {
+    return;
+  }
+
+  // Clamp index
+  if (_activeLayerIdx >= layers.length) _activeLayerIdx = layers.length - 1;
+  if (_activeLayerIdx < 0) _activeLayerIdx = 0;
+
+  const layer = layers[_activeLayerIdx];
+
+  // Show panel
+  panel.style.display = "";
+  if (toggle) toggle.style.display = "";
+
+  // Update layer info
+  const info = document.getElementById("clp-layer-info");
+  if (info) info.textContent = "Layer " + (_activeLayerIdx + 1) + " of " + layers.length;
+
+  // Prev/Next button state
+  const prevBtn = document.getElementById("clp-prev");
+  const nextBtn = document.getElementById("clp-next");
+  if (prevBtn) prevBtn.disabled = (_activeLayerIdx === 0);
+  if (nextBtn) nextBtn.disabled = (_activeLayerIdx === layers.length - 1);
+
+  // Thumbnail
+  const thumbEl = document.getElementById("clp-thumb");
+  if (thumbEl) {
+    thumbEl.innerHTML = "";
+    if (layer.imageBase64) {
+      const img = document.createElement("img");
+      img.src = "data:image/png;base64," + layer.imageBase64;
+      img.alt = layer.name;
+      thumbEl.appendChild(img);
+    }
+  }
+
+  // Name
+  const nameInput = document.getElementById("clp-name");
+  if (nameInput) nameInput.value = layer.name;
+
+  // Eye button
+  const eyeBtn = document.getElementById("clp-eye");
+  if (eyeBtn) {
+    eyeBtn.classList.toggle("clp-icon-btn--active", layer.visible);
+    eyeBtn.title = layer.visible ? "Hide layer" : "Show layer";
+    eyeBtn.innerHTML = layer.visible
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+  }
+
+  // Target button
+  const targetBtn = document.getElementById("clp-target");
+  if (targetBtn) {
+    targetBtn.classList.toggle("clp-icon-btn--active", !!layer.isOutputTarget);
+    targetBtn.title = layer.isOutputTarget ? "Output target (active)" : "Set as output target";
+  }
+
+  // Opacity
+  const opacitySlider = document.getElementById("clp-opacity");
+  const opacityVal    = document.getElementById("clp-opacity-val");
+  if (opacitySlider) opacitySlider.value = String(layer.opacity);
+  if (opacityVal)    opacityVal.textContent = Math.round(layer.opacity * 100) + "%";
+
+  // Scale
+  const scaleSlider = document.getElementById("clp-scale");
+  const scaleVal    = document.getElementById("clp-scale-val");
+  const currentScale = layer.scale !== undefined ? layer.scale : 1.0;
+  if (scaleSlider) scaleSlider.value = String(currentScale);
+  if (scaleVal)    scaleVal.textContent = Math.round(currentScale * 100) + "%";
+
+  // AI Redraw visibility
+  const redrawBtn = document.getElementById("clp-redraw");
+  if (redrawBtn) redrawBtn.style.display = layer.imageBase64 ? "" : "none";
+
+  // Move button active state
+  const moveBtn = document.getElementById("clp-move");
+  if (moveBtn) moveBtn.classList.toggle("clp-action-btn--active", _movingLayer === layer);
+
+  // Highlight corresponding sidebar row
+  document.querySelectorAll(".layer-row").forEach((rowEl, i) => {
+    rowEl.classList.toggle("layer-row--selected", i === _activeLayerIdx);
+  });
+}
+
+function setupCanvasLayerPanel() {
+  // ── Collapse toggle ───────────────────────────────────────
+  const collapseBtn = document.getElementById("clp-collapse");
+  const clpBody     = document.getElementById("clp-body");
+  const savedCollapsed = localStorage.getItem("nai-clp-collapsed") === "true";
+  if (savedCollapsed && clpBody) clpBody.style.display = "none";
+
+  if (collapseBtn && clpBody) {
+    collapseBtn.textContent = savedCollapsed ? "▸" : "▾";
+    collapseBtn.addEventListener("click", () => {
+      const isCollapsed = clpBody.style.display === "none";
+      clpBody.style.display = isCollapsed ? "" : "none";
+      collapseBtn.textContent = isCollapsed ? "▾" : "▸";
+      localStorage.setItem("nai-clp-collapsed", isCollapsed ? "false" : "true");
+    });
+  }
+
+  // ── Prev / Next ───────────────────────────────────────────
+  document.getElementById("clp-prev")?.addEventListener("click", () => {
+    if (_activeLayerIdx > 0) { _activeLayerIdx--; updateCanvasPanel(); }
+  });
+  document.getElementById("clp-next")?.addEventListener("click", () => {
+    if (_activeLayerIdx < layers.length - 1) { _activeLayerIdx++; updateCanvasPanel(); }
+  });
+
+  // ── Name input ────────────────────────────────────────────
+  const nameInput = document.getElementById("clp-name");
+  if (nameInput) {
+    nameInput.addEventListener("change", () => {
+      if (layers.length === 0) return;
+      const layer = layers[_activeLayerIdx];
+      const trimmed = nameInput.value.trim();
+      layer.name = trimmed || layer.name;
+      if (!trimmed) nameInput.value = layer.name;
+      saveLayersToStorage();
+      // Sync name in sidebar row without full re-render
+      const rowEl = document.querySelectorAll(".layer-row")[_activeLayerIdx];
+      if (rowEl) {
+        const nameSpan = rowEl.querySelector(".layer-name");
+        if (nameSpan) nameSpan.textContent = layer.name;
+      }
+    });
+  }
+
+  // ── Eye button ────────────────────────────────────────────
+  document.getElementById("clp-eye")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    const layer = layers[_activeLayerIdx];
+    pushLayerUndo("Toggle visibility");
+    layer.visible = !layer.visible;
+    saveLayersToStorage();
+    updateLayersBadge();
+    refreshCompositePreview();
+    updateCanvasPanel();
+  });
+
+  // ── Target button ─────────────────────────────────────────
+  document.getElementById("clp-target")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    const layer = layers[_activeLayerIdx];
+    pushLayerUndo("Toggle output target");
+    const wasTarget = layer.isOutputTarget;
+    layers.forEach(l => { l.isOutputTarget = false; });
+    layer.isOutputTarget = !wasTarget;
+    // Update sidebar rows in-place
+    document.querySelectorAll(".layer-row").forEach((rowEl) => {
+      const id = Number(rowEl.dataset.layerId);
+      const l = layers.find(x => x.id === id);
+      if (!l) return;
+      rowEl.classList.toggle("layer-row--output-target", !!l.isOutputTarget);
+    });
+    saveLayersToStorage();
+    updateCanvasPanel();
+  });
+
+  // ── Opacity slider ────────────────────────────────────────
+  let _clpOpacityUndoPushed = false;
+  const opacitySlider = document.getElementById("clp-opacity");
+  const opacityVal    = document.getElementById("clp-opacity-val");
+  if (opacitySlider) {
+    opacitySlider.addEventListener("pointerdown", () => { _clpOpacityUndoPushed = false; });
+    opacitySlider.addEventListener("input", () => {
+      if (layers.length === 0) return;
+      if (!_clpOpacityUndoPushed) { pushLayerUndo("Change opacity"); _clpOpacityUndoPushed = true; }
+      const layer = layers[_activeLayerIdx];
+      layer.opacity = parseFloat(opacitySlider.value);
+      if (opacityVal) opacityVal.textContent = Math.round(layer.opacity * 100) + "%";
+      saveLayersToStorage();
+      // Mark input button as changed if on output view
+      _markInputChanged();
+      clearTimeout(_previewDebounceTimer);
+      _previewDebounceTimer = setTimeout(refreshCompositePreview, 50);
+    });
+  }
+
+  // ── Scale slider ──────────────────────────────────────────
+  let _clpScaleUndoPushed = false;
+  const scaleSlider = document.getElementById("clp-scale");
+  const scaleVal    = document.getElementById("clp-scale-val");
+  if (scaleSlider) {
+    scaleSlider.addEventListener("pointerdown", () => { _clpScaleUndoPushed = false; });
+    scaleSlider.addEventListener("input", () => {
+      if (layers.length === 0) return;
+      if (!_clpScaleUndoPushed) { pushLayerUndo("Change scale"); _clpScaleUndoPushed = true; }
+      const layer = layers[_activeLayerIdx];
+      layer.scale = parseFloat(scaleSlider.value);
+      if (scaleVal) scaleVal.textContent = Math.round(layer.scale * 100) + "%";
+      _markInputChanged();
+      clearTimeout(_previewDebounceTimer);
+      _previewDebounceTimer = setTimeout(refreshCompositePreview, 50);
+    });
+    scaleSlider.addEventListener("change", () => {
+      if (layers.length === 0) return;
+      saveLayersToStorage();
+    });
+  }
+  if (scaleVal) {
+    scaleVal.addEventListener("click", () => {
+      if (layers.length === 0) return;
+      const layer = layers[_activeLayerIdx];
+      pushLayerUndo("Reset scale");
+      layer.scale = 1.0;
+      if (scaleSlider) scaleSlider.value = "1";
+      scaleVal.textContent = "100%";
+      saveLayersToStorage();
+      _markInputChanged();
+      clearTimeout(_previewDebounceTimer);
+      _previewDebounceTimer = setTimeout(refreshCompositePreview, 50);
+    });
+  }
+
+  // ── Action buttons ────────────────────────────────────────
+  document.getElementById("clp-move")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    const layer = layers[_activeLayerIdx];
+    if (_movingLayer === layer) {
+      _movingLayer = null;
+      _disableCanvasMove();
+    } else {
+      _movingLayer = layer;
+      _enableCanvasMove(layer);
+    }
+    updateCanvasPanel();
+  });
+
+  document.getElementById("clp-draw")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    const layer = layers[_activeLayerIdx];
+    openLayerDrawEditor(layer, (base64) => {
+      layer.imageBase64 = base64;
+      refreshCompositePreview();
+      saveLayersToStorage();
+      _markInputChanged();
+      updateCanvasPanel();
+    });
+  });
+
+  document.getElementById("clp-mask")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    const layer = layers[_activeLayerIdx];
+    pushLayerUndo("Edit visibility mask");
+    openLayerMaskEditor(layer, () => {
+      saveLayersToStorage();
+      refreshCompositePreview();
+      _markInputChanged();
+    });
+  });
+
+  document.getElementById("clp-inpaint")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    const layer = layers[_activeLayerIdx];
+    pushLayerUndo("Edit inpaint mask");
+    openLayerInpaintEditor(layer, () => {
+      saveLayersToStorage();
+      refreshCompositePreview();
+      _markInputChanged();
+    });
+  });
+
+  document.getElementById("clp-redraw")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    const layer = layers[_activeLayerIdx];
+    if (!layer || !layer.imageBase64) { showStatus("Draw something on this layer first"); return; }
+    if (_openLayerRedraw) {
+      _openLayerRedraw(layer);
+    } else {
+      showStatus("AI Redraw not ready");
+    }
+  });
+
+  document.getElementById("clp-delete")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    pushLayerUndo("Remove layer");
+    layers.splice(_activeLayerIdx, 1);
+    if (_activeLayerIdx >= layers.length && layers.length > 0) _activeLayerIdx = layers.length - 1;
+    renderLayerList();
+    saveLayersToStorage();
+    refreshCompositePreview();
+  });
+
+  // ── Thumb click — load image onto layer ──────────────────
+  document.getElementById("clp-thumb")?.addEventListener("click", () => {
+    if (layers.length === 0) return;
+    const layer = layers[_activeLayerIdx];
+    const fi = document.createElement("input");
+    fi.type = "file";
+    fi.accept = "image/*";
+    fi.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        layer.imageBase64 = ev.target.result.split(",")[1];
+        renderLayerList();
+        saveLayersToStorage();
+        refreshCompositePreview();
+        _markInputChanged();
+      };
+      reader.readAsDataURL(file);
+    });
+    fi.click();
+  });
+}
+
+/* ── Input/Output toggle ──────────────────────────────────── */
+
+function _markInputChanged() {
+  // If we're on the Output view, mark the Input button with a dot
+  if (_canvasView === "output") {
+    const inputBtn = document.getElementById("cvt-input");
+    if (inputBtn) inputBtn.classList.add("cvt-btn--changed");
+  }
+}
+
+function setupCanvasViewToggle() {
+  const inputBtn  = document.getElementById("cvt-input");
+  const outputBtn = document.getElementById("cvt-output");
+  if (!inputBtn || !outputBtn) return;
+
+  function applyView(view) {
+    _canvasView = view;
+    localStorage.setItem("nai-canvas-view", view);
+    inputBtn.classList.toggle("cvt-btn--active", view === "input");
+    outputBtn.classList.toggle("cvt-btn--active", view === "output");
+    if (view === "input") {
+      inputBtn.classList.remove("cvt-btn--changed");
+      // Show source: composite preview (NovelAI) or source image (Grok)
+      const provider = document.getElementById("provider")?.value || "novelai";
+      if (provider === "grok" && state.img2img) {
+        const output = document.getElementById("output");
+        if (output) {
+          const img = document.createElement("img");
+          img.src = "data:image/png;base64," + state.img2img;
+          img.alt = "Source image";
+          output.innerHTML = "";
+          output.appendChild(img);
+        }
+      } else {
+        refreshCompositePreview();
+      }
+    } else {
+      // Show the last generated image
+      if (state.lastGeneratedImageBase64) {
+        const output = document.getElementById("output");
+        if (output) {
+          const img = document.createElement("img");
+          img.src = "data:image/png;base64," + state.lastGeneratedImageBase64;
+          img.alt = "Generated image";
+          output.innerHTML = "";
+          output.appendChild(img);
+          renderCharacterMarkers();
+        }
+      }
+    }
+  }
+
+  inputBtn.addEventListener("click",  () => applyView("input"));
+  outputBtn.addEventListener("click", () => applyView("output"));
+
+  // Restore saved view (default to output)
+  const saved = localStorage.getItem("nai-canvas-view") || "output";
+  inputBtn.classList.toggle("cvt-btn--active", saved === "input");
+  outputBtn.classList.toggle("cvt-btn--active", saved === "output");
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LAYER MASK EDITOR — per-layer white/black mask painting
+   ═══════════════════════════════════════════════════════════ */
+
+// openLayerMaskEditor is called from buildLayerRow's mask button.
+// onApply(layer) is called when the user confirms.
+function openLayerMaskEditor(layer, onApply) {
+  if (!layer.imageBase64) {
+    showStatus("Load an image into this layer first.");
+    return;
+  }
+
+  const overlay    = document.getElementById("layer-mask-overlay");
+  const btnCancel  = document.getElementById("layer-mask-cancel");
+  const btnConfirm = document.getElementById("layer-mask-confirm");
+  const btnClear   = document.getElementById("layer-mask-clear");
+  const btnInvert  = document.getElementById("layer-mask-invert");
+  const btnUndo    = document.getElementById("layer-mask-undo");
+  const btnMode    = document.getElementById("layer-mask-mode-toggle");
+  const brushSlider = document.getElementById("layer-mask-brush-size");
+  const brushVal   = document.getElementById("layer-mask-brush-val");
+  const srcCanvas  = document.getElementById("layer-mask-source");
+  const drawCanvas = document.getElementById("layer-mask-canvas");
+  const cursorEl   = document.getElementById("layer-mask-cursor");
+  const stageWrap  = overlay?.querySelector(".layer-mask-stage-wrap");
+
+  if (!overlay || !srcCanvas || !drawCanvas) return;
+
+  const srcCtx  = srcCanvas.getContext("2d");
+  const drawCtx = drawCanvas.getContext("2d");
+
+  // Offscreen canvas at full image resolution — pure white/black
+  const offscreen = document.createElement("canvas");
+  const offCtx    = offscreen.getContext("2d");
+
+  // AbortController for all listeners registered in this editor session
+  const editorAC = new AbortController();
+  const editorSig = { signal: editorAC.signal };
+
+  // Editor state
+  let brushSize = parseInt(brushSlider.value, 10);
+  let eraseMode = false;  // false = paint white (show), true = paint black (hide)
+  let isDrawing = false;
+  let lastX = 0;
+  let lastY = 0;
+  let scaleX = 1;
+  let scaleY = 1;
+  const undoStack = [];
+  const MAX_UNDO = 20;
+
+  // ── Mode toggle ────────────────────────────────────────────
+  function setMode(mode) {
+    eraseMode = (mode === "erase");
+    btnMode.dataset.mode = mode;
+    const iconPaint = btnMode.querySelector(".layer-mask-icon-paint");
+    const iconErase = btnMode.querySelector(".layer-mask-icon-erase");
+    const label     = btnMode.querySelector(".layer-mask-mode-label");
+    if (iconPaint) iconPaint.style.display = eraseMode ? "none" : "";
+    if (iconErase) iconErase.style.display = eraseMode ? "" : "none";
+    if (label)     label.textContent       = eraseMode ? "Hide" : "Reveal";
+    if (eraseMode) {
+      btnMode.classList.add("layer-mask-mode--hide");
+      btnMode.classList.remove("layer-mask-mode--reveal");
+      cursorEl.style.borderColor = "rgba(220, 50, 50, 0.85)";
+    } else {
+      btnMode.classList.add("layer-mask-mode--reveal");
+      btnMode.classList.remove("layer-mask-mode--hide");
+      cursorEl.style.borderColor = "rgba(255, 255, 255, 0.85)";
+    }
+  }
+
+  btnMode.addEventListener("click", () => setMode(eraseMode ? "paint" : "erase"), editorSig);
+
+  // ── Brush size ─────────────────────────────────────────────
+  function updateBrushSize(val) {
+    brushSize = val;
+    brushVal.textContent = val;
+    cursorEl.style.width  = val + "px";
+    cursorEl.style.height = val + "px";
+  }
+
+  brushSlider.addEventListener("input", () => updateBrushSize(parseInt(brushSlider.value, 10)), editorSig);
+
+  // ── Undo ───────────────────────────────────────────────────
+  function saveUndoSnapshot() {
+    if (drawCanvas.width === 0 || drawCanvas.height === 0) return;
+    const drawSnap = drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height);
+    const offSnap  = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+    if (undoStack.length >= MAX_UNDO) undoStack.shift();
+    undoStack.push({ draw: drawSnap, off: offSnap });
+  }
+
+  function undo() {
+    if (undoStack.length === 0) return;
+    const snap = undoStack.pop();
+    drawCtx.putImageData(snap.draw, 0, 0);
+    offCtx.putImageData(snap.off, 0, 0);
+  }
+
+  btnUndo.addEventListener("click", undo, editorSig);
+
+  // ── Draw helpers ───────────────────────────────────────────
+  function drawAt(dispX, dispY, isFirst) {
+    const r = brushSize / 2;
+
+    // Visible draw canvas — cut out red tint (Reveal) or paint red tint (Hide)
+    drawCtx.save();
+    if (eraseMode) {
+      // Hide mode: paint red tint over the area
+      drawCtx.globalCompositeOperation = "source-over";
+      drawCtx.fillStyle = "rgba(220, 50, 50, 0.45)";
+    } else {
+      // Reveal mode: erase the red tint so the source image shows through
+      drawCtx.globalCompositeOperation = "destination-out";
+      drawCtx.fillStyle = "rgba(0, 0, 0, 1)";
+    }
+
+    if (!isFirst) {
+      const dx = dispX - lastX;
+      const dy = dispY - lastY;
+      const dist = Math.hypot(dx, dy);
+      const step = Math.max(r * 0.4, 1);
+      const steps = Math.ceil(dist / step);
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        const cx = lastX + dx * t;
+        const cy = lastY + dy * t;
+        drawCtx.beginPath();
+        drawCtx.arc(cx, cy, r, 0, Math.PI * 2);
+        drawCtx.fill();
+      }
+    } else {
+      drawCtx.beginPath();
+      drawCtx.arc(dispX, dispY, r, 0, Math.PI * 2);
+      drawCtx.fill();
+    }
+    drawCtx.restore();
+
+    // Offscreen at full image resolution
+    const offX = dispX * scaleX;
+    const offY = dispY * scaleY;
+    const offR = r * Math.max(scaleX, scaleY);
+
+    offCtx.save();
+    offCtx.globalCompositeOperation = "source-over";
+    offCtx.fillStyle = eraseMode ? "#000000" : "#ffffff";
+
+    if (!isFirst) {
+      const offLastX = lastX * scaleX;
+      const offLastY = lastY * scaleY;
+      const dx = offX - offLastX;
+      const dy = offY - offLastY;
+      const dist = Math.hypot(dx, dy);
+      const step = Math.max(offR * 0.4, 1);
+      const steps = Math.ceil(dist / step);
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        const cx = offLastX + dx * t;
+        const cy = offLastY + dy * t;
+        offCtx.beginPath();
+        offCtx.arc(cx, cy, offR, 0, Math.PI * 2);
+        offCtx.fill();
+      }
+    } else {
+      offCtx.beginPath();
+      offCtx.arc(offX, offY, offR, 0, Math.PI * 2);
+      offCtx.fill();
+    }
+    offCtx.restore();
+  }
+
+  // ── Clear (reset to all white = fully visible) ─────────────
+  btnClear.addEventListener("click", () => {
+    saveUndoSnapshot();
+    // All white = fully visible mask
+    offCtx.fillStyle = "#ffffff";
+    offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
+    drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  }, editorSig);
+
+  // ── Invert ─────────────────────────────────────────────────
+  btnInvert.addEventListener("click", () => {
+    saveUndoSnapshot();
+    // Invert offscreen by reading pixel data
+    const imageData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+    const d = imageData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      d[i]     = 255 - d[i];
+      d[i + 1] = 255 - d[i + 1];
+      d[i + 2] = 255 - d[i + 2];
+      // alpha unchanged
+    }
+    offCtx.putImageData(imageData, 0, 0);
+    // Re-sync visible canvas from offscreen
+    syncVisibleFromOffscreen();
+  }, editorSig);
+
+  // Rebuild the visible overlay canvas from the offscreen data.
+  // Hidden areas (black in offscreen) get a red tint overlay.
+  // Revealed areas (white in offscreen) are cut out, showing the source image clearly.
+  function syncVisibleFromOffscreen() {
+    // Build the red overlay from offscreen mask data:
+    // Hidden (black) pixels → red tint, Revealed (white) pixels → transparent
+    const tmpCanvas = document.createElement("canvas");
+    tmpCanvas.width = offscreen.width;
+    tmpCanvas.height = offscreen.height;
+    const tmpCtx = tmpCanvas.getContext("2d");
+    const maskData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+    const d = maskData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const brightness = d[i]; // R channel = mask value (0=hidden, 255=revealed)
+      // Red tint for hidden areas, transparent for revealed
+      d[i]     = 220; // R
+      d[i + 1] = 50;  // G
+      d[i + 2] = 50;  // B
+      d[i + 3] = Math.round((1 - brightness / 255) * 115); // alpha: 0 when revealed, ~115 when hidden
+    }
+    tmpCtx.putImageData(maskData, 0, 0);
+    // Scale to display canvas
+    drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+    drawCtx.drawImage(tmpCanvas, 0, 0, drawCanvas.width, drawCanvas.height);
+  }
+
+  // ── Pointer events ─────────────────────────────────────────
+  function getCanvasPos(e) {
+    const rect = drawCanvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (drawCanvas.width / rect.width),
+      y: (e.clientY - rect.top)  * (drawCanvas.height / rect.height),
+    };
+  }
+
+  drawCanvas.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    drawCanvas.setPointerCapture(e.pointerId);
+    saveUndoSnapshot();
+    isDrawing = true;
+    const pos = getCanvasPos(e);
+    lastX = pos.x;
+    lastY = pos.y;
+    drawAt(pos.x, pos.y, true);
+  }, editorSig);
+
+  drawCanvas.addEventListener("pointermove", (e) => {
+    const stageRect = stageWrap.getBoundingClientRect();
+    cursorEl.style.display = "block";
+    cursorEl.style.left = (e.clientX - stageRect.left) + "px";
+    cursorEl.style.top  = (e.clientY - stageRect.top)  + "px";
+
+    if (!isDrawing) return;
+    e.preventDefault();
+    const pos = getCanvasPos(e);
+    drawAt(pos.x, pos.y, false);
+    lastX = pos.x;
+    lastY = pos.y;
+  }, editorSig);
+
+  drawCanvas.addEventListener("pointerup",     () => { isDrawing = false; }, editorSig);
+  drawCanvas.addEventListener("pointerleave",  () => { isDrawing = false; cursorEl.style.display = "none"; }, editorSig);
+  drawCanvas.addEventListener("pointercancel", () => { isDrawing = false; cursorEl.style.display = "none"; }, editorSig);
+
+  // ── Keyboard shortcuts ─────────────────────────────────────
+  document.addEventListener("keydown", (e) => {
+    if (overlay.style.display === "none") return;
+    if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+      e.preventDefault();
+      undo();
+    }
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      closeEditor(false);
+    }
+  }, editorSig);
+
+  // ── Close / confirm ────────────────────────────────────────
+  function closeEditor(apply) {
+    editorAC.abort(); // removes all listeners registered with editorSig
+    overlay.style.display = "none";
+    cursorEl.style.display = "none";
+    if (apply) {
+      // Save as grayscale PNG (white = show, black = hide)
+      const maskDataUrl = offscreen.toDataURL("image/png");
+      layer.maskBase64 = maskDataUrl.replace("data:image/png;base64,", "");
+      onApply(layer);
+    }
+  }
+
+  btnCancel.addEventListener("click",  () => closeEditor(false), editorSig);
+  btnConfirm.addEventListener("click", () => closeEditor(true),  editorSig);
+
+  // ── Open: load source image and existing mask ──────────────
+  const sourceImg = new Image();
+  sourceImg.onload = () => {
+    const imgW = sourceImg.naturalWidth;
+    const imgH = sourceImg.naturalHeight;
+
+    // Force animation replay (per learnings 2026-03-22)
+    overlay.style.animation = "none";
+    const shell = overlay.querySelector(".layer-mask-shell");
+    if (shell) shell.style.animation = "none";
+    overlay.style.display = "flex";
+    void overlay.offsetWidth;
+    overlay.style.animation = "";
+    if (shell) shell.style.animation = "";
+
+    // Offscreen at full image resolution
+    offscreen.width  = imgW;
+    offscreen.height = imgH;
+
+    // Compute display size
+    const stageRect = stageWrap.getBoundingClientRect();
+    const stageW = stageRect.width  || stageWrap.offsetWidth;
+    const stageH = stageRect.height || stageWrap.offsetHeight;
+    const fitScale = Math.min(stageW / imgW, stageH / imgH, 1);
+    const dispW = Math.round(imgW * fitScale);
+    const dispH = Math.round(imgH * fitScale);
+    const offsetX = Math.round((stageW - dispW) / 2);
+    const offsetY = Math.round((stageH - dispH) / 2);
+
+    scaleX = imgW / dispW;
+    scaleY = imgH / dispH;
+
+    // Size both visible canvases identically
+    srcCanvas.width  = dispW;
+    srcCanvas.height = dispH;
+    drawCanvas.width = dispW;
+    drawCanvas.height = dispH;
+
+    // Position centred in stage
+    [srcCanvas, drawCanvas].forEach((c) => {
+      c.style.left   = offsetX + "px";
+      c.style.top    = offsetY + "px";
+      c.style.width  = dispW + "px";
+      c.style.height = dispH + "px";
+    });
+
+    // Draw source image
+    srcCtx.drawImage(sourceImg, 0, 0, dispW, dispH);
+
+    // Load existing mask if present, else fill white (fully visible)
+    if (layer.maskBase64) {
+      const existingMask = new Image();
+      existingMask.onload = () => {
+        offCtx.drawImage(existingMask, 0, 0, imgW, imgH);
+        syncVisibleFromOffscreen();
+      };
+      existingMask.src = "data:image/png;base64," + layer.maskBase64;
+    } else {
+      // Default mask: all black (hide everything). User paints white
+      // to reveal parts of the layer they want to show.
+      offCtx.fillStyle = "#000000";
+      offCtx.fillRect(0, 0, imgW, imgH);
+      syncVisibleFromOffscreen();
+    }
+
+    // Clear undo stack
+    undoStack.length = 0;
+
+    // Reset mode and brush
+    setMode("paint");
+    updateBrushSize(parseInt(brushSlider.value, 10));
+  };
+  sourceImg.src = "data:image/png;base64," + layer.imageBase64;
+}
+
+function setupLayerMask() {
+  // No global setup needed — the editor is fully self-contained in openLayerMaskEditor.
+  // This function exists as the structural counterpart to setupInpaint / setupLayers.
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LAYER DRAW EDITOR — freehand drawing on a layer
+   ═══════════════════════════════════════════════════════════ */
+
+// openLayerDrawEditor is called from buildLayerRow's draw button.
+// onApply(base64) is called when the user confirms with the PNG data.
+function openLayerDrawEditor(layer, onApply) {
+  const overlay     = document.getElementById("layer-draw-overlay");
+  const btnCancel   = document.getElementById("layer-draw-cancel");
+  const btnConfirm  = document.getElementById("layer-draw-confirm");
+  const btnClear    = document.getElementById("layer-draw-clear");
+  const btnFill     = document.getElementById("layer-draw-fill");
+  const btnUndo     = document.getElementById("layer-draw-undo");
+  const btnMode     = document.getElementById("layer-draw-mode-toggle");
+  const brushSlider = document.getElementById("layer-draw-brush-size");
+  const brushVal    = document.getElementById("layer-draw-brush-val");
+  const colorInput  = document.getElementById("layer-draw-color");
+  const drawCanvas  = document.getElementById("layer-draw-canvas");
+  const cursorEl    = document.getElementById("layer-draw-cursor");
+  const stageWrap   = overlay?.querySelector(".layer-draw-stage-wrap");
+
+  if (!overlay || !drawCanvas) return;
+
+  const drawCtx = drawCanvas.getContext("2d");
+
+  // Offscreen canvas at full target resolution
+  const offscreen = document.createElement("canvas");
+  const offCtx    = offscreen.getContext("2d");
+
+  // AbortController for all listeners registered in this editor session
+  const editorAC  = new AbortController();
+  const editorSig = { signal: editorAC.signal };
+
+  // Editor state
+  let brushSize  = parseInt(brushSlider.value, 10);
+  let eraseMode  = false;
+  let isDrawing  = false;
+  let lastX      = 0;
+  let lastY      = 0;
+  let scaleX     = 1;
+  let scaleY     = 1;
+  const undoStack = [];
+  const MAX_UNDO  = 20;
+
+  // ── Mode toggle ────────────────────────────────────────────
+  function setMode(mode) {
+    eraseMode = (mode === "erase");
+    btnMode.dataset.mode = mode;
+    const iconPaint = btnMode.querySelector(".layer-draw-icon-paint");
+    const iconErase = btnMode.querySelector(".layer-draw-icon-erase");
+    const label     = btnMode.querySelector(".layer-draw-mode-label");
+    if (iconPaint) iconPaint.style.display = eraseMode ? "none" : "";
+    if (iconErase) iconErase.style.display = eraseMode ? "" : "none";
+    if (label)     label.textContent       = eraseMode ? "Erase" : "Paint";
+  }
+
+  btnMode.addEventListener("click", () => setMode(eraseMode ? "paint" : "erase"), editorSig);
+
+  // ── Brush size ─────────────────────────────────────────────
+  function updateBrushSize(val) {
+    brushSize = val;
+    brushVal.textContent = val;
+    cursorEl.style.width  = val + "px";
+    cursorEl.style.height = val + "px";
+  }
+
+  brushSlider.addEventListener("input", () => updateBrushSize(parseInt(brushSlider.value, 10)), editorSig);
+
+  // ── Color picker — update cursor border color to match ─────
+  colorInput.addEventListener("input", () => {
+    cursorEl.style.borderColor = colorInput.value;
+  }, editorSig);
+
+  // ── Undo ───────────────────────────────────────────────────
+  function saveUndoSnapshot() {
+    if (drawCanvas.width === 0 || drawCanvas.height === 0) return;
+    const drawSnap = drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height);
+    const offSnap  = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+    if (undoStack.length >= MAX_UNDO) undoStack.shift();
+    undoStack.push({ draw: drawSnap, off: offSnap });
+  }
+
+  function undo() {
+    if (undoStack.length === 0) return;
+    const snap = undoStack.pop();
+    drawCtx.putImageData(snap.draw, 0, 0);
+    offCtx.putImageData(snap.off, 0, 0);
+  }
+
+  btnUndo.addEventListener("click", undo, editorSig);
+
+  // ── Draw helpers ───────────────────────────────────────────
+  function paintCircle(ctx, cx, cy, r) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawAt(dispX, dispY, isFirst) {
+    const r = brushSize / 2;
+
+    // Visible draw canvas
+    drawCtx.save();
+    if (eraseMode) {
+      drawCtx.globalCompositeOperation = "destination-out";
+    } else {
+      drawCtx.globalCompositeOperation = "source-over";
+      drawCtx.fillStyle = colorInput.value;
+    }
+
+    if (!isFirst) {
+      const dx = dispX - lastX;
+      const dy = dispY - lastY;
+      const dist = Math.hypot(dx, dy);
+      const step = Math.max(r * 0.4, 1);
+      const steps = Math.ceil(dist / step);
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        paintCircle(drawCtx, lastX + dx * t, lastY + dy * t, r);
+      }
+    } else {
+      paintCircle(drawCtx, dispX, dispY, r);
+    }
+    drawCtx.restore();
+
+    // Offscreen at full resolution
+    const offX    = dispX * scaleX;
+    const offY    = dispY * scaleY;
+    const offR    = r * Math.max(scaleX, scaleY);
+    const offLastX = lastX * scaleX;
+    const offLastY = lastY * scaleY;
+
+    offCtx.save();
+    if (eraseMode) {
+      offCtx.globalCompositeOperation = "destination-out";
+    } else {
+      offCtx.globalCompositeOperation = "source-over";
+      offCtx.fillStyle = colorInput.value;
+    }
+
+    if (!isFirst) {
+      const dx = offX - offLastX;
+      const dy = offY - offLastY;
+      const dist = Math.hypot(dx, dy);
+      const step = Math.max(offR * 0.4, 1);
+      const steps = Math.ceil(dist / step);
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        paintCircle(offCtx, offLastX + dx * t, offLastY + dy * t, offR);
+      }
+    } else {
+      paintCircle(offCtx, offX, offY, offR);
+    }
+    offCtx.restore();
+  }
+
+  // ── Clear (reset to white — opaque base for img2img) ───────
+  btnClear.addEventListener("click", () => {
+    saveUndoSnapshot();
+    offCtx.clearRect(0, 0, offscreen.width, offscreen.height);
+    drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  }, editorSig);
+
+  // ── Fill (flood canvas with selected color) ─────────────────
+  btnFill.addEventListener("click", () => {
+    saveUndoSnapshot();
+    offCtx.fillStyle = colorInput.value;
+    offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
+    drawCtx.fillStyle = colorInput.value;
+    drawCtx.fillRect(0, 0, drawCanvas.width, drawCanvas.height);
+  }, editorSig);
+
+  // ── Pointer events ─────────────────────────────────────────
+  function getCanvasPos(e) {
+    const rect = drawCanvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (drawCanvas.width / rect.width),
+      y: (e.clientY - rect.top)  * (drawCanvas.height / rect.height),
+    };
+  }
+
+  drawCanvas.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    drawCanvas.setPointerCapture(e.pointerId);
+    saveUndoSnapshot();
+    isDrawing = true;
+    const pos = getCanvasPos(e);
+    lastX = pos.x;
+    lastY = pos.y;
+    drawAt(pos.x, pos.y, true);
+  }, editorSig);
+
+  drawCanvas.addEventListener("pointermove", (e) => {
+    const stageRect = stageWrap.getBoundingClientRect();
+    cursorEl.style.display = "block";
+    cursorEl.style.left = (e.clientX - stageRect.left) + "px";
+    cursorEl.style.top  = (e.clientY - stageRect.top)  + "px";
+
+    if (!isDrawing) return;
+    e.preventDefault();
+    const pos = getCanvasPos(e);
+    drawAt(pos.x, pos.y, false);
+    lastX = pos.x;
+    lastY = pos.y;
+  }, editorSig);
+
+  drawCanvas.addEventListener("pointerup",     () => { isDrawing = false; }, editorSig);
+  drawCanvas.addEventListener("pointerleave",  () => { isDrawing = false; cursorEl.style.display = "none"; }, editorSig);
+  drawCanvas.addEventListener("pointercancel", () => { isDrawing = false; cursorEl.style.display = "none"; }, editorSig);
+
+  // ── Keyboard shortcuts ─────────────────────────────────────
+  document.addEventListener("keydown", (e) => {
+    if (overlay.style.display === "none") return;
+    if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+      e.preventDefault();
+      undo();
+    }
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      closeEditor(false);
+    }
+  }, editorSig);
+
+  // ── Close / confirm ────────────────────────────────────────
+  function closeEditor(apply) {
+    editorAC.abort();
+    overlay.style.display = "none";
+    cursorEl.style.display = "none";
+    if (apply) {
+      const dataUrl = offscreen.toDataURL("image/png");
+      const base64  = dataUrl.replace("data:image/png;base64,", "");
+      onApply(base64);
+    }
+  }
+
+  btnCancel.addEventListener("click",  () => closeEditor(false), editorSig);
+  btnConfirm.addEventListener("click", () => closeEditor(true),  editorSig);
+
+  // ── Open: determine target resolution and initialise ──────
+  // Read resolution from #resolution dropdown (e.g. "832x1216")
+  const resolutionEl = document.getElementById("resolution");
+  const resValue     = resolutionEl ? resolutionEl.value : "832x1216";
+  const [targetW, targetH] = resValue.split("x").map(Number);
+  const safeW = targetW  || 832;
+  const safeH = targetH  || 1216;
+
+  // Force animation replay (per learnings 2026-03-22)
+  overlay.style.animation = "none";
+  const shell = overlay.querySelector(".layer-draw-shell");
+  if (shell) shell.style.animation = "none";
+  overlay.style.display = "flex";
+  void overlay.offsetWidth;
+  overlay.style.animation = "";
+  if (shell) shell.style.animation = "";
+
+  // Offscreen at full target resolution
+  offscreen.width  = safeW;
+  offscreen.height = safeH;
+
+  // Compute display size to fit stage
+  const stageRect = stageWrap.getBoundingClientRect();
+  const stageW    = stageRect.width  || stageWrap.offsetWidth  || 700;
+  const stageH    = stageRect.height || stageWrap.offsetHeight || 500;
+  const fitScale  = Math.min(stageW / safeW, stageH / safeH, 1);
+  const dispW     = Math.round(safeW * fitScale);
+  const dispH     = Math.round(safeH * fitScale);
+  const offsetX   = Math.round((stageW - dispW) / 2);
+  const offsetY   = Math.round((stageH - dispH) / 2);
+
+  scaleX = safeW / dispW;
+  scaleY = safeH / dispH;
+
+  // Guard: setting canvas dimensions clears content (learnings 2026-03-20).
+  // We're always reinitialising on open so this is intentional.
+  drawCanvas.width  = dispW;
+  drawCanvas.height = dispH;
+
+  drawCanvas.style.left   = offsetX + "px";
+  drawCanvas.style.top    = offsetY + "px";
+  drawCanvas.style.width  = dispW + "px";
+  drawCanvas.style.height = dispH + "px";
+
+  // Background preview: composite of all OTHER visible layers
+  const bgCanvas = document.getElementById("layer-draw-bg");
+  if (bgCanvas) {
+    bgCanvas.width  = dispW;
+    bgCanvas.height = dispH;
+    bgCanvas.style.left   = offsetX + "px";
+    bgCanvas.style.top    = offsetY + "px";
+    bgCanvas.style.width  = dispW + "px";
+    bgCanvas.style.height = dispH + "px";
+    const bgCtx = bgCanvas.getContext("2d");
+    bgCtx.clearRect(0, 0, dispW, dispH);
+    // Draw other layers (excluding current layer) as background
+    const otherLayers = layers.filter((l) => l.visible && l.imageBase64 && l.id !== layer.id);
+    if (otherLayers.length > 0) {
+      // Draw bottom-to-top (reversed array order: last = bottom)
+      [...otherLayers].reverse().forEach((other) => {
+        const img = new Image();
+        img.onload = () => {
+          bgCtx.globalAlpha = other.opacity;
+          bgCtx.drawImage(img, 0, 0, dispW, dispH);
+          bgCtx.globalAlpha = 1.0;
+        };
+        img.src = "data:image/png;base64," + other.imageBase64;
+      });
+    }
+  }
+
+  function initContents() {
+    if (layer.imageBase64) {
+      // Load existing image data into both canvases
+      const existingImg = new Image();
+      existingImg.onload = () => {
+        offCtx.drawImage(existingImg, 0, 0, safeW, safeH);
+        drawCtx.drawImage(existingImg, 0, 0, dispW, dispH);
+        undoStack.length = 0;
+        setMode("paint");
+        updateBrushSize(parseInt(brushSlider.value, 10));
+        cursorEl.style.borderColor = colorInput.value;
+      };
+      existingImg.src = "data:image/png;base64," + layer.imageBase64;
+    } else {
+      // Empty layer — start transparent so drawn content doesn't
+      // cover layers below with a white background
+      offCtx.clearRect(0, 0, safeW, safeH);
+      drawCtx.clearRect(0, 0, dispW, dispH);
+      undoStack.length = 0;
+      setMode("paint");
+      updateBrushSize(parseInt(brushSlider.value, 10));
+      cursorEl.style.borderColor = colorInput.value;
+    }
+  }
+
+  initContents();
+}
+
+function setupLayerDraw() {
+  // No global setup needed — the editor is fully self-contained in openLayerDrawEditor.
+  // This function exists as the structural counterpart to setupLayerMask.
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INPAINT — mask painting overlay
+   ═══════════════════════════════════════════════════════════ */
+
+// Call this whenever the canvas image state or provider changes
+// to show/hide action buttons in #image-actions.
+function syncInpaintButtonVisibility() {
+  const sendBtn = document.getElementById("btn-send-to-layer");
+  const provider = document.getElementById("provider")?.value || "novelai";
+  const hasImage = !!state.canvasImageBase64;
+  const hasGenerated = !!state.lastGeneratedImageBase64;
+  const isNovelAI = provider === "novelai";
+  if (sendBtn) {
+    sendBtn.style.display = (hasImage && isNovelAI) ? "" : "none";
+    sendBtn.disabled = !hasGenerated;
+    sendBtn.title = hasGenerated
+      ? "Send this image to a new layer in the Layers panel"
+      : "Generate an image first to send it to a layer";
+  }
+  // Grok: Set as Source button — only shown after generation in Grok mode
+  const setBtn = document.getElementById("btn-set-as-source");
+  if (setBtn) {
+    setBtn.style.display = (hasGenerated && !isNovelAI) ? "" : "none";
+  }
+  // NovelAI → Grok handoff buttons
+  const editGrokBtn = document.getElementById("btn-edit-in-grok");
+  const animGrokBtn = document.getElementById("btn-animate-in-grok");
+  if (editGrokBtn) editGrokBtn.style.display = (hasGenerated && isNovelAI) ? "" : "none";
+  if (animGrokBtn) animGrokBtn.style.display = (hasGenerated && isNovelAI) ? "" : "none";
+}
+
+function setupInpaint() {
+  // The inpaint overlay is now opened via openLayerInpaintEditor(layer, onConfirm).
+  // This setup function wires up the static controls (brush, mode, clear, undo, cancel, confirm).
+  // The open logic and confirm callback are injected per-call.
+
+  const overlay  = document.getElementById("inpaint-overlay");
+  const btnCancel = document.getElementById("inpaint-cancel");
+  const btnConfirm = document.getElementById("inpaint-confirm");
+  const btnClear = document.getElementById("inpaint-clear");
+  const btnUndo  = document.getElementById("inpaint-undo");
+  const btnMode  = document.getElementById("inpaint-mode-toggle");
+  const brushSlider = document.getElementById("inpaint-brush-size");
+  const brushVal = document.getElementById("inpaint-brush-val");
+  const srcCanvas  = document.getElementById("inpaint-source");
+  const maskCanvas = document.getElementById("inpaint-mask");
+  const cursorEl   = document.getElementById("inpaint-cursor");
+  const stageWrap  = overlay?.querySelector(".inpaint-stage-wrap");
+
+  if (!overlay || !srcCanvas || !maskCanvas) return;
+
+  const srcCtx  = srcCanvas.getContext("2d");
+  const maskCtx = maskCanvas.getContext("2d");
+
+  // Offscreen canvas — same pixel dimensions as source image, pure B&W
+  const offscreen = document.createElement("canvas");
+  const offCtx    = offscreen.getContext("2d");
+
+  // Editor state
+  let brushSize = 32;
+  let eraseMode = false;
+  let isDrawing = false;
+  let lastX = 0;
+  let lastY = 0;
+  let scaleX = 1;
+  let scaleY = 1;
+  const undoStack = [];
+  const MAX_UNDO  = 20;
+
+  // Per-call confirm callback — set by openLayerInpaintEditor
+  let _currentLayer    = null;
+  let _onConfirmCb     = null;
+
+  // ── Open (called from openLayerInpaintEditor) ──────────────
+  function openInpaint(layer, onConfirm) {
+    _currentLayer = layer;
+    _onConfirmCb  = onConfirm;
+
+    // Use the composite preview as the inpaint source — this matches
+    // what gets sent to the API, so the mask coordinates align correctly.
+    // Fall back to layer's own image if no composite is available.
+    const sourceb64 = state.canvasImageBase64 || layer.imageBase64;
+    if (!sourceb64) {
+      showStatus("No image to inpaint — add images to layers first.");
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      // Use output resolution for the mask — must match the composite
+      // that gets sent to the API, not the source image's natural size
+      const resSel = document.getElementById("resolution");
+      const resParts = (resSel ? resSel.value : "832x1216").split("x").map(Number);
+      const imgW = resParts[0] || 832;
+      const imgH = resParts[1] || 1216;
+
+      // Show overlay first so stageWrap has layout dimensions.
+      overlay.style.animation = "none";
+      const shell = overlay.querySelector(".inpaint-shell");
+      if (shell) shell.style.animation = "none";
+      overlay.style.display = "flex";
+      void overlay.offsetWidth;
+      overlay.style.animation = "";
+      if (shell) shell.style.animation = "";
+
+      // Offscreen canvas at output resolution — start black (no-paint)
+      offscreen.width  = imgW;
+      offscreen.height = imgH;
+      offCtx.fillStyle = "#000000";
+      offCtx.fillRect(0, 0, imgW, imgH);
+
+      // Compute display size: fit within stageWrap
+      const stageRect = stageWrap.getBoundingClientRect();
+      const stageW = stageRect.width  || stageWrap.offsetWidth;
+      const stageH = stageRect.height || stageWrap.offsetHeight;
+      const fitScale = Math.min(stageW / imgW, stageH / imgH, 1);
+      const dispW = Math.round(imgW * fitScale);
+      const dispH = Math.round(imgH * fitScale);
+      const offsetX = Math.round((stageW - dispW) / 2);
+      const offsetY = Math.round((stageH - dispH) / 2);
+
+      scaleX = imgW / dispW;
+      scaleY = imgH / dispH;
+
+      // Size both visible canvases identically
+      srcCanvas.width  = dispW;
+      srcCanvas.height = dispH;
+      maskCanvas.width = dispW;
+      maskCanvas.height = dispH;
+
+      [srcCanvas, maskCanvas].forEach((c) => {
+        c.style.left   = offsetX + "px";
+        c.style.top    = offsetY + "px";
+        c.style.width  = dispW + "px";
+        c.style.height = dispH + "px";
+      });
+
+      // Draw source image
+      srcCtx.drawImage(img, 0, 0, dispW, dispH);
+
+      // Load existing mask if present
+      maskCtx.clearRect(0, 0, dispW, dispH);
+      if (layer.inpaintMaskBase64) {
+        const maskImg = new Image();
+        maskImg.onload = () => {
+          // Restore offscreen (B&W) from saved mask
+          offCtx.drawImage(maskImg, 0, 0, imgW, imgH);
+          // Re-draw visible tint overlay from offscreen
+          const od = offCtx.getImageData(0, 0, imgW, imgH).data;
+          maskCtx.clearRect(0, 0, dispW, dispH);
+          for (let py = 0; py < dispH; py++) {
+            for (let px = 0; px < dispW; px++) {
+              const ox = Math.round(px * scaleX);
+              const oy = Math.round(py * scaleY);
+              const i = (oy * imgW + ox) * 4;
+              if (od[i] > 128) {
+                maskCtx.fillStyle = "rgba(240,80,80,0.55)";
+                maskCtx.fillRect(px, py, 1, 1);
+              }
+            }
+          }
+        };
+        maskImg.src = "data:image/png;base64," + layer.inpaintMaskBase64;
+      }
+
+      undoStack.length = 0;
+      setMode("paint");
+      updateBrushSize(parseInt(brushSlider.value, 10));
+    };
+    img.src = "data:image/png;base64," + sourceb64;
+  }
+
+  // ── Close overlay ─────────────────────────────────────────
+  function closeInpaint() {
+    overlay.style.display = "none";
+    cursorEl.style.display = "none";
+    _currentLayer = null;
+    _onConfirmCb  = null;
+  }
+
+  // ── Mode toggle ───────────────────────────────────────────
+  function setMode(mode) {
+    eraseMode = (mode === "erase");
+    btnMode.dataset.mode = mode;
+    const iconPaint = btnMode.querySelector(".inpaint-icon-paint");
+    const iconErase = btnMode.querySelector(".inpaint-icon-erase");
+    const label     = btnMode.querySelector(".inpaint-mode-label");
+    if (iconPaint) iconPaint.style.display = eraseMode ? "none" : "";
+    if (iconErase) iconErase.style.display = eraseMode ? "" : "none";
+    if (label)     label.textContent       = eraseMode ? "Erase" : "Paint";
+  }
+
+  btnMode.addEventListener("click", () => {
+    setMode(eraseMode ? "paint" : "erase");
+  });
+
+  // ── Brush size ────────────────────────────────────────────
+  function updateBrushSize(val) {
+    brushSize = val;
+    brushVal.textContent = val;
+    cursorEl.style.width  = val + "px";
+    cursorEl.style.height = val + "px";
+  }
+
+  brushSlider.addEventListener("input", () => {
+    updateBrushSize(parseInt(brushSlider.value, 10));
+  });
+
+  // ── Draw helpers ──────────────────────────────────────────
+  function drawAt(dispX, dispY, isFirst) {
+    const r = brushSize / 2;
+
+    maskCtx.save();
+    if (eraseMode) {
+      maskCtx.globalCompositeOperation = "destination-out";
+      maskCtx.fillStyle = "rgba(0,0,0,1)";
+    } else {
+      maskCtx.globalCompositeOperation = "source-over";
+      maskCtx.fillStyle = "rgba(240,80,80,0.55)";
+    }
+
+    if (!isFirst) {
+      const dx = dispX - lastX;
+      const dy = dispY - lastY;
+      const dist = Math.hypot(dx, dy);
+      const step = Math.max(r * 0.4, 1);
+      const steps = Math.ceil(dist / step);
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        const cx = lastX + dx * t;
+        const cy = lastY + dy * t;
+        maskCtx.beginPath();
+        maskCtx.arc(cx, cy, r, 0, Math.PI * 2);
+        maskCtx.fill();
+      }
+    } else {
+      maskCtx.beginPath();
+      maskCtx.arc(dispX, dispY, r, 0, Math.PI * 2);
+      maskCtx.fill();
+    }
+    maskCtx.restore();
+
+    const offX = dispX * scaleX;
+    const offY = dispY * scaleY;
+    const offR = r * Math.max(scaleX, scaleY);
+
+    offCtx.save();
+    offCtx.globalCompositeOperation = "source-over";
+    offCtx.fillStyle = eraseMode ? "#000000" : "#ffffff";
+
+    if (!isFirst) {
+      const offLastX = lastX * scaleX;
+      const offLastY = lastY * scaleY;
+      const dx = offX - offLastX;
+      const dy = offY - offLastY;
+      const dist = Math.hypot(dx, dy);
+      const step = Math.max(offR * 0.4, 1);
+      const steps = Math.ceil(dist / step);
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        const cx = offLastX + dx * t;
+        const cy = offLastY + dy * t;
+        offCtx.beginPath();
+        offCtx.arc(cx, cy, offR, 0, Math.PI * 2);
+        offCtx.fill();
+      }
+    } else {
+      offCtx.beginPath();
+      offCtx.arc(offX, offY, offR, 0, Math.PI * 2);
+      offCtx.fill();
+    }
+    offCtx.restore();
+  }
+
+  // ── Undo ──────────────────────────────────────────────────
+  function saveUndoSnapshot() {
+    if (maskCanvas.width === 0 || maskCanvas.height === 0) return;
+    const maskSnap = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+    const offSnap  = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+    if (undoStack.length >= MAX_UNDO) undoStack.shift();
+    undoStack.push({ mask: maskSnap, off: offSnap });
+  }
+
+  function undo() {
+    if (undoStack.length === 0) return;
+    const snap = undoStack.pop();
+    maskCtx.putImageData(snap.mask, 0, 0);
+    offCtx.putImageData(snap.off, 0, 0);
+  }
+
+  btnUndo.addEventListener("click", undo);
+
+  // ── Clear mask ────────────────────────────────────────────
+  btnClear.addEventListener("click", () => {
+    saveUndoSnapshot();
+    maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+    offCtx.fillStyle = "#000000";
+    offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
+  });
+
+  // ── Pointer events ────────────────────────────────────────
+  function getCanvasPos(e) {
+    const rect = maskCanvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (maskCanvas.width / rect.width),
+      y: (e.clientY - rect.top)  * (maskCanvas.height / rect.height),
+    };
+  }
+
+  maskCanvas.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    maskCanvas.setPointerCapture(e.pointerId);
+    saveUndoSnapshot();
+    isDrawing = true;
+    const pos = getCanvasPos(e);
+    lastX = pos.x;
+    lastY = pos.y;
+    drawAt(pos.x, pos.y, true);
+  });
+
+  maskCanvas.addEventListener("pointermove", (e) => {
+    const stageRect = stageWrap.getBoundingClientRect();
+    cursorEl.style.display = "block";
+    cursorEl.style.left = (e.clientX - stageRect.left) + "px";
+    cursorEl.style.top  = (e.clientY - stageRect.top)  + "px";
+
+    if (!isDrawing) return;
+    e.preventDefault();
+    const pos = getCanvasPos(e);
+    drawAt(pos.x, pos.y, false);
+    lastX = pos.x;
+    lastY = pos.y;
+  });
+
+  maskCanvas.addEventListener("pointerup", () => { isDrawing = false; });
+  maskCanvas.addEventListener("pointerleave", () => { isDrawing = false; cursorEl.style.display = "none"; });
+  maskCanvas.addEventListener("pointercancel", () => { isDrawing = false; cursorEl.style.display = "none"; });
+
+  // ── Keyboard: Cmd/Ctrl+Z undo, Escape close ───────────────
+  document.addEventListener("keydown", (e) => {
+    if (overlay.style.display === "none") return;
+    if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+      e.preventDefault();
+      undo();
+    }
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      closeInpaint();
+    }
+  });
+
+  // ── Confirm: save mask to layer ───────────────────────────
+  btnConfirm.addEventListener("click", () => {
+    if (!_currentLayer) return;
+
+    // Check that the mask has at least some painted pixels
+    const imgData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+    const d = imgData.data;
+    let hasWhite = false;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] > 128) { hasWhite = true; break; }
+    }
+    if (!hasWhite) {
+      // No mask painted — clear the inpaint mask (disable inpainting)
+      _currentLayer.inpaintMaskBase64 = null;
+      const cb = _onConfirmCb;
+      closeInpaint();
+      if (cb) cb();
+      showStatus("Inpaint mask cleared");
+      return;
+    }
+
+    // Save mask to layer — does NOT trigger generate()
+    const dataUrl = offscreen.toDataURL("image/png");
+    _currentLayer.inpaintMaskBase64 = dataUrl.replace("data:image/png;base64,", "");
+
+    const cb = _onConfirmCb;
+    closeInpaint();
+    if (cb) cb();
+  });
+
+  // ── Cancel ────────────────────────────────────────────────
+  btnCancel.addEventListener("click", closeInpaint);
+
+  // Expose open function so openLayerInpaintEditor can call it
+  setupInpaint._open = openInpaint;
+}
+
+// Called from buildLayerRow's inpaint button.
+// onConfirm() is called after the mask is saved to layer.inpaintMaskBase64.
+function openLayerInpaintEditor(layer, onConfirm) {
+  if (!setupInpaint._open) {
+    showStatus("Inpaint editor not ready — please wait.");
+    return;
+  }
+  setupInpaint._open(layer, onConfirm);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   AI REDRAW MODAL — redraw a sketch layer with AI while preserving transparency
+   ═══════════════════════════════════════════════════════════ */
+
+(function setupLayerRedraw() {
+  const modal      = document.getElementById("layer-redraw-modal");
+  const titleEl    = document.getElementById("layer-redraw-title");
+  const previewImg = document.getElementById("layer-redraw-preview");
+  const promptEl   = document.getElementById("layer-redraw-prompt");
+  if (promptEl && typeof _tagAC !== "undefined") _tagAC.attach(promptEl);
+  const strengthEl = document.getElementById("layer-redraw-strength");
+  const strengthVal = document.getElementById("layer-redraw-strength-val");
+  const submitBtn  = document.getElementById("layer-redraw-submit");
+  const acceptBtn  = document.getElementById("layer-redraw-accept");
+  const cancelBtn  = document.getElementById("layer-redraw-cancel");
+  const closeBtn   = document.getElementById("layer-redraw-close");
+  let _lastRedrawResult = null;
+
+  if (!modal) return;
+
+  let _activeLayer = null;
+
+  function openLayerRedrawModal(layer) {
+    _activeLayer = layer;
+    _lastRedrawResult = null;
+    titleEl.textContent = "AI Redraw — " + layer.name;
+    previewImg.src = "data:image/png;base64," + layer.imageBase64;
+    promptEl.value = "";
+    strengthEl.value = "0.7";
+    strengthVal.textContent = "0.70";
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Redraw";
+    if (acceptBtn) acceptBtn.style.display = "none";
+    modal.style.display = "flex";
+    // Force animation replay
+    modal.style.animation = "none";
+    void modal.offsetWidth;
+    modal.style.animation = "";
+    setTimeout(() => promptEl.focus(), 50);
+  }
+
+  function closeModal() {
+    modal.style.display = "none";
+    _activeLayer = null;
+  }
+
+  strengthEl.addEventListener("input", () => {
+    strengthVal.textContent = parseFloat(strengthEl.value).toFixed(2);
+  });
+
+  async function doRedraw() {
+    const layer = _activeLayer;
+    if (!layer) return;
+
+    const desc = promptEl.value.trim();
+    if (!desc) {
+      promptEl.focus();
+      return;
+    }
+
+    // Only use the user's description — don't mix in global prompt
+    // which would add unrelated scene/character content
+    const useQualityTags = document.getElementById("quality-tags")?.checked;
+    let fullPrompt = desc;
+    if (useQualityTags) fullPrompt += ", very aesthetic, masterpiece";
+
+    const resVal   = document.getElementById("resolution")?.value || "832x1216";
+    const [width, height] = resVal.split("x").map(Number);
+
+    const body = {
+      image:           layer.imageBase64,
+      prompt:          fullPrompt,
+      negative_prompt: document.getElementById("negative-prompt")?.value || "",
+      width:           width  || 832,
+      height:          height || 1216,
+      steps:           parseInt(document.getElementById("steps")?.value) || 28,
+      scale:           parseFloat(document.getElementById("scale")?.value) || 6,
+      sampler:         document.getElementById("sampler")?.value || "k_euler",
+      seed:            parseInt(document.getElementById("seed")?.value) || 0,
+      strength:        parseFloat(strengthEl.value),
+    };
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Redrawing…";
+
+    try {
+      const resp = await fetch("/api/layer-redraw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+        throw new Error(err.detail || "Redraw failed");
+      }
+      const data = await resp.json();
+      _lastRedrawResult = data.image;
+      // Show result in preview — stay in modal
+      previewImg.src = "data:image/png;base64," + data.image;
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Retry";
+      // Show accept button
+      acceptBtn.style.display = "";
+      showStatus("Preview ready — Accept or adjust and Retry");
+    } catch (err) {
+      showStatus("Redraw error: " + err.message);
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Redraw";
+    }
+  }
+
+  submitBtn.addEventListener("click", doRedraw);
+  if (acceptBtn) acceptBtn.addEventListener("click", () => {
+    if (!_lastRedrawResult || !_activeLayer) return;
+    pushLayerUndo("AI Redraw");
+    _activeLayer.imageBase64 = _lastRedrawResult;
+    closeModal();
+    renderLayerList();
+    saveLayersToStorage();
+    refreshCompositePreview();
+    updateCanvasPanel();
+    showStatus("AI Redraw applied to " + _activeLayer.name);
+  });
+  cancelBtn.addEventListener("click", closeModal);
+  closeBtn.addEventListener("click", closeModal);
+
+  promptEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      doRedraw();
+    }
+  });
+
+  modal.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      e.stopImmediatePropagation();
+      closeModal();
+    }
+  });
+
+  // Expose open function via module-level variable
+  _openLayerRedraw = openLayerRedrawModal;
+})();
