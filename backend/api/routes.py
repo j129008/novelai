@@ -1385,15 +1385,15 @@ class HasPersonBatchRequest(BaseModel):
 
 @router.post("/explore/has-person-batch")
 async def explore_has_person_batch(req: HasPersonBatchRequest):
-    """Batch person detection using WD Tagger. Returns SSE stream with per-image progress."""
-    from api.tagger import ensure_model_loaded, get_model_status, run_inference
+    """Batch person detection using Florence-2 caption. Returns SSE stream with per-image progress."""
+    from api.florence import ensure_model_loaded, get_model_status, run_caption_only
 
     status = ensure_model_loaded()
     if status in ("not_started", "downloading"):
         _, progress = get_model_status()
         raise HTTPException(status_code=202, detail=f"Model downloading: {progress}%")
     if status == "failed":
-        raise HTTPException(status_code=503, detail="Tagger model failed to load")
+        raise HTTPException(status_code=503, detail="Florence model failed to load")
 
     import httpx
 
@@ -1412,12 +1412,16 @@ async def explore_has_person_batch(req: HasPersonBatchRequest):
                     validated = _validate_explore_url(url)
                     resp = await client.get(validated)
                     if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("image/"):
-                        image_b64 = base64.b64encode(resp.content).decode()
-                        raw_tags = run_inference(image_b64)
-                        for t in raw_tags:
-                            if t["name"] in _PERSON_TAGS and t["score"] >= 0.4:
-                                has_person = True
-                                break
+                        # Resize for speed
+                        from PIL import Image as PILImage
+                        img = PILImage.open(io.BytesIO(resp.content))
+                        if max(img.size) > 384:
+                            img.thumbnail((384, 384))
+                        buf = io.BytesIO()
+                        img.save(buf, format="JPEG", quality=60)
+
+                        caption = run_caption_only(buf.getvalue()).lower()
+                        has_person = any(kw in caption for kw in _PERSON_KEYWORDS)
                 except Exception:
                     pass
 

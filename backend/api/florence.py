@@ -90,3 +90,26 @@ def run_inference(image_bytes: bytes) -> dict:
         results[key] = parsed.get(task, generated_text).strip()
 
     return results
+
+
+def run_caption_only(image_bytes: bytes) -> str:
+    """Run Florence-2 <CAPTION> only. Fast, for person detection. Returns caption string."""
+    global _model, _processor
+    if _model is None or _processor is None:
+        raise RuntimeError("Model not ready")
+
+    import torch
+
+    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    task = "<CAPTION>"
+    inputs = _processor(text=task, images=image, return_tensors="pt")
+    with torch.no_grad():
+        generated_ids = _model.generate(
+            input_ids=inputs["input_ids"],
+            pixel_values=inputs["pixel_values"],
+            max_new_tokens=64,
+            num_beams=1,
+        )
+    generated_text = _processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
+    parsed = _processor.post_process_generation(generated_text, task=task, image_size=(image.width, image.height))
+    return parsed.get(task, generated_text).strip()
