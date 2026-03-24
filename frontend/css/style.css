@@ -3224,7 +3224,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   border-color: var(--accent);
   box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 40%, transparent);
 }
-.explore-mode { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+.explore-mode { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border-muted) transparent; }
 
 /* ── Local breadcrumb ─────────────────────────────────────── */
 .local-breadcrumb {
