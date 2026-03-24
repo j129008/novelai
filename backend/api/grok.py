@@ -7,6 +7,7 @@ Video generation is asynchronous: submit a job, poll until done, download the re
 """
 import asyncio
 import base64
+import json
 
 import httpx
 
@@ -140,3 +141,60 @@ async def generate_video(
         if video_resp.status_code != 200:
             raise RuntimeError(f"Video download failed {video_resp.status_code}")
         return video_resp.content
+
+
+CHAT_URL = "https://api.x.ai/v1/chat/completions"
+
+_VISION_SYSTEM_PROMPT = """You are an image analysis assistant. Analyze the provided image and return a JSON object with exactly two fields:
+- "tags": an array of danbooru-style tags (lowercase, underscored, e.g. "1girl", "long_hair", "black_dress"). Include tags for: characters, hair, clothing, pose, expression, setting, lighting, art style. Order by relevance. Maximum 30 tags.
+- "description": a single paragraph natural language description of the image, suitable as an image generation prompt. 2-3 sentences, descriptive and specific.
+
+Return ONLY the JSON object, no markdown formatting."""
+
+
+async def analyze_image_vision(api_key: str, image_b64: str) -> dict:
+    """Analyze an image using Grok Vision. Returns {"tags": [...], "description": "..."}."""
+    import re
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": "grok-2-vision-latest",
+        "messages": [
+            {"role": "system", "content": _VISION_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"},
+                    },
+                    {"type": "text", "text": "Analyze this image."},
+                ],
+            },
+        ],
+        "temperature": 0.2,
+    }
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.post(CHAT_URL, json=payload, headers=headers)
+        if resp.status_code != 200:
+            raise RuntimeError(f"{resp.status_code}: {resp.text[:500]}")
+
+    text = resp.json()["choices"][0]["message"]["content"]
+
+    # Strip markdown code fences defensively
+    text = re.sub(r"^```(?:json)?\s*", "", text.strip())
+    text = re.sub(r"\s*```$", "", text.strip())
+
+    try:
+        result = json.loads(text)
+    except json.JSONDecodeError:
+        raise RuntimeError(f"Failed to parse Grok Vision response as JSON: {text[:200]}")
+
+    if "tags" not in result or "description" not in result:
+        raise RuntimeError(f"Grok Vision response missing required fields: {list(result.keys())}")
+
+    return result
