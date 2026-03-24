@@ -1357,3 +1357,35 @@ async def list_local_folder(path: str = Query(default="")):
         key=lambda x: _natural_sort_key(x.name),
     )
     return LocalBrowseResponse(path=path, directories=directories, files=files)
+
+
+@router.get("/explore/local/image")
+def serve_local_image(path: str = Query(min_length=1), thumbnail: bool = False):
+    root = _get_local_browse_root()
+    filepath = root / path
+    filepath = filepath.resolve()
+    if not filepath.is_file() or not filepath.is_relative_to(root.resolve()):
+        raise HTTPException(status_code=404, detail="Image not found")
+    if filepath.suffix.lower() not in _IMAGE_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Not a recognized image file")
+
+    if thumbnail:
+        from PIL import Image as PILImage
+        try:
+            img = PILImage.open(filepath)
+            img.thumbnail((300, 300))
+            buf = io.BytesIO()
+            fmt = "JPEG" if filepath.suffix.lower() in (".jpg", ".jpeg") else "PNG"
+            img.save(buf, format=fmt)
+            buf.seek(0)
+            media = "image/jpeg" if fmt == "JPEG" else "image/png"
+            return StreamingResponse(buf, media_type=media)
+        except Exception:
+            raise HTTPException(status_code=500, detail="Failed to create thumbnail")
+
+    ext = filepath.suffix.lower()
+    media_map = {
+        ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+        ".gif": "image/gif", ".webp": "image/webp", ".bmp": "image/bmp", ".tiff": "image/tiff",
+    }
+    return FileResponse(filepath, media_type=media_map.get(ext, "application/octet-stream"))
