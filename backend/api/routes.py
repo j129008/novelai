@@ -1180,6 +1180,19 @@ async def _explore_with_playwright(url: str) -> tuple[list[dict], list[dict], st
             final_url = page.url
             title = await page.title()
 
+            # Scroll down to trigger lazy-loading / infinite scroll
+            import asyncio
+            for _ in range(8):
+                prev_height = await page.evaluate("document.body.scrollHeight")
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await asyncio.sleep(1.5)
+                new_height = await page.evaluate("document.body.scrollHeight")
+                if new_height == prev_height:
+                    break  # No more content loading
+
+            # Scroll back to top
+            await page.evaluate("window.scrollTo(0, 0)")
+
             # Extract images and links from the rendered DOM
             result = await page.evaluate("""() => {
                 const imgs = Array.from(document.querySelectorAll("img"))
@@ -1260,9 +1273,9 @@ async def explore_page(req: ExplorePageRequest):
             seen_srcs.add(img["src"])
             images.append(img)
 
-    # --- Fallback: if no images found, try Playwright for JS-rendered pages ---
+    # --- Fallback: if few images found, try Playwright for JS-rendered pages (with scroll) ---
     title = parser.title.strip()
-    if not images:
+    if len(images) < 10:
         try:
             pw_images, pw_links, final_url, pw_title = await _explore_with_playwright(url)
             images = pw_images
