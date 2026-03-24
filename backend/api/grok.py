@@ -198,3 +198,49 @@ async def analyze_image_vision(api_key: str, image_b64: str) -> dict:
         raise RuntimeError(f"Grok Vision response missing required fields: {list(result.keys())}")
 
     return result
+
+
+_PROMPT_ASSIST_TAGS = """You are a prompt tag assistant for NovelAI (an anime image generator that uses danbooru-style tags).
+The user will describe what they want. Generate a JSON object with one field:
+- "tags": an array of 15-30 danbooru-style tags (lowercase, underscored). Include tags for: characters, hair, clothing, pose, expression, setting, lighting, composition, art style. Order by importance.
+
+Return ONLY the JSON object, no markdown formatting."""
+
+_PROMPT_ASSIST_DESC = """You are a prompt assistant for an AI image generator that uses natural language descriptions.
+The user will describe what they want. Generate a JSON object with one field:
+- "description": a detailed natural language description (2-4 sentences) suitable as an image generation prompt. Be specific about visual details: subject, pose, clothing, setting, lighting, mood, camera angle.
+
+Return ONLY the JSON object, no markdown formatting."""
+
+
+async def prompt_assist(api_key: str, direction: str, mode: str) -> dict:
+    """Generate prompt suggestions. mode='tags' returns {"tags":[...]}, mode='description' returns {"description":"..."}."""
+    import re
+
+    system = _PROMPT_ASSIST_TAGS if mode == "tags" else _PROMPT_ASSIST_DESC
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": "grok-4-1-fast-non-reasoning",
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": direction},
+        ],
+        "temperature": 0.7,
+    }
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(CHAT_URL, json=payload, headers=headers)
+        if resp.status_code != 200:
+            raise RuntimeError(f"{resp.status_code}: {resp.text[:500]}")
+
+    text = resp.json()["choices"][0]["message"]["content"]
+    text = re.sub(r"^```(?:json)?\s*", "", text.strip())
+    text = re.sub(r"\s*```$", "", text.strip())
+
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        raise RuntimeError(f"Failed to parse response: {text[:200]}")

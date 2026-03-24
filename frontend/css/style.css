@@ -3383,6 +3383,26 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 15%, transparent);
 }
+/* ── Prompt assist modal ───────────────────────────────────── */
+.prompt-assist-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-muted) transparent;
+}
+.prompt-assist-input-row {
+  display: flex;
+  gap: 6px;
+}
+.prompt-assist-input-row input {
+  flex: 1;
+}
+
 .local-analysis-tag.selected {
   border-color: var(--accent);
   background: var(--accent);

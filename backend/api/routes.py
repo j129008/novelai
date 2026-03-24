@@ -1389,6 +1389,26 @@ _PERSON_KEYWORDS = frozenset([
 ])
 
 
+class PromptAssistRequest(BaseModel):
+    direction: str = PydanticField(min_length=1)
+    mode: str  # "tags" or "description"
+
+
+@router.post("/prompt-assist")
+async def prompt_assist_endpoint(req: PromptAssistRequest):
+    if not XAI_API_KEY:
+        raise HTTPException(status_code=503, detail="XAI_API_KEY not configured")
+    if req.mode not in ("tags", "description"):
+        raise HTTPException(status_code=400, detail="Mode must be 'tags' or 'description'")
+
+    from api.grok import prompt_assist
+    try:
+        result = await prompt_assist(XAI_API_KEY, req.direction, req.mode)
+        return result
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
 class HasPersonBatchRequest(BaseModel):
     urls: list[str] = PydanticField(min_length=1, max_length=100)
 

@@ -925,6 +925,173 @@ function renderGrokImagesList() {
    ERROR
    ═══════════════════════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════════════════════
+   PROMPT ASSIST — AI-powered prompt suggestions
+   ═══════════════════════════════════════════════════════════ */
+
+function setupPromptAssist() {
+  const btn = $("#prompt-assist-btn");
+  const overlay = $("#prompt-assist-overlay");
+  const closeBtn = $("#prompt-assist-close");
+  const dirInput = $("#prompt-assist-direction");
+  const tagsBtn = $("#prompt-assist-tags");
+  const descBtn = $("#prompt-assist-desc");
+  const statusEl = $("#prompt-assist-status");
+  const resultsEl = $("#prompt-assist-results");
+  const selectedArea = $("#prompt-assist-selected");
+  const selectedContainer = $("#prompt-assist-selected-tags");
+  const clearBtn = $("#prompt-assist-clear");
+  const addBtn = $("#prompt-assist-add");
+
+  if (!btn || !overlay) return;
+
+  let selected = [];
+
+  function open() {
+    overlay.style.display = "flex";
+    resultsEl.innerHTML = "";
+    statusEl.style.display = "none";
+    selected = [];
+    renderSelected();
+    if (dirInput) dirInput.focus();
+  }
+
+  function close() {
+    overlay.style.display = "none";
+  }
+
+  function addTag(tag) {
+    if (!selected.includes(tag)) {
+      selected.push(tag);
+      renderSelected();
+    }
+  }
+
+  function renderSelected() {
+    if (!selectedContainer || !selectedArea) return;
+    selectedContainer.innerHTML = "";
+    if (selected.length === 0) { selectedArea.style.display = "none"; return; }
+    selectedArea.style.display = "";
+    for (const tag of selected) {
+      const pill = document.createElement("button");
+      pill.type = "button";
+      pill.className = "local-analysis-tag selected";
+      pill.textContent = tag + " \u00d7";
+      pill.addEventListener("click", () => {
+        selected = selected.filter(t => t !== tag);
+        renderSelected();
+      });
+      selectedContainer.appendChild(pill);
+    }
+  }
+
+  async function generate(mode) {
+    const direction = dirInput?.value.trim();
+    if (!direction) { dirInput?.focus(); return; }
+
+    statusEl.style.display = "block";
+    statusEl.textContent = mode === "tags" ? "Generating tags…" : "Generating description…";
+
+    try {
+      const resp = await fetch("/api/prompt-assist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ direction, mode }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || "Generation failed");
+      }
+      const data = await resp.json();
+      statusEl.style.display = "none";
+
+      if (mode === "tags" && data.tags) {
+        const section = document.createElement("div");
+        const label = document.createElement("div");
+        label.className = "local-analysis-section-label";
+        label.textContent = "NovelAI Tags";
+        section.appendChild(label);
+
+        const container = document.createElement("div");
+        container.className = "local-analysis-tags";
+        for (const tag of data.tags) {
+          const pill = document.createElement("button");
+          pill.type = "button";
+          pill.className = "local-analysis-tag";
+          pill.textContent = tag.replace(/_/g, " ");
+          pill.addEventListener("click", () => addTag(tag.replace(/_/g, " ")));
+          container.appendChild(pill);
+        }
+        section.appendChild(container);
+        resultsEl.innerHTML = "";
+        resultsEl.appendChild(section);
+      }
+
+      if (mode === "description" && data.description) {
+        const section = document.createElement("div");
+        const label = document.createElement("div");
+        label.className = "local-analysis-section-label";
+        label.textContent = "Grok Description";
+        section.appendChild(label);
+
+        const desc = document.createElement("div");
+        desc.className = "local-analysis-description";
+        desc.textContent = data.description;
+        section.appendChild(desc);
+
+        const actions = document.createElement("div");
+        actions.className = "local-analysis-desc-actions";
+
+        const copyBtn2 = document.createElement("button");
+        copyBtn2.type = "button";
+        copyBtn2.className = "btn-action";
+        copyBtn2.textContent = "Copy";
+        copyBtn2.addEventListener("click", () => {
+          navigator.clipboard.writeText(data.description);
+          copyBtn2.textContent = "Copied!";
+          setTimeout(() => { copyBtn2.textContent = "Copy"; }, 1500);
+        });
+        actions.appendChild(copyBtn2);
+
+        const useBtn = document.createElement("button");
+        useBtn.type = "button";
+        useBtn.className = "btn-action";
+        useBtn.textContent = "Use as Prompt";
+        useBtn.addEventListener("click", () => {
+          const el = $("#prompt");
+          if (el) { el.value = data.description; el.dispatchEvent(new Event("input", { bubbles: true })); }
+          close();
+        });
+        actions.appendChild(useBtn);
+
+        section.appendChild(actions);
+        resultsEl.innerHTML = "";
+        resultsEl.appendChild(section);
+      }
+    } catch (err) {
+      statusEl.style.display = "block";
+      statusEl.textContent = "Error: " + err.message;
+    }
+  }
+
+  btn.addEventListener("click", open);
+  closeBtn?.addEventListener("click", close);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  tagsBtn?.addEventListener("click", () => generate("tags"));
+  descBtn?.addEventListener("click", () => generate("description"));
+  clearBtn?.addEventListener("click", () => { selected = []; renderSelected(); });
+  addBtn?.addEventListener("click", () => {
+    if (selected.length > 0) {
+      insertTagIntoPrompt(selected.join(", "));
+    }
+    close();
+  });
+  dirInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); generate("tags"); }
+  });
+}
+
+
 function showStatus(msg) {
   clearError();
   const slot = $("#error-slot");
@@ -1055,6 +1222,7 @@ async function init() {
   setupLightbox();
   setupCraftPanel();
   setupExplorePanel();
+  setupPromptAssist();
   setupInpaint();
   setupLayers();
   setupCanvasLayerPanel();

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=108">
+  <link rel="stylesheet" href="css/style.css?v=109">
 </head>
 <body>
   <div class="app">
@@ -175,6 +175,40 @@
             </ul>
           </section>
 
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         PROMPT ASSIST OVERLAY — AI prompt suggestion modal
+         ═══════════════════════════════════════════════════════ -->
+    <div id="prompt-assist-overlay" class="analysis-overlay" style="display:none" aria-modal="true" role="dialog" aria-label="Prompt assistant">
+      <div class="analysis-shell">
+        <div class="analysis-header">
+          <span class="analysis-title">AI Prompt Assistant</span>
+          <button id="prompt-assist-close" class="crop-cancel-btn" type="button">Close</button>
+        </div>
+        <div class="prompt-assist-body">
+          <div class="prompt-assist-input-row">
+            <input type="text" id="prompt-assist-direction" class="explore-url-input" placeholder="Describe what you want… e.g. girl at the beach, cyberpunk city" spellcheck="false">
+          </div>
+          <div class="local-analysis-actions">
+            <button id="prompt-assist-tags" class="btn-action" type="button">NovelAI Tags</button>
+            <button id="prompt-assist-desc" class="btn-action" type="button">Grok Description</button>
+          </div>
+          <div id="prompt-assist-status" class="explore-status" style="display:none"></div>
+          <div id="prompt-assist-results" class="local-analysis-results"></div>
+          <div id="prompt-assist-selected" class="local-analysis-selected" style="display:none">
+            <div class="local-analysis-selected-header">
+              <span class="local-analysis-section-label">Selected Tags</span>
+              <button id="prompt-assist-clear" class="btn-action local-analysis-reanalyze" type="button">Clear</button>
+            </div>
+            <div id="prompt-assist-selected-tags" class="local-analysis-tags"></div>
+          </div>
+        </div>
+        <div class="local-analysis-footer">
+          <div style="flex:1"></div>
+          <button id="prompt-assist-add" class="btn-action btn-action--confirm" type="button">Add to Prompt</button>
         </div>
       </div>
     </div>
@@ -529,6 +563,9 @@
             </div>
             <div class="prompt-history-wrap">
               <textarea id="prompt" class="field-textarea field-textarea--prompt" rows="6" placeholder="Describe your vision… e.g. a girl standing in a field of sunflowers at golden hour" spellcheck="false"></textarea>
+              <button id="prompt-assist-btn" class="prompt-history-btn novelai-only" type="button" title="AI Prompt Assistant">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+              </button>
               <button id="prompt-history-btn" class="prompt-history-btn" type="button" title="Prompt history (Ctrl+H)">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               </button>
@@ -1087,16 +1124,16 @@
     </div>
   </div>
 
-  <script src="js/state.js?v=108"></script>
-  <script src="js/provider.js?v=108"></script>
-  <script src="js/crop.js?v=108"></script>
-  <script src="js/tags.js?v=108"></script>
-  <script src="js/layers.js?v=108"></script>
-  <script src="js/generate.js?v=108"></script>
-  <script src="js/craft.js?v=108"></script>
-  <script src="js/gallery.js?v=108"></script>
-  <script src="js/explore.js?v=108"></script>
-  <script src="js/characters.js?v=108"></script>
-  <script src="js/app.js?v=108"></script>
+  <script src="js/state.js?v=109"></script>
+  <script src="js/provider.js?v=109"></script>
+  <script src="js/crop.js?v=109"></script>
+  <script src="js/tags.js?v=109"></script>
+  <script src="js/layers.js?v=109"></script>
+  <script src="js/generate.js?v=109"></script>
+  <script src="js/craft.js?v=109"></script>
+  <script src="js/gallery.js?v=109"></script>
+  <script src="js/explore.js?v=109"></script>
+  <script src="js/characters.js?v=109"></script>
+  <script src="js/app.js?v=109"></script>
 </body>
 </html>
