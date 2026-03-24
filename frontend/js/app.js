@@ -6643,8 +6643,9 @@ function setupLightbox() {
     <div class="lightbox-footer">
       <div class="lightbox-prompt-row">
         <p class="lightbox-prompt" id="lb-prompt"></p>
-        <button class="btn-action lightbox-copy-prompt" id="lb-copy-prompt" type="button" title="Copy prompt">Copy</button>
+        <button class="btn-action lightbox-copy-prompt" id="lb-copy-prompt" type="button" title="Copy full prompt">Copy All</button>
       </div>
+      <div class="lightbox-tags local-analysis-tags" id="lb-tags"></div>
       <div class="lightbox-actions">
         <button class="btn-action" id="lb-load" type="button">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.84"/></svg>
@@ -6812,6 +6813,29 @@ function renderLightboxFrame() {
   // Prompt
   const promptEl = overlay.querySelector("#lb-prompt");
   if (promptEl) promptEl.textContent = meta.prompt || "";
+
+  // Tag pills — split prompt by commas
+  const tagsWrap = overlay.querySelector("#lb-tags");
+  if (tagsWrap) {
+    tagsWrap.innerHTML = "";
+    const promptText = meta.prompt || "";
+    if (promptText) {
+      const tags = promptText.split(",").map(t => t.trim()).filter(t => t);
+      for (const tag of tags) {
+        const pill = document.createElement("button");
+        pill.type = "button";
+        pill.className = "local-analysis-tag";
+        pill.textContent = tag;
+        pill.title = "Click to copy";
+        pill.addEventListener("click", () => {
+          navigator.clipboard.writeText(tag);
+          pill.classList.add("selected");
+          setTimeout(() => pill.classList.remove("selected"), 800);
+        });
+        tagsWrap.appendChild(pill);
+      }
+    }
+  }
 
   // Arrow disabled state
   const prevBtn = overlay.querySelector("#lb-prev");
