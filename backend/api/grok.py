@@ -161,7 +161,7 @@ async def analyze_image_vision(api_key: str, image_b64: str) -> dict:
         "Content-Type": "application/json",
     }
     payload = {
-        "model": "grok-2-vision-latest",
+        "model": "grok-4-1-fast-non-reasoning",
         "messages": [
             {"role": "system", "content": _VISION_SYSTEM_PROMPT},
             {
