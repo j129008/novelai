@@ -6641,7 +6641,10 @@ function setupLightbox() {
       </button>
     </div>
     <div class="lightbox-footer">
-      <p class="lightbox-prompt" id="lb-prompt"></p>
+      <div class="lightbox-prompt-row">
+        <p class="lightbox-prompt" id="lb-prompt"></p>
+        <button class="btn-action lightbox-copy-prompt" id="lb-copy-prompt" type="button" title="Copy prompt">Copy</button>
+      </div>
       <div class="lightbox-actions">
         <button class="btn-action" id="lb-load" type="button">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.84"/></svg>
@@ -6672,6 +6675,16 @@ function setupLightbox() {
   });
 
   overlay.querySelector("#lb-close").addEventListener("click", closeLightbox);
+
+  overlay.querySelector("#lb-copy-prompt").addEventListener("click", () => {
+    const promptEl = overlay.querySelector("#lb-prompt");
+    if (promptEl && promptEl.textContent) {
+      navigator.clipboard.writeText(promptEl.textContent);
+      const btn = overlay.querySelector("#lb-copy-prompt");
+      btn.textContent = "Copied!";
+      setTimeout(() => { btn.textContent = "Copy"; }, 1500);
+    }
+  });
 
   overlay.querySelector("#lb-prev").addEventListener("click", () => navigateLightbox(-1));
   overlay.querySelector("#lb-next").addEventListener("click", () => navigateLightbox(1));
