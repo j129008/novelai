@@ -1352,8 +1352,8 @@ _PERSON_TAGS = frozenset([
 
 @router.post("/explore/has-person")
 async def explore_has_person(req: AnalyzeImageRequest):
-    """Quick check if an image contains a person using WD Tagger. Returns {has_person: bool}."""
-    from api.tagger import ensure_model_loaded, get_model_status, run_inference
+    """Quick check if an image contains a person using Florence-2 caption. Returns {has_person: bool}."""
+    from api.florence import ensure_model_loaded, get_model_status, run_caption_only
 
     status = ensure_model_loaded()
     if status in ("not_started", "downloading"):
@@ -1363,14 +1363,12 @@ async def explore_has_person(req: AnalyzeImageRequest):
         return {"has_person": None, "status": "failed"}
 
     try:
-        raw_tags = run_inference(req.image)
-    except RuntimeError:
+        image_bytes = base64.b64decode(req.image)
+        caption = run_caption_only(image_bytes).lower()
+        has_person = any(kw in caption for kw in _PERSON_KEYWORDS)
+        return {"has_person": has_person, "status": "ready"}
+    except Exception:
         return {"has_person": None, "status": "error"}
-
-    for t in raw_tags:
-        if t["name"] in _PERSON_TAGS and t["score"] >= 0.4:
-            return {"has_person": True, "status": "ready"}
-    return {"has_person": False, "status": "ready"}
 
 
 _PERSON_KEYWORDS = frozenset([

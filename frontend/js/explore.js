@@ -648,77 +648,61 @@ function setupExplorePanel() {
       const cards = Array.from(grid.querySelectorAll(".explore-card"));
       if (cards.length === 0) return;
 
-      // Collect original image URLs for batch detection
-      const urls = cards.map(c => c.dataset.src).filter(Boolean);
-      if (urls.length === 0) return;
+      // Hide all cards, then show as we find people
+      cards.forEach(c => { c.style.display = "none"; });
 
       if (status) {
         status.style.display = "block";
-        status.textContent = "Analyzing 0/" + urls.length + " images…";
+        status.textContent = "Analyzing 0/" + cards.length + " images…";
       }
 
-      // Build URL→card lookup
-      const cardMap = {};
+      let visible = 0;
+      let done = 0;
+      const total = cards.length;
+
+      // Process cards sequentially — extract base64 from already-loaded proxy img, send to backend
       for (const card of cards) {
-        if (card.dataset.src) cardMap[card.dataset.src] = card;
+        if (!filterActive) break;
+        const imgEl = card.querySelector("img");
+        if (!imgEl || !imgEl.complete || !imgEl.naturalWidth) {
+          done++;
+          continue;
+        }
+
+        try {
+          // Draw loaded image to canvas to get base64
+          const canvas = document.createElement("canvas");
+          const size = Math.min(384, Math.max(imgEl.naturalWidth, imgEl.naturalHeight));
+          const scale = size / Math.max(imgEl.naturalWidth, imgEl.naturalHeight);
+          canvas.width = Math.round(imgEl.naturalWidth * scale);
+          canvas.height = Math.round(imgEl.naturalHeight * scale);
+          canvas.getContext("2d").drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+          const b64 = canvas.toDataURL("image/jpeg", 0.6).split(",")[1];
+
+          const resp = await fetch("/api/explore/has-person", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image: b64 }),
+          });
+          if (resp.ok) {
+            const result = await resp.json();
+            if (result.has_person) {
+              card.style.display = "";
+              visible++;
+            }
+          }
+        } catch (_) {}
+
+        done++;
+        if (status && filterActive) {
+          status.textContent = "Analyzing " + done + "/" + total + " — " + visible + " with people";
+        }
       }
 
-      // Hide all cards initially, show as we find people
-      cards.forEach(c => { c.style.display = "none"; });
-
-      try {
-        const resp = await fetch("/api/explore/has-person-batch", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ urls }),
-        });
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => ({}));
-          throw new Error(err.detail || "Analysis failed");
-        }
-
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let visible = 0;
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          // Parse SSE lines
-          const lines = buffer.split("\n");
-          buffer = lines.pop(); // keep incomplete line
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.complete) break;
-
-              if (data.url && cardMap[data.url]) {
-                if (data.has_person) {
-                  cardMap[data.url].style.display = "";
-                  visible++;
-                }
-              }
-              if (status && filterActive) {
-                status.textContent = "Analyzing " + data.done + "/" + data.total + " — " + visible + " with people";
-              }
-            } catch (_) {}
-          }
-        }
-
-        if (status && filterActive) {
-          status.textContent = visible > 0
-            ? "Filter complete: " + visible + " images with people"
-            : "No images with people found";
-        }
-      } catch (err) {
-        if (status) {
-          status.style.display = "block";
-          status.textContent = "Filter error: " + err.message;
-        }
+      if (status && filterActive) {
+        status.textContent = visible > 0
+          ? "Filter complete: " + visible + " images with people"
+          : "No images with people found";
       }
     });
   }
