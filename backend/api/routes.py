@@ -1372,8 +1372,7 @@ async def explore_has_person(req: AnalyzeImageRequest):
 
 
 _PERSON_KEYWORDS = frozenset([
-    "person", "people", "man", "woman", "girl", "boy", "child", "baby",
-    "face", "portrait", "selfie", "couple", "crowd", "human",
+    "woman", "women", "girl", "lady", "female",
 ])
 
 

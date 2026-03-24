@@ -563,9 +563,10 @@ function setupExplorePanel() {
         return;
       }
 
-      // Render image grid (pre-filter tiny images < 150px)
+      // Render image grid
       for (const img of data.images) {
-        if (img.width && img.height && (img.width < 150 || img.height < 150)) continue;
+        // Pre-filter by declared size if available
+        if (img.width > 0 && img.height > 0 && (img.width < 150 || img.height < 150)) continue;
 
         const card = document.createElement("div");
         card.className = "explore-card";
@@ -575,6 +576,12 @@ function setupExplorePanel() {
         imgEl.src = "/api/explore/image?url=" + encodeURIComponent(img.src);
         imgEl.alt = img.alt || "";
         imgEl.loading = "lazy";
+        // Hide tiny images after they load (catches cases where declared size was missing)
+        imgEl.addEventListener("load", () => {
+          if (imgEl.naturalWidth < 150 || imgEl.naturalHeight < 150) {
+            card.style.display = "none";
+          }
+        });
         imgEl.addEventListener("click", () => {
           useExploreImage(img.src);
         });
