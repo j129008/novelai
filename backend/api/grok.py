@@ -269,7 +269,7 @@ async def prompt_assist(api_key: str, direction: str, mode: str, current_prompt:
         "Content-Type": "application/json",
     }
     payload = {
-        "model": "grok-4-1-fast-non-reasoning",
+        "model": "grok-3-mini",
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user_msg},
