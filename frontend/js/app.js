@@ -809,45 +809,8 @@ function loadImageFile(file) {
   reader.onload = (ev) => {
     const img = new Image();
     img.onload = () => {
-      const provider = document.getElementById("provider")?.value || "novelai";
-
-      if (provider === "grok") {
-        const b64 = ev.target.result.split(",")[1];
-        const ar = document.getElementById("grok-aspect-ratio")?.value || "auto";
-        if (ar !== "auto") {
-          // Specific aspect ratio: open crop overlay
-          openCropOverlay(img);
-        } else if (!state.img2img) {
-          // No source yet — set as source
-          state.img2img = b64;
-          state.canvasImageBase64 = b64;
-          state.canvasImageWidth = img.naturalWidth;
-          state.canvasImageHeight = img.naturalHeight;
-        } else if (grokRefs.length < MAX_GROK_REFS) {
-          // Source exists — add as reference
-          grokRefs.push({ base64: b64 });
-        }
-        renderGrokImagesList();
-        const canvasTab = $("#tab-canvas");
-        if (canvasTab) canvasTab.click();
-        return;
-      }
-
-      // NovelAI: add image to a new layer instead of img2img source
-      const b64 = ev.target.result.split(",")[1];
-      if (layers.length >= MAX_LAYERS) {
-        showStatus("Maximum of " + MAX_LAYERS + " layers reached.");
-        return;
-      }
-      const baseName = file.name ? file.name.replace(/\.[^.]+$/, "") : "Layer " + (layers.length + 1);
-      layers.push({ id: Date.now(), name: baseName, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0, scale: 1.0 });
-      renderLayerList();
-      saveLayersToStorage();
-      refreshCompositePreview();
-      // Open layers accordion so the user sees the new layer
-      const accordion = document.getElementById("layers-accordion");
-      if (accordion && !accordion.open) accordion.open = true;
-      showStatus("Image added as layer \"" + baseName + "\"");
+      // Route through crop overlay — confirmCrop/skipCrop handle all post-import logic
+      openCropOverlay(img);
     };
     img.src = ev.target.result;
   };
@@ -858,9 +821,51 @@ function loadImageFile(file) {
    CROP OVERLAY
    ═══════════════════════════════════════════════════════════ */
 
+/**
+ * Shared post-import logic for all image import paths (crop confirm, skip, etc.)
+ * Handles both Grok (source/ref) and NovelAI (layer) modes.
+ */
+function applyImportedImage(b64, width, height, dataUrl) {
+  const provider = document.getElementById("provider")?.value || "novelai";
+  if (provider === "grok") {
+    if (!state.img2img) {
+      // No source yet — set as source
+      state.img2img = b64;
+      state.canvasImageBase64 = b64;
+      state.canvasImageWidth = width;
+      state.canvasImageHeight = height;
+      showGrokSourceOnCanvas(dataUrl || "data:image/png;base64," + b64);
+    } else if (grokRefs.length < MAX_GROK_REFS) {
+      // Source exists — add as reference
+      grokRefs.push({ base64: b64 });
+    }
+    renderGrokImagesList();
+    const canvasTab = $("#tab-canvas");
+    if (canvasTab) canvasTab.click();
+  } else {
+    // NovelAI: add as layer
+    if (layers.length < MAX_LAYERS) {
+      const n = layers.length + 1;
+      layers.push({ id: Date.now(), name: "Layer " + n, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0, scale: 1.0 });
+      renderLayerList();
+      saveLayersToStorage();
+      refreshCompositePreview();
+      const accordion = document.getElementById("layers-accordion");
+      if (accordion && !accordion.open) accordion.open = true;
+      showStatus("Image added as layer.");
+    } else {
+      showStatus("Maximum of " + MAX_LAYERS + " layers reached.");
+    }
+    const canvasTab = $("#tab-canvas");
+    if (canvasTab) canvasTab.click();
+  }
+}
+
 function openCropOverlay(imgEl) {
   const overlay = $("#crop-overlay");
   if (!overlay) return;
+  // Prevent double-open when multiple images are imported rapidly
+  if (overlay.style.display !== "none") return;
 
   // Read target resolution based on current provider
   const provider = document.getElementById("provider")?.value || "novelai";
@@ -1081,6 +1086,9 @@ function setupCropInteraction() {
 
   // Cancel
   if (cancelBtn)  cancelBtn.addEventListener("click", closeCropOverlay);
+
+  const skipBtn = $("#crop-skip");
+  if (skipBtn) skipBtn.addEventListener("click", skipCrop);
 }
 
 function teardownCropInteraction() {
@@ -1152,11 +1160,6 @@ function confirmCrop() {
   exportCanvas.height = crop.targetH;
   const ctx = exportCanvas.getContext("2d");
 
-  // The crop region in image-native pixels:
-  //   srcX = offsetX / scale
-  //   srcY = offsetY / scale
-  //   srcW = frameW  / scale
-  //   srcH = frameH  / scale
   const srcX = crop.offsetX / crop.scale;
   const srcY = crop.offsetY / crop.scale;
   const srcW = crop.frameW  / crop.scale;
@@ -1168,37 +1171,32 @@ function confirmCrop() {
     0, 0, crop.targetW, crop.targetH
   );
 
-  // Export as PNG base64
   const dataUrl = exportCanvas.toDataURL("image/png");
   const b64 = dataUrl.split(",")[1];
 
   closeCropOverlay();
+  applyImportedImage(b64, crop.targetW, crop.targetH, dataUrl);
+}
 
-  const provider = document.getElementById("provider")?.value || "novelai";
-  if (provider === "grok") {
-    state.img2img = b64;
-    state.canvasImageBase64 = b64;
-    state.canvasImageWidth = crop.targetW;
-    state.canvasImageHeight = crop.targetH;
-    showGrokSourceOnCanvas(dataUrl);
-    renderGrokImagesList();
-  } else {
-    // NovelAI: add cropped image as a new layer
-    if (layers.length < MAX_LAYERS) {
-      const n = layers.length + 1;
-      layers.push({ id: Date.now(), name: "Layer " + n, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0, scale: 1.0 });
-      renderLayerList();
-      saveLayersToStorage();
-      refreshCompositePreview();
-      const accordion = document.getElementById("layers-accordion");
-      if (accordion && !accordion.open) accordion.open = true;
-      showStatus("Cropped image added as layer.");
-    } else {
-      showStatus("Maximum of " + MAX_LAYERS + " layers reached.");
-    }
-    const canvasTab = $("#tab-canvas");
-    if (canvasTab) canvasTab.click();
-  }
+function skipCrop() {
+  if (!crop.img) return;
+
+  // Capture dimensions before closing overlay
+  const w = crop.img.naturalWidth;
+  const h = crop.img.naturalHeight;
+
+  // Use original image at native dimensions (no cropping)
+  const exportCanvas = document.createElement("canvas");
+  exportCanvas.width = w;
+  exportCanvas.height = h;
+  const ctx = exportCanvas.getContext("2d");
+  ctx.drawImage(crop.img, 0, 0);
+
+  const dataUrl = exportCanvas.toDataURL("image/png");
+  const b64 = dataUrl.split(",")[1];
+
+  closeCropOverlay();
+  applyImportedImage(b64, w, h, dataUrl);
 }
 
 function showGrokSourceOnCanvas(dataUrl) {
@@ -7369,35 +7367,11 @@ function setupExplorePanel() {
       const reader = new FileReader();
       reader.onload = (ev) => {
         const dataUrl = ev.target.result;
-        const b64 = dataUrl.split(",")[1];
-
-        const provider = document.getElementById("provider")?.value || "novelai";
-        if (provider === "grok") {
-          state.img2img = b64;
-          showGrokSourceOnCanvas(dataUrl);
-          state.canvasImageBase64 = b64;
-          state.canvasImageWidth = null;
-          state.canvasImageHeight = null;
-          renderGrokImagesList();
-        } else {
-          // NovelAI: add to layers
-          if (layers.length < MAX_LAYERS) {
-            layers.push({ id: Date.now(), name: "Explore Image", imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0, scale: 1.0 });
-            renderLayerList();
-            saveLayersToStorage();
-            refreshCompositePreview();
-            const accordion = document.getElementById("layers-accordion");
-            if (accordion && !accordion.open) accordion.open = true;
-          } else {
-            showStatus("Maximum of " + MAX_LAYERS + " layers reached.");
-          }
-        }
-
-        // Switch to Canvas tab so the user sees the loaded source
-        const canvasTab = $("#tab-canvas");
-        if (canvasTab) canvasTab.click();
-
-        showStatus("Image loaded");
+        const img = new Image();
+        img.onload = () => {
+          openCropOverlay(img);
+        };
+        img.src = dataUrl;
       };
       reader.readAsDataURL(blob);
     } catch (err) {
