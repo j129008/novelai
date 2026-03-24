@@ -40,6 +40,8 @@ from models.schemas import (
     GrokVideoResponse,
     LayerRedrawRequest,
     LayerRedrawResponse,
+    LocalBrowseItem,
+    LocalBrowseResponse,
     RecordCharactersRequest,
     SuggestTagsRequest,
     SuggestTagsResponse,

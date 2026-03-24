@@ -216,3 +216,16 @@ class ExplorePageResponse(BaseModel):
     images: list[ExploreImage]
     links: list[ExploreLink]
 
+
+# ---------------------------------------------------------------------------
+# Local Folder Browser
+# ---------------------------------------------------------------------------
+
+class LocalBrowseItem(BaseModel):
+    name: str
+
+class LocalBrowseResponse(BaseModel):
+    path: str
+    directories: list[LocalBrowseItem]
+    files: list[LocalBrowseItem]
+
