@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=100">
+  <link rel="stylesheet" href="css/style.css?v=101">
 </head>
 <body>
   <div class="app">
@@ -175,6 +175,36 @@
             </ul>
           </section>
 
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         IMAGE ANALYSIS OVERLAY — modal for tag analysis
+         ═══════════════════════════════════════════════════════ -->
+    <div id="local-analysis-overlay" class="analysis-overlay" style="display:none" aria-modal="true" role="dialog" aria-label="Image analysis">
+      <div class="analysis-shell">
+        <div class="analysis-header">
+          <span class="analysis-title">Image Analysis</span>
+          <button id="local-analysis-close" class="crop-cancel-btn" type="button">Close</button>
+        </div>
+        <div class="analysis-body">
+          <div class="local-analysis-preview">
+            <img id="local-analysis-img" alt="">
+          </div>
+          <div class="local-analysis-right">
+            <div class="local-analysis-actions">
+              <button id="local-analyze-wd" class="btn-action" type="button">WD Tagger</button>
+              <button id="local-analyze-grok" class="btn-action" type="button">Grok Vision</button>
+            </div>
+            <div id="local-analysis-status" class="explore-status" style="display:none"></div>
+            <div id="local-analysis-results" class="local-analysis-results"></div>
+          </div>
+        </div>
+        <div class="local-analysis-footer">
+          <button id="local-analysis-reanalyze-wd" class="btn-action local-analysis-reanalyze" type="button" style="display:none">Re-analyze WD</button>
+          <button id="local-analysis-reanalyze-grok" class="btn-action local-analysis-reanalyze" type="button" style="display:none">Re-analyze Grok</button>
+          <button id="local-analysis-send" class="btn-action btn-action--confirm" type="button">Send to Canvas</button>
         </div>
       </div>
     </div>
@@ -1023,26 +1053,6 @@
             <div id="local-breadcrumb" class="local-breadcrumb"></div>
             <div id="local-status" class="explore-status" style="display:none"></div>
             <div id="local-grid" class="explore-grid"></div>
-            <div id="local-analysis-panel" class="local-analysis-panel" style="display:none">
-              <div class="local-analysis-content">
-                <div class="local-analysis-preview">
-                  <img id="local-analysis-img" alt="">
-                </div>
-                <div class="local-analysis-right">
-                  <div class="local-analysis-actions">
-                    <button id="local-analyze-wd" class="btn-action" type="button">WD Tagger</button>
-                    <button id="local-analyze-grok" class="btn-action" type="button">Grok Vision</button>
-                  </div>
-                  <div id="local-analysis-status" class="explore-status" style="display:none"></div>
-                  <div id="local-analysis-results" class="local-analysis-results"></div>
-                </div>
-              </div>
-              <div class="local-analysis-footer">
-                <button id="local-analysis-reanalyze-wd" class="btn-action local-analysis-reanalyze" type="button" style="display:none">Re-analyze WD</button>
-                <button id="local-analysis-reanalyze-grok" class="btn-action local-analysis-reanalyze" type="button" style="display:none">Re-analyze Grok</button>
-                <button id="local-analysis-send" class="btn-action btn-action--confirm" type="button">Send to Canvas</button>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -1066,6 +1076,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=100"></script>
+  <script src="js/app.js?v=101"></script>
 </body>
 </html>

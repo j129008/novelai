@@ -7248,8 +7248,8 @@ function setupExplorePanel() {
     }
   }
 
-  // ── Analysis panel state ──
-  const analysisPanel = $("#local-analysis-panel");
+  // ── Analysis overlay state ──
+  const analysisPanel = $("#local-analysis-overlay");
   const analysisImg = $("#local-analysis-img");
   const analysisResults = $("#local-analysis-results");
   const analysisStatus = $("#local-analysis-status");
@@ -7272,7 +7272,7 @@ function setupExplorePanel() {
     currentAnalysisPath = imgPath;
     analysisResults.innerHTML = "";
     analysisStatus.style.display = "none";
-    analysisPanel.style.display = "";
+    analysisPanel.style.display = "flex";
     reanalyzeWdBtn.style.display = "none";
     reanalyzeGrokBtn.style.display = "none";
 
@@ -7292,6 +7292,15 @@ function setupExplorePanel() {
   function closeAnalysisPanel() {
     analysisPanel.style.display = "none";
     currentAnalysisPath = "";
+  }
+
+  // Close button + click backdrop to close
+  const analysisCloseBtn = $("#local-analysis-close");
+  if (analysisCloseBtn) analysisCloseBtn.addEventListener("click", closeAnalysisPanel);
+  if (analysisPanel) {
+    analysisPanel.addEventListener("click", (e) => {
+      if (e.target === analysisPanel) closeAnalysisPanel(); // click backdrop
+    });
   }
 
   function renderWdTags(tags) {
