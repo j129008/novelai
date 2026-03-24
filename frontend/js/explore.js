@@ -668,12 +668,12 @@ function setupExplorePanel() {
           throw new Error(err.detail || "Analysis failed");
         }
         const result = await resp.json();
-        // result.results = { url: true/false, ... }
+        const resultMap = result.results || {};
 
         let visible = 0;
         for (const card of cards) {
           const src = card.dataset.src;
-          if (src && result.results[src] === true) {
+          if (src && resultMap[src] === true) {
             card.style.display = "";
             visible++;
           } else {
