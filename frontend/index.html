@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=103">
+  <link rel="stylesheet" href="css/style.css?v=104">
 </head>
 <body>
   <div class="app">
@@ -202,10 +202,19 @@
             <div id="local-analysis-results" class="local-analysis-results"></div>
           </div>
         </div>
+        <div id="local-analysis-selected" class="local-analysis-selected" style="display:none">
+          <div class="local-analysis-selected-header">
+            <span class="local-analysis-section-label">Selected Tags</span>
+            <button id="local-analysis-clear-tags" class="btn-action local-analysis-reanalyze" type="button">Clear</button>
+          </div>
+          <div id="local-analysis-selected-tags" class="local-analysis-tags"></div>
+        </div>
         <div class="local-analysis-footer">
           <button id="local-analysis-reanalyze-wd" class="btn-action local-analysis-reanalyze" type="button" style="display:none">Re-analyze WD</button>
           <button id="local-analysis-reanalyze-florence" class="btn-action local-analysis-reanalyze" type="button" style="display:none">Re-analyze Florence</button>
           <button id="local-analysis-reanalyze-grok" class="btn-action local-analysis-reanalyze" type="button" style="display:none">Re-analyze Grok</button>
+          <div style="flex:1"></div>
+          <button id="local-analysis-add-prompt" class="btn-action btn-action--primary" type="button">Add to Prompt</button>
           <button id="local-analysis-send" class="btn-action btn-action--confirm" type="button">Send to Canvas</button>
         </div>
       </div>
@@ -1078,6 +1087,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=103"></script>
+  <script src="js/app.js?v=104"></script>
 </body>
 </html>

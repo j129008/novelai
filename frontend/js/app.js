@@ -7261,6 +7261,47 @@ function setupExplorePanel() {
   const reanalyzeFlorenceBtn = $("#local-analysis-reanalyze-florence");
   const reanalyzeGrokBtn = $("#local-analysis-reanalyze-grok");
   let currentAnalysisPath = "";
+  let selectedTags = [];
+  const selectedArea = $("#local-analysis-selected");
+  const selectedTagsContainer = $("#local-analysis-selected-tags");
+  const clearTagsBtn = $("#local-analysis-clear-tags");
+  const addToPromptBtn = $("#local-analysis-add-prompt");
+
+  function addTagToSelection(tag) {
+    if (selectedTags.includes(tag)) return;
+    selectedTags.push(tag);
+    renderSelectedTags();
+  }
+
+  function removeTagFromSelection(tag) {
+    selectedTags = selectedTags.filter(t => t !== tag);
+    renderSelectedTags();
+  }
+
+  function renderSelectedTags() {
+    if (!selectedTagsContainer || !selectedArea) return;
+    selectedTagsContainer.innerHTML = "";
+    if (selectedTags.length === 0) {
+      selectedArea.style.display = "none";
+      return;
+    }
+    selectedArea.style.display = "";
+    for (const tag of selectedTags) {
+      const pill = document.createElement("button");
+      pill.type = "button";
+      pill.className = "local-analysis-tag selected";
+      pill.textContent = tag + " ×";
+      pill.addEventListener("click", () => removeTagFromSelection(tag));
+      selectedTagsContainer.appendChild(pill);
+    }
+  }
+
+  if (clearTagsBtn) clearTagsBtn.addEventListener("click", () => { selectedTags = []; renderSelectedTags(); });
+  if (addToPromptBtn) addToPromptBtn.addEventListener("click", () => {
+    if (selectedTags.length === 0) return;
+    insertTagIntoPrompt(selectedTags.join(", "));
+    closeAnalysisPanel();
+  });
 
   // Check if Grok Vision is available
   fetch("/api/settings").then(r => r.json()).then(s => {
@@ -7278,6 +7319,8 @@ function setupExplorePanel() {
     reanalyzeWdBtn.style.display = "none";
     reanalyzeFlorenceBtn.style.display = "none";
     reanalyzeGrokBtn.style.display = "none";
+    selectedTags = [];
+    renderSelectedTags();
 
     // Show preview
     analysisImg.src = "/api/explore/local/image?path=" + encodeURIComponent(imgPath);
@@ -7327,7 +7370,7 @@ function setupExplorePanel() {
       pill.className = "local-analysis-tag";
       pill.textContent = tag.name.replace(/_/g, " ");
       pill.title = tag.name + " (" + (tag.score * 100).toFixed(0) + "%)";
-      pill.addEventListener("click", () => insertTagIntoPrompt(tag.name.replace(/_/g, " ")));
+      pill.addEventListener("click", () => addTagToSelection(tag.name.replace(/_/g, " ")));
       container.appendChild(pill);
     }
     section.appendChild(container);
@@ -7424,7 +7467,7 @@ function setupExplorePanel() {
       pill.type = "button";
       pill.className = "local-analysis-tag";
       pill.textContent = tag.replace(/_/g, " ");
-      pill.addEventListener("click", () => insertTagIntoPrompt(tag.replace(/_/g, " ")));
+      pill.addEventListener("click", () => addTagToSelection(tag.replace(/_/g, " ")));
       tagContainer.appendChild(pill);
     }
     section.appendChild(tagContainer);
