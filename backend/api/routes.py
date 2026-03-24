@@ -18,7 +18,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 log = logging.getLogger("app")
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field as PydanticField
 
 from models.schemas import (
     AnalyzeImageRequest,
@@ -1380,7 +1380,7 @@ _PERSON_KEYWORDS = frozenset([
 
 
 class HasPersonBatchRequest(BaseModel):
-    urls: list[str] = Field(min_length=1, max_length=100)
+    urls: list[str] = PydanticField(min_length=1, max_length=100)
 
 
 @router.post("/explore/has-person-batch")
