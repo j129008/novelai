@@ -7159,6 +7159,16 @@ function setupExplorePanel() {
       }
       const data = await resp.json();
 
+      // Fetch batch tag status for dot indicators
+      let analyzedMap = {};
+      try {
+        const tagsResp = await fetch("/api/explore/local/tags/batch?path=" + encodeURIComponent(subpath));
+        if (tagsResp.ok) {
+          const tagsData = await tagsResp.json();
+          analyzedMap = tagsData.analyzed || {};
+        }
+      } catch (_) {}
+
       localStatus.style.display = "none";
       renderLocalBreadcrumb(subpath);
 
@@ -7184,6 +7194,11 @@ function setupExplorePanel() {
         imgEl.loading = "lazy";
         imgEl.addEventListener("click", () => useLocalImage(imgPath));
         card.appendChild(imgEl);
+        if (analyzedMap[file.name]) {
+          const dot = document.createElement("div");
+          dot.className = "explore-card-analyzed-dot";
+          card.appendChild(dot);
+        }
         localGrid.appendChild(card);
       }
 
@@ -7233,25 +7248,203 @@ function setupExplorePanel() {
     }
   }
 
-  async function useLocalImage(imgPath) {
-    try {
-      const resp = await fetch("/api/explore/local/image?path=" + encodeURIComponent(imgPath));
-      if (!resp.ok) throw new Error("Failed to load image");
-      const blob = await resp.blob();
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const dataUrl = ev.target.result;
-        // Create temp Image element for crop overlay
-        const img = new Image();
-        img.onload = () => {
-          openCropOverlay(img);
-        };
-        img.src = dataUrl;
-      };
-      reader.readAsDataURL(blob);
-    } catch (err) {
-      showError("Failed to load image: " + err.message);
+  // ── Analysis panel state ──
+  const analysisPanel = $("#local-analysis-panel");
+  const analysisImg = $("#local-analysis-img");
+  const analysisResults = $("#local-analysis-results");
+  const analysisStatus = $("#local-analysis-status");
+  const analyzeWdBtn = $("#local-analyze-wd");
+  const analyzeGrokBtn = $("#local-analyze-grok");
+  const analysisSendBtn = $("#local-analysis-send");
+  const reanalyzeWdBtn = $("#local-analysis-reanalyze-wd");
+  const reanalyzeGrokBtn = $("#local-analysis-reanalyze-grok");
+  let currentAnalysisPath = "";
+
+  // Check if Grok Vision is available
+  fetch("/api/settings").then(r => r.json()).then(s => {
+    if (!s.xai_api_configured && analyzeGrokBtn) {
+      analyzeGrokBtn.disabled = true;
+      analyzeGrokBtn.title = "XAI_API_KEY not configured";
     }
+  }).catch(() => {});
+
+  function openAnalysisPanel(imgPath) {
+    currentAnalysisPath = imgPath;
+    analysisResults.innerHTML = "";
+    analysisStatus.style.display = "none";
+    analysisPanel.style.display = "";
+    reanalyzeWdBtn.style.display = "none";
+    reanalyzeGrokBtn.style.display = "none";
+
+    // Show preview
+    analysisImg.src = "/api/explore/local/image?path=" + encodeURIComponent(imgPath);
+
+    // Load cached tags
+    fetch("/api/explore/local/tags?path=" + encodeURIComponent(imgPath))
+      .then(r => r.json())
+      .then(data => {
+        if (data.wd) renderWdTags(data.wd);
+        if (data.grok) renderGrokAnalysis(data.grok);
+      })
+      .catch(() => {});
+  }
+
+  function closeAnalysisPanel() {
+    analysisPanel.style.display = "none";
+    currentAnalysisPath = "";
+  }
+
+  function renderWdTags(tags) {
+    const existing = analysisResults.querySelector(".wd-section");
+    if (existing) existing.remove();
+
+    const section = document.createElement("div");
+    section.className = "wd-section";
+
+    const label = document.createElement("div");
+    label.className = "local-analysis-section-label";
+    label.textContent = "WD Tagger";
+    section.appendChild(label);
+
+    const container = document.createElement("div");
+    container.className = "local-analysis-tags";
+    for (const tag of tags) {
+      const pill = document.createElement("button");
+      pill.type = "button";
+      pill.className = "local-analysis-tag";
+      pill.textContent = tag.name.replace(/_/g, " ");
+      pill.title = tag.name + " (" + (tag.score * 100).toFixed(0) + "%)";
+      pill.addEventListener("click", () => insertTagIntoPrompt(tag.name.replace(/_/g, " ")));
+      container.appendChild(pill);
+    }
+    section.appendChild(container);
+    analysisResults.appendChild(section);
+    reanalyzeWdBtn.style.display = "";
+  }
+
+  function renderGrokAnalysis(grok) {
+    const existing = analysisResults.querySelector(".grok-section");
+    if (existing) existing.remove();
+
+    const section = document.createElement("div");
+    section.className = "grok-section";
+
+    const tagLabel = document.createElement("div");
+    tagLabel.className = "local-analysis-section-label";
+    tagLabel.textContent = "Grok Vision Tags";
+    section.appendChild(tagLabel);
+
+    const tagContainer = document.createElement("div");
+    tagContainer.className = "local-analysis-tags";
+    for (const tag of grok.tags) {
+      const pill = document.createElement("button");
+      pill.type = "button";
+      pill.className = "local-analysis-tag";
+      pill.textContent = tag.replace(/_/g, " ");
+      pill.addEventListener("click", () => insertTagIntoPrompt(tag.replace(/_/g, " ")));
+      tagContainer.appendChild(pill);
+    }
+    section.appendChild(tagContainer);
+
+    const descLabel = document.createElement("div");
+    descLabel.className = "local-analysis-section-label";
+    descLabel.textContent = "Description";
+    descLabel.style.marginTop = "8px";
+    section.appendChild(descLabel);
+
+    const desc = document.createElement("div");
+    desc.className = "local-analysis-description";
+    desc.textContent = grok.description;
+    section.appendChild(desc);
+
+    const descActions = document.createElement("div");
+    descActions.className = "local-analysis-desc-actions";
+
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "btn-action";
+    copyBtn.textContent = "Copy";
+    copyBtn.addEventListener("click", () => {
+      navigator.clipboard.writeText(grok.description);
+      copyBtn.textContent = "Copied!";
+      setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
+    });
+    descActions.appendChild(copyBtn);
+
+    const useBtn = document.createElement("button");
+    useBtn.type = "button";
+    useBtn.className = "btn-action";
+    useBtn.textContent = "Use as Prompt";
+    useBtn.addEventListener("click", () => {
+      const el = $("#prompt");
+      if (el) { el.value = grok.description; el.dispatchEvent(new Event("input", { bubbles: true })); }
+    });
+    descActions.appendChild(useBtn);
+
+    section.appendChild(descActions);
+    analysisResults.appendChild(section);
+    reanalyzeGrokBtn.style.display = "";
+  }
+
+  async function runAnalysis(method) {
+    if (!currentAnalysisPath) return;
+    analysisStatus.style.display = "block";
+    analysisStatus.textContent = method === "wd" ? "Running WD Tagger..." : "Analyzing with Grok Vision...";
+
+    try {
+      const resp = await fetch("/api/explore/local/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: currentAnalysisPath, method }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || "Analysis failed");
+      }
+      const data = await resp.json();
+      analysisStatus.style.display = "none";
+
+      if (data.wd) renderWdTags(data.wd);
+      if (data.grok) renderGrokAnalysis(data.grok);
+
+      // Refresh grid to show dot indicator
+      browseLocalFolder(localCurrentSubpath);
+    } catch (err) {
+      analysisStatus.style.display = "block";
+      analysisStatus.textContent = "Error: " + err.message;
+    }
+  }
+
+  // Wire up buttons
+  if (analyzeWdBtn) analyzeWdBtn.addEventListener("click", () => runAnalysis("wd"));
+  if (analyzeGrokBtn) analyzeGrokBtn.addEventListener("click", () => runAnalysis("grok"));
+  if (reanalyzeWdBtn) reanalyzeWdBtn.addEventListener("click", () => runAnalysis("wd"));
+  if (reanalyzeGrokBtn) reanalyzeGrokBtn.addEventListener("click", () => runAnalysis("grok"));
+
+  // Send to Canvas button
+  if (analysisSendBtn) {
+    analysisSendBtn.addEventListener("click", async () => {
+      if (!currentAnalysisPath) return;
+      try {
+        const resp = await fetch("/api/explore/local/image?path=" + encodeURIComponent(currentAnalysisPath));
+        if (!resp.ok) throw new Error("Failed to load image");
+        const blob = await resp.blob();
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.onload = () => { openCropOverlay(img); };
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(blob);
+      } catch (err) {
+        showError("Failed to load image: " + err.message);
+      }
+    });
+  }
+
+  // Image click handler — opens analysis panel instead of crop overlay
+  async function useLocalImage(imgPath) {
+    openAnalysisPanel(imgPath);
   }
 
   // Browse button — macOS folder picker
