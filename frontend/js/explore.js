@@ -528,7 +528,10 @@ function setupExplorePanel() {
 
       if (data.wd) renderWdTags(data.wd);
       if (data.florence) renderFlorenceResults(data.florence);
-      if (data.grok) renderGrokAnalysis(data.grok);
+      if (data.grok) {
+        renderGrokAnalysis(data.grok);
+        if (typeof fetchGrokUsage === "function") fetchGrokUsage();
+      }
 
       // Add dot indicator to the current image card (without refreshing the whole grid)
       const fileName = currentAnalysisPath.split("/").pop();

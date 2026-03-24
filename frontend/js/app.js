@@ -1030,6 +1030,7 @@ function setupPromptAssist() {
       }
       const data = await resp.json();
       statusEl.style.display = "none";
+      if (typeof fetchGrokUsage === "function") fetchGrokUsage();
 
       if (mode === "tags" && data.tags) {
         const section = document.createElement("div");

@@ -124,6 +124,11 @@ async function fetchGrokUsage() {
 
     // Show bar regardless of provider
     if (bar) bar.style.display = "";
+
+    // Schedule next auto-refresh
+    if (!fetchGrokUsage._timer) {
+      fetchGrokUsage._timer = setInterval(fetchGrokUsage, 60000);
+    }
   } catch {
     label.textContent = "—";
   }
