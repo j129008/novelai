@@ -565,15 +565,20 @@
             </div>
             <div class="prompt-history-wrap">
               <textarea id="prompt" class="field-textarea field-textarea--prompt" rows="6" placeholder="Describe your vision… e.g. a girl standing in a field of sunflowers at golden hour" spellcheck="false"></textarea>
-              <button id="prompt-optimize-btn" class="prompt-history-btn" type="button" title="Optimize prompt (reorder tags, fix formatting)">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14h4v7H4z"/><path d="M10 9h4v12h-4z"/><path d="M16 3h4v18h-4z"/></svg>
-              </button>
-              <button id="prompt-assist-btn" class="prompt-history-btn" type="button" title="AI Prompt Assistant">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-              </button>
-              <button id="prompt-history-btn" class="prompt-history-btn" type="button" title="Prompt history (Ctrl+H)">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              </button>
+              <div class="prompt-toolbar">
+                <button id="prompt-optimize-btn" class="prompt-tool-btn" type="button" title="Optimize prompt (reorder tags, fix formatting)">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14h4v7H4z"/><path d="M10 9h4v12h-4z"/><path d="M16 3h4v18h-4z"/></svg>
+                  Optimize
+                </button>
+                <button id="prompt-assist-btn" class="prompt-tool-btn" type="button" title="AI Prompt Assistant">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                  AI Assist
+                </button>
+                <button id="prompt-history-btn" class="prompt-tool-btn" type="button" title="Prompt history (Ctrl+H)">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  History
+                </button>
+              </div>
             </div>
 
             <textarea id="negative-prompt" class="field-textarea field-textarea--negative" rows="6" placeholder="What to exclude…" spellcheck="false" style="display:none">nsfw, lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page, @_@, mismatched pupils, glowing eyes, bad anatomy</textarea>
@@ -730,18 +735,6 @@
 
         <!-- Generation settings popover: Quality, Style Reference, Advanced -->
         <div id="gen-settings-popover" class="gen-settings-popover" style="display:none">
-          <!-- Quality -->
-          <div class="gen-settings-section">
-            <div class="control-group">
-              <div class="slider-header">
-                <label class="field-label" for="steps">Quality</label>
-                <span class="slider-value" id="steps-val">23</span>
-              </div>
-              <input type="range" id="steps" class="field-range" min="1" max="50" value="23">
-              <div class="slider-endpoints"><span>Draft</span><span>Best</span></div>
-            </div>
-          </div>
-          <div class="gen-settings-divider"></div>
           <!-- Style Reference -->
           <div class="gen-settings-section">
             <div class="vibe-section-header">
@@ -762,14 +755,6 @@
             <div class="control-group control-group--tight">
               <label class="field-label" for="sampler">Style Engine</label>
               <select id="sampler" class="field-select"></select>
-            </div>
-            <div class="control-group control-group--tight">
-              <div class="slider-header">
-                <label class="field-label" for="scale">Prompt Adherence</label>
-                <span class="slider-value" id="scale-val">5.0</span>
-              </div>
-              <input type="range" id="scale" class="field-range" min="0" max="10" step="0.1" value="5.0">
-              <div class="slider-endpoints"><span>Creative</span><span>Precise</span></div>
             </div>
             <div class="control-group control-group--tight">
               <div class="slider-header">
@@ -825,6 +810,20 @@
           </div>
         </div>
 
+        <!-- Quick sliders (surfaced from settings) -->
+        <div class="quick-sliders novelai-only">
+          <div class="quick-slider-row">
+            <label class="quick-slider-label" for="steps">Quality</label>
+            <input type="range" id="steps" class="field-range" min="1" max="50" value="23">
+            <span class="quick-slider-val" id="steps-val">23</span>
+          </div>
+          <div class="quick-slider-row">
+            <label class="quick-slider-label" for="scale">Adherence</label>
+            <input type="range" id="scale" class="field-range" min="0" max="10" step="0.1" value="5.0">
+            <span class="quick-slider-val" id="scale-val">5.0</span>
+          </div>
+        </div>
+
         <div class="controls-footer">
           <div class="seed-footer-row" id="seed-footer-row">
             <label class="seed-footer-label" for="seed">Seed</label>
@@ -857,7 +856,6 @@
           <div class="canvas-tabs">
             <button class="canvas-tab canvas-tab--active" id="tab-canvas" type="button">Canvas</button>
             <button class="canvas-tab" id="tab-history" type="button">History <span id="gallery-count" class="gallery-count-badge"></span></button>
-            <button class="canvas-tab" id="tab-craft" type="button">Craft</button>
             <button class="canvas-tab" id="tab-explore" type="button">Explore</button>
             <button class="canvas-tab" id="btn-tag-browser" type="button" title="Browse tags by category" aria-expanded="false">Tags</button>
           </div>
@@ -965,35 +963,28 @@
           <div id="image-actions" class="image-actions" style="display:none">
             <span id="info-seed" class="seed-badge"></span>
             <div class="action-group">
+              <button id="btn-refine-prompt" class="btn-action btn-action--iterate" type="button" title="Analyze output image and refine prompt">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14h4v7H4z"/><path d="M10 9h4v12h-4z"/><path d="M16 3h4v18h-4z"/></svg>
+                Refine
+              </button>
               <button id="btn-reuse-seed" class="btn-action" type="button">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.84"/></svg>
                 Reuse Seed
-              </button>
-              <button id="btn-set-as-source" class="btn-action btn-action--iterate grok-only" type="button" title="Set this output as the source image in the Images panel" style="display:none">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                Set as Source
-              </button>
-              <button id="btn-send-to-layer" class="btn-action novelai-only" type="button" title="Send this image to a new layer in the Layers panel" style="display:none">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M9 10l3 3 3-3"/></svg>
-                Send to Layer
-              </button>
-              <button id="btn-edit-in-grok" class="btn-action btn-action--iterate novelai-only" type="button" title="Send to Grok for editing with natural language" style="display:none">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                Edit in Grok
-              </button>
-              <button id="btn-animate-in-grok" class="btn-action novelai-only" type="button" title="Send to Grok to generate a video" style="display:none">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                Animate in Grok
-              </button>
-              <button id="btn-refine-prompt" class="btn-action btn-action--iterate" type="button" title="Analyze output image and refine prompt">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14h4v7H4z"/><path d="M10 9h4v12h-4z"/><path d="M16 3h4v18h-4z"/></svg>
-                Refine Prompt
               </button>
               <button id="btn-download" class="btn-action btn-action--primary" type="button">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Download
               </button>
-              <button id="btn-clear-canvas" class="btn-action btn-action--danger-subtle" type="button" title="Clear image and img2img source">×</button>
+              <div class="action-overflow">
+                <button id="btn-overflow-toggle" class="btn-action btn-action--danger-subtle" type="button" title="More actions">...</button>
+                <div id="overflow-menu" class="action-overflow-menu">
+                  <button id="btn-set-as-source" class="btn-action grok-only" type="button" title="Set as source image" style="display:none">Set as Source</button>
+                  <button id="btn-send-to-layer" class="btn-action novelai-only" type="button" title="Send to layer" style="display:none">Send to Layer</button>
+                  <button id="btn-edit-in-grok" class="btn-action novelai-only" type="button" title="Edit in Grok" style="display:none">Edit in Grok</button>
+                  <button id="btn-animate-in-grok" class="btn-action novelai-only" type="button" title="Animate in Grok" style="display:none">Animate in Grok</button>
+                  <button id="btn-clear-canvas" class="btn-action btn-action--danger-subtle" type="button" title="Clear image">Clear</button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1010,74 +1001,6 @@
           </div>
           <div id="gallery-list" class="history-grid"></div>
           <p id="gallery-empty" class="gallery-empty" style="display:none">No saved images yet</p>
-        </div>
-
-        <div id="panel-craft" class="craft-panel" style="display:none">
-
-          <!-- Variation Dial -->
-          <details class="accordion" id="craft-variation">
-            <summary class="accordion-header">
-              <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
-              Variation Dial
-              <span class="accordion-hint">Pick a dimension, generate 4 systematic variations</span>
-            </summary>
-            <div class="accordion-body">
-              <div class="variation-dims" id="variation-dims" role="group" aria-label="Variation dimension"></div>
-              <button id="btn-run-variations" class="btn-generate variation-run-btn" type="button" disabled>
-                <span class="btn-generate-label">Run Variations</span>
-              </button>
-              <div class="variation-grid" id="variation-grid" style="display:none"></div>
-            </div>
-          </details>
-
-          <!-- Prompt Autopsy -->
-          <details class="accordion" id="craft-autopsy">
-            <summary class="accordion-header">
-              <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
-              Prompt Autopsy
-              <span class="accordion-hint">Upload an image, dissect its tag composition</span>
-            </summary>
-            <div class="accordion-body">
-              <div class="autopsy-dropzone" id="autopsy-drop" role="button" tabindex="0" aria-label="Upload image for analysis">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                <span>Drop image here, or click to upload</span>
-                <span class="autopsy-formats">PNG / JPG / WebP</span>
-                <input type="file" accept="image/*" id="autopsy-file-input" hidden>
-              </div>
-              <div id="autopsy-results" style="display:none">
-                <div class="autopsy-thumb-row">
-                  <img id="autopsy-thumb" src="" alt="Uploaded image" class="autopsy-thumb-img">
-                  <div class="autopsy-status" id="autopsy-status">Analyzing…</div>
-                </div>
-                <div id="autopsy-progress-wrap" style="display:none">
-                  <div class="autopsy-progress-bar"><div class="autopsy-progress-fill" id="autopsy-progress-fill"></div></div>
-                </div>
-                <div id="autopsy-tags" class="autopsy-tags"></div>
-                <button id="btn-autopsy-insert-all" class="btn-action btn-action--primary" type="button" style="width:100%;justify-content:center;display:none">
-                  Insert All High-Confidence
-                </button>
-              </div>
-            </div>
-          </details>
-
-          <!-- Prompt DNA -->
-          <details class="accordion" id="craft-dna">
-            <summary class="accordion-header">
-              <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
-              Prompt DNA
-              <span class="accordion-hint">Analyze your prompt, recommend tags you haven't used</span>
-            </summary>
-            <div class="accordion-body">
-              <button id="btn-analyze-prompt" class="btn-action btn-action--primary" type="button" style="width:100%;justify-content:center" disabled>
-                Analyze Prompt
-              </button>
-              <div id="dna-results" style="display:none"></div>
-              <button id="btn-dna-refresh" class="btn-action" type="button" style="width:100%;justify-content:center;display:none">
-                Refresh
-              </button>
-            </div>
-          </details>
-
         </div>
 
         <div id="panel-explore" class="tab-panel explore-panel" style="display:none">
@@ -1143,7 +1066,7 @@
   <script src="js/tags.js?v=120"></script>
   <script src="js/layers.js?v=120"></script>
   <script src="js/generate.js?v=120"></script>
-  <script src="js/craft.js?v=120"></script>
+
   <script src="js/gallery.js?v=120"></script>
   <script src="js/explore.js?v=120"></script>
   <script src="js/characters.js?v=120"></script>
