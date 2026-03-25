@@ -1388,7 +1388,6 @@ async function init() {
   setupPromptFocus();
   setupCharacters();
   setupLightbox();
-  setupCraftPanel();
   setupExplorePanel();
   setupPromptAssist();
   setupPromptOptimize();
@@ -1464,6 +1463,18 @@ async function init() {
     durationSlider.addEventListener("input", () => {
       durationVal.textContent = durationSlider.value + "s";
     });
+  }
+
+  // Overflow menu toggle
+  const overflowToggle = $("#btn-overflow-toggle");
+  const overflowMenu = $("#overflow-menu");
+  if (overflowToggle && overflowMenu) {
+    overflowToggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      overflowMenu.classList.toggle("open");
+    });
+    document.addEventListener("click", () => overflowMenu.classList.remove("open"));
+    overflowMenu.addEventListener("click", () => overflowMenu.classList.remove("open"));
   }
 
   // "×" Clear canvas

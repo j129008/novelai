@@ -10,11 +10,9 @@ let _settingsLoadedToast = null;
 function setupHistoryTabs() {
   const tabCanvas = $("#tab-canvas");
   const tabHistory = $("#tab-history");
-  const tabCraft = $("#tab-craft");
   const tabExplore = $("#tab-explore");
   const panelCanvas = $("#panel-canvas");
   const panelHistory = $("#panel-history");
-  const panelCraft = $("#panel-craft");
   const panelExplore = $("#panel-explore");
   const searchWrap = $("#history-search-wrap");
   const searchInput = $("#gallery-search");
@@ -27,14 +25,12 @@ function setupHistoryTabs() {
   function clearAllTabs() {
     tabCanvas.classList.remove("canvas-tab--active");
     tabHistory.classList.remove("canvas-tab--active");
-    if (tabCraft) tabCraft.classList.remove("canvas-tab--active");
     if (tabExplore) tabExplore.classList.remove("canvas-tab--active");
   }
 
   function hideAllPanels() {
     panelCanvas.style.display = "none";
     panelHistory.style.display = "none";
-    if (panelCraft) panelCraft.style.display = "none";
     if (panelExplore) panelExplore.style.display = "none";
     searchWrap.style.display = "none";
     const bc = $("#gallery-breadcrumb");
@@ -61,15 +57,6 @@ function setupHistoryTabs() {
     localStorage.setItem("nai-active-tab", "history");
   }
 
-  function showCraft() {
-    if (!tabCraft || !panelCraft) return;
-    clearAllTabs();
-    hideAllPanels();
-    tabCraft.classList.add("canvas-tab--active");
-    panelCraft.style.display = "flex";
-    localStorage.setItem("nai-active-tab", "craft");
-  }
-
   function showExplore() {
     if (!tabExplore || !panelExplore) return;
     clearAllTabs();
@@ -81,15 +68,13 @@ function setupHistoryTabs() {
 
   tabCanvas.addEventListener("click", showCanvas);
   tabHistory.addEventListener("click", showHistory);
-  if (tabCraft) tabCraft.addEventListener("click", showCraft);
   if (tabExplore) tabExplore.addEventListener("click", showExplore);
 
   // Restore last active tab (default: canvas)
   let savedTab = localStorage.getItem("nai-active-tab") || "canvas";
-  if (savedTab === "inspire") savedTab = "craft";
+  if (savedTab === "inspire" || savedTab === "craft") savedTab = "canvas";
   if (savedTab === "story") savedTab = "canvas";
   if (savedTab === "history") showHistory();
-  else if (savedTab === "craft") showCraft();
   else if (savedTab === "explore") showExplore();
   // else canvas is already active by default
 
@@ -293,6 +278,19 @@ function renderGallery(files, directories, filter) {
   const list = $("#gallery-list");
   const empty = $("#gallery-empty");
   if (!list) return;
+
+  // Update filter button visibility based on content
+  const _filterCounts = {
+    image: files.filter(f => !f.name.toLowerCase().endsWith(".mp4")).length,
+    video: files.filter(f => f.name.toLowerCase().endsWith(".mp4")).length,
+    novelai: files.filter(f => !f.name.includes("-grok") && !f.name.startsWith("grok-") && !f.name.toLowerCase().endsWith(".mp4")).length,
+    grok: files.filter(f => f.name.includes("-grok") || f.name.startsWith("grok-")).length,
+  };
+  document.querySelectorAll(".gallery-filter[data-filter]").forEach(btn => {
+    const key = btn.dataset.filter;
+    if (key === "all") return; // always visible
+    btn.style.display = (_filterCounts[key] || 0) > 0 ? "" : "none";
+  });
 
   // Apply type/source filter
   let typeFiltered = files;
