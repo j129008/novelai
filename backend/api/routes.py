@@ -1390,8 +1390,8 @@ _PERSON_KEYWORDS = frozenset([
 
 
 class PromptAssistRequest(BaseModel):
-    direction: str = PydanticField(min_length=1)
-    mode: str  # "tags" or "description"
+    direction: str = ""
+    mode: str  # "tags", "description", "edit", or "optimize"
     current_prompt: str = ""
 
 
@@ -1399,8 +1399,12 @@ class PromptAssistRequest(BaseModel):
 async def prompt_assist_endpoint(req: PromptAssistRequest):
     if not XAI_API_KEY:
         raise HTTPException(status_code=503, detail="XAI_API_KEY not configured")
-    if req.mode not in ("tags", "description", "edit"):
-        raise HTTPException(status_code=400, detail="Mode must be 'tags', 'description', or 'edit'")
+    if req.mode not in ("tags", "description", "edit", "optimize"):
+        raise HTTPException(status_code=400, detail="Mode must be 'tags', 'description', 'edit', or 'optimize'")
+    if req.mode == "optimize" and not req.current_prompt.strip():
+        raise HTTPException(status_code=400, detail="Current prompt is required for optimize mode")
+    if req.mode != "optimize" and not req.direction.strip():
+        raise HTTPException(status_code=400, detail="Direction is required")
 
     from api.grok import prompt_assist
     try:

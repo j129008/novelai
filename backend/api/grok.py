@@ -231,6 +231,25 @@ If a current prompt is provided, expand and refine it into a better description.
 
 Return ONLY the JSON object, no markdown formatting."""
 
+_PROMPT_OPTIMIZE = f"""You are a prompt optimizer for NovelAI (an anime image generator that uses danbooru-style tags).
+
+{_NOVELAI_GUIDE}
+
+The user will provide their current prompt. Your job is to OPTIMIZE it:
+1. Reorder tags following the correct tag order: Count → Character/Series → Appearance → Action/Expression → Scene → Style
+2. Fix formatting: lowercase, underscored where appropriate, remove duplicates
+3. Remove redundant or conflicting tags
+4. Add missing quality/style tags if beneficial (but don't drastically change the intent)
+5. Fix common misspellings of known danbooru tags
+6. Keep emphasis markers (curly braces, [brackets], weight::syntax::) intact and in place
+
+If the user provides additional instructions, follow them while optimizing.
+
+Return a JSON object with one field:
+- "prompt": the optimized prompt string (comma-separated tags, ready to paste)
+
+Return ONLY the JSON object, no markdown formatting."""
+
 _PROMPT_ASSIST_EDIT = """You are a prompt assistant for Grok Imagine's IMAGE EDITING mode.
 The user has a source image loaded and wants to modify it. Grok edit mode works best with SHORT, DIRECTIVE prompts that describe what to CHANGE, not what the whole image should look like.
 
@@ -258,11 +277,17 @@ async def prompt_assist(api_key: str, direction: str, mode: str, current_prompt:
     """Generate prompt suggestions. mode='tags' returns {"tags":[...]}, mode='description' returns {"description":"..."}."""
     import re
 
-    systems = {"tags": _PROMPT_ASSIST_TAGS, "description": _PROMPT_ASSIST_DESC, "edit": _PROMPT_ASSIST_EDIT}
+    systems = {"tags": _PROMPT_ASSIST_TAGS, "description": _PROMPT_ASSIST_DESC, "edit": _PROMPT_ASSIST_EDIT, "optimize": _PROMPT_OPTIMIZE}
     system = systems.get(mode, _PROMPT_ASSIST_DESC)
-    user_msg = direction
-    if current_prompt.strip():
-        user_msg = f"Current prompt: {current_prompt.strip()}\n\nUser request: {direction}"
+
+    if mode == "optimize":
+        user_msg = f"Prompt to optimize:\n{current_prompt.strip()}"
+        if direction.strip():
+            user_msg += f"\n\nAdditional instructions: {direction.strip()}"
+    else:
+        user_msg = direction
+        if current_prompt.strip():
+            user_msg = f"Current prompt: {current_prompt.strip()}\n\nUser request: {direction}"
 
     headers = {
         "Authorization": f"Bearer {api_key}",
