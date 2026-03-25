@@ -242,13 +242,89 @@ The user will provide their current prompt. Your job is to OPTIMIZE it:
 4. Add missing quality/style tags if beneficial (but don't drastically change the intent)
 5. Fix common misspellings of known danbooru tags
 6. Keep emphasis markers (curly braces, [brackets], weight::syntax::) intact and in place
+7. IMPORTANT: If the prompt describes multiple characters (2+ people), you MUST use the pipe | format:
+   - Base prompt (count, scene, style) | character 1 tags | character 2 tags
+   - Each character section should use "girl"/"boy" (no number prefix), plus their appearance and expression
+   - The base prompt should contain the count tag (e.g. 2girls), scene, and style tags
+   - Interactions go IN the character section: source#action (initiator), target#action (receiver), mutual#action (both)
+   - Example: "2girls, park, year 2024 | girl, blonde hair, blue eyes, smile, source#hug | girl, black hair, red eyes, serious, target#hug"
 
 If the user provides additional instructions, follow them while optimizing.
 
 Return a JSON object with one field:
-- "prompt": the optimized prompt string (comma-separated tags, ready to paste)
+- "prompt": the optimized prompt string (comma-separated tags, with | separators for multi-character)
 
 Return ONLY the JSON object, no markdown formatting."""
+
+_PROMPT_REFINE = f"""You are a prompt refiner for NovelAI (an anime image generator that uses danbooru-style tags).
+
+{_NOVELAI_GUIDE}
+
+The user will provide:
+1. Their CURRENT PROMPT (the tags they used to generate an image)
+2. An ANALYSIS of what the generated image actually looks like
+
+Your job is to REFINE the prompt so the next generation is better:
+- Keep tags that produced desired results (tags in both the prompt and the analysis)
+- Strengthen or add emphasis to tags that didn't come through strongly enough
+- Remove or weaken tags that produced unwanted results
+- Add new tags from the analysis that describe desirable elements not in the original prompt
+- Maintain correct tag order: Count → Character/Series → Appearance → Action/Expression → Scene → Style
+- Keep emphasis markers intact
+- IMPORTANT: If there are multiple characters in the image, use pipe | format:
+  - Base prompt (count, scene, style) | character 1 tags | character 2 tags
+  - Each character section: "girl"/"boy" (no number), appearance, expression
+  - Interactions go IN the character section: source#action (initiator), target#action (receiver), mutual#action (both)
+  - Base contains count tag (e.g. 2girls), scene, style
+
+Return a JSON object with two fields:
+- "prompt": the refined prompt string (comma-separated tags, with | separators for multi-character)
+- "changes": a brief summary of what was changed and why (1-2 sentences)
+
+Return ONLY the JSON object, no markdown formatting."""
+
+
+async def refine_prompt_with_image(api_key: str, current_prompt: str, image_b64: str, instructions: str = "") -> dict:
+    """Analyze a generated image and refine the prompt based on the result."""
+    import re
+
+    # Step 1: Analyze the image
+    analysis = await analyze_image_vision(api_key, image_b64)
+
+    # Step 2: Use the analysis to refine the prompt
+    tags_str = ", ".join(analysis.get("tags", []))
+    desc_str = analysis.get("description", "")
+    user_msg = f"Current prompt:\n{current_prompt.strip()}\n\nImage analysis (what was actually generated):\n- Tags: {tags_str}\n- Description: {desc_str}"
+    if instructions.strip():
+        user_msg += f"\n\nAdditional instructions: {instructions.strip()}"
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": "grok-3-mini",
+        "messages": [
+            {"role": "system", "content": _PROMPT_REFINE},
+            {"role": "user", "content": user_msg},
+        ],
+        "temperature": 0.7,
+    }
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(CHAT_URL, json=payload, headers=headers)
+        if resp.status_code != 200:
+            raise RuntimeError(f"{resp.status_code}: {resp.text[:500]}")
+
+    text = resp.json()["choices"][0]["message"]["content"]
+    text = re.sub(r"^```(?:json)?\s*", "", text.strip())
+    text = re.sub(r"\s*```$", "", text.strip())
+
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        raise RuntimeError(f"Failed to parse response: {text[:200]}")
+
 
 _PROMPT_ASSIST_EDIT = """You are a prompt assistant for Grok Imagine's IMAGE EDITING mode.
 The user has a source image loaded and wants to modify it. Grok edit mode works best with SHORT, DIRECTIVE prompts that describe what to CHANGE, not what the whole image should look like.

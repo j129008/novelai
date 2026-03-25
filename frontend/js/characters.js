@@ -558,3 +558,87 @@ function collectCharacterPayload() {
   });
 }
 
+
+/**
+ * Split a pipe-separated prompt into base prompt + character blocks.
+ * Returns { applied: true, base, charCount } or { applied: false } if no pipes.
+ */
+function populateCharactersFromPipe(promptText) {
+  const parts = promptText.split("|").map(s => s.trim()).filter(Boolean);
+  if (parts.length < 2) return { applied: false };
+
+  const base = parts[0];
+  const charParts = parts.slice(1);
+
+  // Clear existing characters
+  const slotsEl = $("#character-slots");
+  if (slotsEl) slotsEl.innerHTML = "";
+  characters.length = 0;
+
+  // Parse interactions (source#, target#, mutual#) out of each character prompt
+  const interactionRe = /\b(source#|target#|mutual#)(\S+)/g;
+
+  const count = charParts.length;
+  charParts.forEach((rawPrompt, i) => {
+    // Extract interactions
+    const interactions = [];
+    let match;
+    while ((match = interactionRe.exec(rawPrompt)) !== null) {
+      interactions.push({ directive: match[1], action: match[2].replace(/,$/, "") });
+    }
+    // Remove interaction tags from prompt text
+    const cleanPrompt = rawPrompt.replace(interactionRe, "").replace(/,\s*,/g, ",").replace(/,\s*$/, "").replace(/^\s*,/, "").trim();
+
+    addCharacterSlot(slotsEl, _updateCharUI);
+    const charData = characters[i];
+    charData.prompt = cleanPrompt;
+    charData.interactions = interactions;
+    charData.x = count === 1 ? 0.5 : (0.2 + (0.6 * i / (count - 1)));
+    charData.positionAuto = false;
+
+    // Update the card UI
+    const card = slotsEl.querySelectorAll(".char-slot-card")[i];
+    const ta = card?.querySelector(".char-slot-textarea");
+    if (ta) ta.value = cleanPrompt;
+
+    // Re-render interactions chips if any were extracted
+    if (interactions.length > 0) {
+      const oldDetails = card?.querySelector(".char-interactions-details");
+      if (oldDetails) {
+        const newDetails = buildInteractionsSection(charData);
+        oldDetails.replaceWith(newDetails);
+      }
+    }
+  });
+
+  saveCharactersToCache();
+
+  // Open the accordion
+  const accordion = $("#characters-accordion");
+  if (accordion) accordion.open = true;
+  _updateCharUI();
+  renderCharacterMarkers();
+
+  return { applied: true, base, charCount: count };
+}
+
+// Helper to update character UI badges (exposed for populateCharactersFromPipe)
+function _updateCharUI() {
+  const count = characters.length;
+  const badge = $("#char-count-badge");
+  if (badge) {
+    badge.textContent = count;
+    badge.style.display = count > 0 ? "inline-flex" : "none";
+  }
+  const emptyState = $("#char-empty-state");
+  if (emptyState) emptyState.style.display = count === 0 ? "flex" : "none";
+  const addBtnInline = $("#btn-add-character-inline");
+  if (addBtnInline) {
+    addBtnInline.style.display = count === 0 ? "none" : "";
+    addBtnInline.disabled = count >= MAX_CHARACTERS;
+  }
+  const sceneLabel = $("#scene-label");
+  if (sceneLabel) sceneLabel.style.display = count > 0 ? "" : "none";
+  updateCountSuggestionChip(count);
+}
+

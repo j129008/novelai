@@ -1414,6 +1414,25 @@ async def prompt_assist_endpoint(req: PromptAssistRequest):
         raise HTTPException(status_code=502, detail=str(exc))
 
 
+class PromptRefineRequest(BaseModel):
+    current_prompt: str = PydanticField(min_length=1)
+    image: str = PydanticField(min_length=1)  # base64
+    instructions: str = ""
+
+
+@router.post("/prompt-refine")
+async def prompt_refine_endpoint(req: PromptRefineRequest):
+    if not XAI_API_KEY:
+        raise HTTPException(status_code=503, detail="XAI_API_KEY not configured")
+
+    from api.grok import refine_prompt_with_image
+    try:
+        result = await refine_prompt_with_image(XAI_API_KEY, req.current_prompt, req.image, req.instructions)
+        return result
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
 class HasPersonBatchRequest(BaseModel):
     urls: list[str] = PydanticField(min_length=1, max_length=100)
 

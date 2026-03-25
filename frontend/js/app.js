@@ -1151,31 +1151,49 @@ function setupPromptOptimize() {
   if (!btn || !promptEl) return;
 
   btn.addEventListener("click", async () => {
-    const currentPrompt = promptEl.value.trim();
-    if (!currentPrompt) { showStatus("Nothing to optimize — prompt is empty"); return; }
+    const basePrompt = promptEl.value.trim();
+    if (!basePrompt) { showStatus("Nothing to optimize — prompt is empty"); return; }
+
+    // Re-compose full prompt including character blocks
+    const charPrompts = characters.map(c => c.prompt.trim()).filter(Boolean);
+    const fullPrompt = charPrompts.length > 0
+      ? [basePrompt, ...charPrompts].join(" | ")
+      : basePrompt;
 
     btn.disabled = true;
     showStatus("Optimizing prompt…");
 
     try {
+      console.log("[optimize] sending:", fullPrompt.substring(0, 100));
       const resp = await fetch("/api/prompt-assist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ direction: "", mode: "optimize", current_prompt: currentPrompt }),
+        body: JSON.stringify({ direction: "", mode: "optimize", current_prompt: fullPrompt }),
       });
       if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.detail || "Optimize failed");
+        const errBody = await resp.text();
+        console.error("[optimize] API error:", resp.status, errBody);
+        const err = JSON.parse(errBody).detail || "Optimize failed";
+        throw new Error(err);
       }
       const data = await resp.json();
+      console.log("[optimize] response:", data);
       if (data.prompt) {
         window._savePromptToHistory?.();
-        promptEl.value = data.prompt;
+        const split = populateCharactersFromPipe(data.prompt);
+        console.log("[optimize] split result:", split);
+        if (split.applied) {
+          promptEl.value = split.base;
+          showStatus(`Prompt optimized — ${split.charCount} character(s) moved to blocks`);
+        } else {
+          promptEl.value = data.prompt;
+          showStatus("Prompt optimized");
+        }
         promptEl.dispatchEvent(new Event("input", { bubbles: true }));
-        showStatus("Prompt optimized");
       }
       if (typeof fetchGrokUsage === "function") fetchGrokUsage();
     } catch (err) {
+      console.error("[optimize] error:", err);
       showStatus("Optimize error: " + err.message);
     } finally {
       btn.disabled = false;
@@ -1274,6 +1292,65 @@ async function init() {
       renderGrokImagesList();
       syncInpaintButtonVisibility();
       showStatus("Output set as source — describe your next edit");
+    });
+  }
+
+  // Refine Prompt — analyze output image and improve prompt
+  const refineBtn = document.getElementById("btn-refine-prompt");
+  if (refineBtn) {
+    refineBtn.addEventListener("click", async () => {
+      if (!state.lastGeneratedImageBase64) return;
+      const promptEl = $("#prompt");
+      const basePrompt = promptEl?.value.trim();
+      if (!basePrompt) { showStatus("No prompt to refine"); return; }
+
+      // Re-compose full prompt including character blocks
+      const charPrompts = characters.map(c => c.prompt.trim()).filter(Boolean);
+      const fullPrompt = charPrompts.length > 0
+        ? [basePrompt, ...charPrompts].join(" | ")
+        : basePrompt;
+
+      refineBtn.disabled = true;
+      showStatus("Analyzing image & refining prompt…");
+
+      try {
+        console.log("[refine] sending prompt:", fullPrompt.substring(0, 100), "image size:", state.lastGeneratedImageBase64.length);
+        const resp = await fetch("/api/prompt-refine", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            current_prompt: fullPrompt,
+            image: state.lastGeneratedImageBase64,
+          }),
+        });
+        if (!resp.ok) {
+          const errBody = await resp.text();
+          console.error("[refine] API error:", resp.status, errBody);
+          const err = JSON.parse(errBody).detail || "Refine failed";
+          throw new Error(err);
+        }
+        const data = await resp.json();
+        console.log("[refine] response:", data);
+        if (data.prompt) {
+          window._savePromptToHistory?.();
+          const split = populateCharactersFromPipe(data.prompt);
+          console.log("[refine] split result:", split);
+          if (split.applied) {
+            promptEl.value = split.base;
+            showStatus((data.changes || "Prompt refined") + ` — ${split.charCount} character(s) moved to blocks`);
+          } else {
+            promptEl.value = data.prompt;
+            showStatus(data.changes || "Prompt refined");
+          }
+          promptEl.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        if (typeof fetchGrokUsage === "function") fetchGrokUsage();
+      } catch (err) {
+        console.error("[refine] error:", err);
+        showStatus("Refine error: " + err.message);
+      } finally {
+        refineBtn.disabled = false;
+      }
     });
   }
 
