@@ -1145,6 +1145,44 @@ function setupPromptAssist() {
 }
 
 
+function setupPromptOptimize() {
+  const btn = $("#prompt-optimize-btn");
+  const promptEl = $("#prompt");
+  if (!btn || !promptEl) return;
+
+  btn.addEventListener("click", async () => {
+    const currentPrompt = promptEl.value.trim();
+    if (!currentPrompt) { showStatus("Nothing to optimize — prompt is empty"); return; }
+
+    btn.disabled = true;
+    showStatus("Optimizing prompt…");
+
+    try {
+      const resp = await fetch("/api/prompt-assist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ direction: "", mode: "optimize", current_prompt: currentPrompt }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || "Optimize failed");
+      }
+      const data = await resp.json();
+      if (data.prompt) {
+        window._savePromptToHistory?.();
+        promptEl.value = data.prompt;
+        promptEl.dispatchEvent(new Event("input", { bubbles: true }));
+        showStatus("Prompt optimized");
+      }
+      if (typeof fetchGrokUsage === "function") fetchGrokUsage();
+    } catch (err) {
+      showStatus("Optimize error: " + err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
 function showStatus(msg) {
   clearError();
   const slot = $("#error-slot");
@@ -1276,6 +1314,7 @@ async function init() {
   setupCraftPanel();
   setupExplorePanel();
   setupPromptAssist();
+  setupPromptOptimize();
   setupInpaint();
   setupLayers();
   setupCanvasLayerPanel();

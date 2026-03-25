@@ -1274,8 +1274,10 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 /* Prompt history — Spotlight style */
 .prompt-history-wrap { position: relative; }
 .prompt-history-btn { position: absolute; top: 4px; right: 4px; background: none; border: none; color: var(--text-tertiary); cursor: pointer; padding: 3px; border-radius: var(--radius-sm); z-index: 2; }
+#prompt-optimize-btn { right: 44px; }
 #prompt-assist-btn { right: 24px; }
 .prompt-history-btn:hover { color: var(--text-primary); background: var(--bg-overlay); }
+.prompt-history-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .prompt-history-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(4,4,10,0.7); backdrop-filter: blur(4px); display: flex; align-items: flex-start; justify-content: center; padding-top: 15vh; }
 .prompt-history-panel { width: min(600px, 90vw); background: var(--bg-raised); border: 1px solid var(--border-muted); border-radius: var(--radius-xl); box-shadow: 0 16px 48px rgba(0,0,0,0.6); overflow: hidden; animation: promptHistoryIn 0.15s ease-out; }
 @keyframes promptHistoryIn { from { opacity: 0; transform: translateY(-8px) scale(0.98); } to { opacity: 1; transform: none; } }
