@@ -2458,6 +2458,8 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   display: block;
   animation: lightboxImgIn 0.18s var(--ease-out) both;
 }
+.lightbox-img-wrap.lightbox-zoomed { overflow: auto; cursor: grab; align-items: flex-start; justify-content: flex-start; max-height: calc(100vh - 160px); display: block; }
+.lightbox-img-wrap.lightbox-zoomed .lightbox-img { max-width: none; max-height: none; width: auto; height: auto; display: block; margin: auto; }
 :fullscreen .lightbox-img {
   max-width: 100vw;
   max-height: 100vh;

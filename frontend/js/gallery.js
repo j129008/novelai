@@ -279,29 +279,32 @@ function renderGallery(files, directories, filter) {
   const empty = $("#gallery-empty");
   if (!list) return;
 
+  const _isGrok = f => f.name.includes("-grok") || f.name.startsWith("grok-") || f.name.startsWith("xai-");
+  const _isVideo = f => f.name.toLowerCase().endsWith(".mp4");
+
   // Update filter button visibility based on content
   const _filterCounts = {
-    image: files.filter(f => !f.name.toLowerCase().endsWith(".mp4")).length,
-    video: files.filter(f => f.name.toLowerCase().endsWith(".mp4")).length,
-    novelai: files.filter(f => !f.name.includes("-grok") && !f.name.startsWith("grok-") && !f.name.toLowerCase().endsWith(".mp4")).length,
-    grok: files.filter(f => f.name.includes("-grok") || f.name.startsWith("grok-")).length,
+    image: files.filter(f => !_isVideo(f)).length,
+    video: files.filter(_isVideo).length,
+    novelai: files.filter(f => !_isGrok(f) && !_isVideo(f)).length,
+    grok: files.filter(_isGrok).length,
   };
   document.querySelectorAll(".gallery-filter[data-filter]").forEach(btn => {
     const key = btn.dataset.filter;
-    if (key === "all") return; // always visible
+    if (key === "all") return;
     btn.style.display = (_filterCounts[key] || 0) > 0 ? "" : "none";
   });
 
   // Apply type/source filter
   let typeFiltered = files;
   if (_galleryTypeFilter === "image") {
-    typeFiltered = files.filter(f => !f.name.toLowerCase().endsWith(".mp4"));
+    typeFiltered = files.filter(f => !_isVideo(f));
   } else if (_galleryTypeFilter === "video") {
-    typeFiltered = files.filter(f => f.name.toLowerCase().endsWith(".mp4"));
+    typeFiltered = files.filter(_isVideo);
   } else if (_galleryTypeFilter === "grok") {
-    typeFiltered = files.filter(f => f.name.includes("-grok") || f.name.startsWith("grok-"));
+    typeFiltered = files.filter(_isGrok);
   } else if (_galleryTypeFilter === "novelai") {
-    typeFiltered = files.filter(f => !f.name.includes("-grok") && !f.name.startsWith("grok-") && !f.name.toLowerCase().endsWith(".mp4"));
+    typeFiltered = files.filter(f => !_isGrok(f) && !_isVideo(f));
   }
 
   const filtered = filter
@@ -556,6 +559,14 @@ function setupLightbox() {
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
           Fullscreen
         </button>
+        <button class="btn-action" id="lb-download" type="button" title="Download image">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Save
+        </button>
+        <button class="btn-action btn-action--danger-subtle" id="lb-delete" type="button" title="Delete image">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          Delete
+        </button>
       </div>
     </div>
   `;
@@ -626,6 +637,34 @@ function setupLightbox() {
       document.exitFullscreen();
     } else {
       overlay.requestFullscreen().catch(() => {});
+    }
+  });
+
+  // Download
+  overlay.querySelector("#lb-download").addEventListener("click", () => {
+    const file = _lightboxData[_lightboxIndex];
+    if (!file) return;
+    const a = document.createElement("a");
+    a.href = galleryFileUrl(file.name);
+    a.download = file.name;
+    a.click();
+  });
+
+  // Delete
+  overlay.querySelector("#lb-delete").addEventListener("click", async () => {
+    const file = _lightboxData[_lightboxIndex];
+    if (!file) return;
+    const r = await fetch(galleryFileUrl(file.name), { method: "DELETE" });
+    if (r.ok) {
+      _lightboxData.splice(_lightboxIndex, 1);
+      if (_lightboxData.length === 0) {
+        closeLightbox();
+        loadGallery();
+      } else {
+        if (_lightboxIndex >= _lightboxData.length) _lightboxIndex = _lightboxData.length - 1;
+        renderLightboxFrame();
+        loadGallery();
+      }
     }
   });
 }
@@ -780,6 +819,37 @@ function renderLightboxFrame() {
     imgWrap.appendChild(img);
     if (_slideshowActive) scheduleSlideshowAdvance();
   };
+  img.style.cursor = "zoom-in";
+  let _dragging = false, _startX = 0, _startY = 0, _scrollX = 0, _scrollY = 0;
+  img.addEventListener("click", (e) => {
+    if (_dragging) return; // ignore click after drag
+    e.stopPropagation();
+    const isZoomed = imgWrap.classList.toggle("lightbox-zoomed");
+    img.style.cursor = isZoomed ? "grab" : "zoom-in";
+    if (!isZoomed) { imgWrap.scrollTop = 0; imgWrap.scrollLeft = 0; }
+  });
+  imgWrap.addEventListener("mousedown", (e) => {
+    if (!imgWrap.classList.contains("lightbox-zoomed")) return;
+    _dragging = false;
+    _startX = e.clientX; _startY = e.clientY;
+    _scrollX = imgWrap.scrollLeft; _scrollY = imgWrap.scrollTop;
+    img.style.cursor = "grabbing";
+    e.preventDefault();
+    const onMove = (ev) => {
+      const dx = ev.clientX - _startX, dy = ev.clientY - _startY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) _dragging = true;
+      imgWrap.scrollLeft = _scrollX - dx;
+      imgWrap.scrollTop = _scrollY - dy;
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      img.style.cursor = "grab";
+      setTimeout(() => { _dragging = false; }, 0);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
   img.onerror = () => {
     imgWrap.innerHTML = "";
     const err = document.createElement("p");

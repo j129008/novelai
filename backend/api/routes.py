@@ -691,14 +691,14 @@ async def list_gallery(path: str = Query(default="")):
     )
     media_files = sorted(
         (f for f in current_dir.iterdir()
-         if f.is_file() and f.suffix.lower() in (".png", ".mp4") and not f.name.startswith("._")),
+         if f.is_file() and f.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp", ".mp4") and not f.name.startswith("._")),
         key=lambda f: f.stat().st_mtime, reverse=True,
     )
     files = [
         GalleryFileItem(
             name=f.name,
             size=f.stat().st_size,
-            meta=_read_png_meta(f) if f.suffix.lower() == ".png" else {},
+            meta=_read_png_meta(f) if f.suffix.lower() == ".png" else {},  # only PNG has embedded metadata
         )
         for f in media_files
     ]
