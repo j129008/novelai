@@ -529,8 +529,7 @@ function setupLayers() {
       const outputLayers = layers.filter((l) => l.name.startsWith("Output"));
       const n = outputLayers.length;
       const name = n === 0 ? "Output" : "Output " + (n + 1);
-      _activeLayerIdx = layers.length;
-      layers.push({
+      layers.unshift({
         id: Date.now(),
         name,
         imageBase64: state.lastGeneratedImageBase64,
@@ -541,6 +540,7 @@ function setupLayers() {
         isOutputTarget: false,
         offsetX: 0, offsetY: 0, scale: 1.0,
       });
+      _activeLayerIdx = 0;
       renderLayerList();
       saveLayersToStorage();
 
