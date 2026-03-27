@@ -339,7 +339,7 @@ function renderGallery(files, directories, filter) {
     const icon = document.createElement("div");
     icon.className = "gallery-folder-icon";
     icon.setAttribute("aria-hidden", "true");
-    icon.textContent = "\uD83D\uDCC1"; // 📁
+    icon.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
 
     const name = document.createElement("div");
     name.className = "gallery-folder-name";
@@ -435,7 +435,7 @@ function renderGallery(files, directories, filter) {
     loadBtn.className = "history-card-action-btn history-card-action-btn--load";
     loadBtn.type = "button";
     loadBtn.title = "Load settings";
-    loadBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.84"/></svg>Load`;
+    loadBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.84"/></svg>Load Settings`;
     loadBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       loadSettingsFromMeta(meta);
@@ -450,13 +450,29 @@ function renderGallery(files, directories, filter) {
     delBtn.type = "button";
     delBtn.title = "Delete";
     delBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+    let _delConfirmTimer = null;
     delBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
+      // Two-click delete: first click arms, second click confirms
+      if (!delBtn.classList.contains("history-card-action-btn--confirm-delete")) {
+        delBtn.classList.add("history-card-action-btn--confirm-delete");
+        delBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>Sure?`;
+        _delConfirmTimer = setTimeout(() => {
+          delBtn.classList.remove("history-card-action-btn--confirm-delete");
+          delBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+        }, 2000);
+        return;
+      }
+      clearTimeout(_delConfirmTimer);
       card.style.opacity = "0.4";
       card.style.pointerEvents = "none";
       const r = await fetch(galleryFileUrl(file.name), { method: "DELETE" });
       if (r.ok) loadGallery();
-      else { card.style.opacity = ""; card.style.pointerEvents = ""; }
+      else {
+        card.style.opacity = ""; card.style.pointerEvents = "";
+        delBtn.classList.remove("history-card-action-btn--confirm-delete");
+        delBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+      }
     });
 
     const moveBtn = document.createElement("button");

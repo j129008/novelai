@@ -1161,6 +1161,7 @@ function setupPromptOptimize() {
       : basePrompt;
 
     btn.disabled = true;
+    btn.classList.add("loading");
     showStatus("Optimizing prompt…");
 
     try {
@@ -1187,9 +1188,10 @@ function setupPromptOptimize() {
           showStatus(`Prompt optimized — ${split.charCount} character(s) moved to blocks`);
         } else {
           promptEl.value = data.prompt;
-          showStatus("Prompt optimized");
+          showStatus("Tags reordered and cleaned");
         }
         promptEl.dispatchEvent(new Event("input", { bubbles: true }));
+        flashPromptTextarea();
       }
       if (typeof fetchGrokUsage === "function") fetchGrokUsage();
     } catch (err) {
@@ -1197,18 +1199,28 @@ function setupPromptOptimize() {
       showStatus("Optimize error: " + err.message);
     } finally {
       btn.disabled = false;
+      btn.classList.remove("loading");
     }
   });
 }
 
-function showStatus(msg) {
+function flashPromptTextarea() {
+  const el = $("#prompt");
+  if (!el) return;
+  el.classList.remove("prompt-updated-flash");
+  void el.offsetWidth; // force reflow to restart animation
+  el.classList.add("prompt-updated-flash");
+  setTimeout(() => el.classList.remove("prompt-updated-flash"), 700);
+}
+
+function showStatus(msg, duration = 3000) {
   clearError();
   const slot = $("#error-slot");
   const div = document.createElement("div");
   div.className = "status-msg";
   div.textContent = msg;
   slot.appendChild(div);
-  setTimeout(() => { if (slot.contains(div)) slot.removeChild(div); }, 3000);
+  setTimeout(() => { if (slot.contains(div)) slot.removeChild(div); }, duration);
 }
 
 function showError(msg) {
@@ -1283,6 +1295,23 @@ async function init() {
   $("#btn-reuse-seed").addEventListener("click", reuseSeed);
   $("#btn-download").addEventListener("click", downloadImage);
 
+  // Seed badge: click to copy
+  const seedBadge = $("#info-seed");
+  if (seedBadge) {
+    seedBadge.style.cursor = "pointer";
+    seedBadge.title = "Click to copy seed";
+    seedBadge.addEventListener("click", () => {
+      const text = seedBadge.textContent.replace(/^Seed:\s*/, "").trim();
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = seedBadge.textContent;
+        seedBadge.textContent = "Copied!";
+        seedBadge.style.color = "var(--accent-bright)";
+        setTimeout(() => { seedBadge.textContent = orig; seedBadge.style.color = ""; }, 1500);
+      });
+    });
+  }
+
   // Grok: Set as Source — move current output into the source slot in the Images panel
   const setAsSourceBtn = document.getElementById("btn-set-as-source");
   if (setAsSourceBtn) {
@@ -1311,6 +1340,7 @@ async function init() {
         : basePrompt;
 
       refineBtn.disabled = true;
+      refineBtn.classList.add("loading");
       showStatus("Analyzing image & refining prompt…");
 
       try {
@@ -1337,12 +1367,13 @@ async function init() {
           console.log("[refine] split result:", split);
           if (split.applied) {
             promptEl.value = split.base;
-            showStatus((data.changes || "Prompt refined") + ` — ${split.charCount} character(s) moved to blocks`);
+            showStatus((data.changes || "Prompt refined") + ` — ${split.charCount} character(s) moved to blocks`, 5000);
           } else {
             promptEl.value = data.prompt;
-            showStatus(data.changes || "Prompt refined");
+            showStatus(data.changes || "Prompt refined", 5000);
           }
           promptEl.dispatchEvent(new Event("input", { bubbles: true }));
+          flashPromptTextarea();
         }
         if (typeof fetchGrokUsage === "function") fetchGrokUsage();
       } catch (err) {
@@ -1350,6 +1381,7 @@ async function init() {
         showStatus("Refine error: " + err.message);
       } finally {
         refineBtn.disabled = false;
+        refineBtn.classList.remove("loading");
       }
     });
   }

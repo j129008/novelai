@@ -598,11 +598,12 @@ function updateCanvasPanel() {
   const info = document.getElementById("clp-layer-info");
   if (info) info.textContent = "Layer " + (_activeLayerIdx + 1) + " of " + layers.length;
 
-  // Prev/Next button state
+  // Prev/Next button state — hide entirely when only 1 layer
   const prevBtn = document.getElementById("clp-prev");
   const nextBtn = document.getElementById("clp-next");
-  if (prevBtn) prevBtn.disabled = (_activeLayerIdx === 0);
-  if (nextBtn) nextBtn.disabled = (_activeLayerIdx === layers.length - 1);
+  const singleLayer = layers.length <= 1;
+  if (prevBtn) { prevBtn.style.display = singleLayer ? "none" : ""; prevBtn.disabled = (_activeLayerIdx === 0); }
+  if (nextBtn) { nextBtn.style.display = singleLayer ? "none" : ""; nextBtn.disabled = (_activeLayerIdx === layers.length - 1); }
 
   // Thumbnail
   const thumbEl = document.getElementById("clp-thumb");
@@ -672,11 +673,13 @@ function setupCanvasLayerPanel() {
   if (savedCollapsed && clpBody) clpBody.style.display = "none";
 
   if (collapseBtn && clpBody) {
-    collapseBtn.textContent = savedCollapsed ? "▸" : "▾";
+    const chevronDown = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+    const chevronRight = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>';
+    collapseBtn.innerHTML = savedCollapsed ? chevronRight : chevronDown;
     collapseBtn.addEventListener("click", () => {
       const isCollapsed = clpBody.style.display === "none";
       clpBody.style.display = isCollapsed ? "" : "none";
-      collapseBtn.textContent = isCollapsed ? "▾" : "▸";
+      collapseBtn.innerHTML = isCollapsed ? chevronDown : chevronRight;
       localStorage.setItem("nai-clp-collapsed", isCollapsed ? "false" : "true");
     });
   }
