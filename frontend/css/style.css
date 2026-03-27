@@ -260,6 +260,8 @@ body { font-family: -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-ser
 .field-textarea--prompt { min-height: 120px; }
 .field-textarea--negative { min-height: 120px; color: var(--text-secondary); font-size: 0.83rem; }
 .field-textarea:focus { outline: none; }
+@keyframes promptFlash { 0% { box-shadow: 0 0 0 2px var(--accent-glow); } 100% { box-shadow: none; } }
+.prompt-updated-flash { animation: promptFlash 0.7s ease-out; }
 
 /* Standalone textarea (outside prompt-box) */
 .control-group > .field-textarea { background: var(--bg-deep); border: 1px solid var(--border-muted); border-radius: var(--radius-md); padding: 11px 13px; transition: border-color 0.15s, box-shadow 0.15s; }
@@ -353,7 +355,8 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 
 /* Image actions */
 .image-actions { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--bg-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
-.seed-badge { font-size: 0.78rem; color: var(--text-tertiary); font-variant-numeric: tabular-nums; font-family: "SF Mono","Fira Code","Cascadia Code",monospace; }
+.seed-badge { font-size: 0.78rem; color: var(--text-tertiary); font-variant-numeric: tabular-nums; font-family: "SF Mono","Fira Code","Cascadia Code",monospace; padding-right: 12px; border-right: 1px solid var(--border-subtle); transition: color 0.15s; }
+.seed-badge:hover { color: var(--text-secondary); }
 .action-group { display: flex; gap: 8px; align-items: center; }
 .action-overflow { position: relative; }
 .action-overflow-menu { display: none; position: absolute; bottom: calc(100% + 6px); right: 0; background: var(--bg-raised); border: 1px solid var(--border-muted); border-radius: var(--radius-md); padding: 4px; flex-direction: column; gap: 2px; min-width: 150px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 50; }
@@ -1282,6 +1285,12 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 .prompt-tool-btn { display: inline-flex; align-items: center; gap: 4px; background: none; border: 1px solid transparent; color: var(--text-tertiary); cursor: pointer; padding: 3px 8px; border-radius: var(--radius-sm); font-size: 0.7rem; font-family: inherit; font-weight: 500; transition: all 0.15s; }
 .prompt-tool-btn:hover { color: var(--text-primary); background: var(--bg-overlay); border-color: var(--border-muted); }
 .prompt-tool-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.prompt-tool-btn.loading { position: relative; pointer-events: none; color: transparent; }
+.prompt-tool-btn.loading svg { visibility: hidden; }
+.prompt-tool-btn.loading::after { content: ""; position: absolute; width: 12px; height: 12px; top: 50%; left: 50%; margin: -6px 0 0 -6px; border: 2px solid var(--border-muted); border-top-color: var(--accent-bright); border-radius: 50%; animation: spin 0.55s linear infinite; }
+.btn-action--iterate.loading { position: relative; pointer-events: none; color: transparent; }
+.btn-action--iterate.loading svg { visibility: hidden; }
+.btn-action--iterate.loading::after { content: ""; position: absolute; width: 12px; height: 12px; top: 50%; left: 50%; margin: -6px 0 0 -6px; border: 2px solid var(--border-muted); border-top-color: var(--accent-bright); border-radius: 50%; animation: spin 0.55s linear infinite; }
 .prompt-history-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(4,4,10,0.7); backdrop-filter: blur(4px); display: flex; align-items: flex-start; justify-content: center; padding-top: 15vh; }
 .prompt-history-panel { width: min(600px, 90vw); background: var(--bg-raised); border: 1px solid var(--border-muted); border-radius: var(--radius-xl); box-shadow: 0 16px 48px rgba(0,0,0,0.6); overflow: hidden; animation: promptHistoryIn 0.15s ease-out; }
 @keyframes promptHistoryIn { from { opacity: 0; transform: translateY(-8px) scale(0.98); } to { opacity: 1; transform: none; } }
@@ -1473,6 +1482,13 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   background: var(--danger-bg);
   border-color: var(--danger-border);
   color: var(--danger);
+}
+.history-card-action-btn--confirm-delete {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger);
+  font-size: 0.68rem;
+  gap: 3px;
 }
 
 /* Video play badge on gallery cards */
@@ -1670,7 +1686,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 .char-slot-textarea {
   resize: none;
   overflow: hidden;
-  min-height: 52px;
+  min-height: 72px;
   font-size: 0.83rem;
   padding: 8px 10px;
   background: var(--bg-float);
@@ -2073,7 +2089,13 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   font-size: 0.72rem;
   font-weight: 600;
   font-family: "SF Mono", "Fira Code", monospace;
+  max-width: 200px;
   animation: chipIn 0.18s var(--ease-out) both;
+}
+.char-interaction-chip > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @keyframes chipIn {
@@ -4282,8 +4304,8 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   position: absolute;
   bottom: 12px;
   left: 12px;
-  z-index: 30;
-  width: min(280px, calc(100% - 24px));
+  z-index: 32;
+  width: min(320px, calc(100% - 24px));
   background: var(--bg-raised);
   border: 1px solid var(--border-muted);
   border-radius: var(--radius-lg);
@@ -4433,7 +4455,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 }
 
 .clp-label {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -4443,7 +4465,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 
 .clp-actions {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 4px;
 }
 
@@ -4456,6 +4478,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   cursor: pointer;
+  min-height: 32px;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
@@ -4478,6 +4501,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 
 .clp-action-btn--danger {
   color: var(--danger);
+  margin-left: auto;
 }
 
 .clp-action-btn--danger:hover {

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=121">
+  <link rel="stylesheet" href="css/style.css?v=123">
 </head>
 <body>
   <div class="app">
@@ -913,10 +913,12 @@
             <!-- Canvas Layer Panel — floating panel showing active layer controls -->
             <div id="canvas-layer-panel" class="canvas-layer-panel" style="display:none">
               <div class="clp-header">
-                <button id="clp-prev" class="clp-nav" type="button" title="Previous layer">&#8249;</button>
+                <button id="clp-prev" class="clp-nav" type="button" title="Previous layer" style="display:none">&#8249;</button>
                 <span id="clp-layer-info" class="clp-layer-info">Layer 1 of 1</span>
-                <button id="clp-next" class="clp-nav" type="button" title="Next layer">&#8250;</button>
-                <button id="clp-collapse" class="clp-collapse" type="button" title="Collapse panel">&#9662;</button>
+                <button id="clp-next" class="clp-nav" type="button" title="Next layer" style="display:none">&#8250;</button>
+                <button id="clp-collapse" class="clp-collapse" type="button" title="Collapse panel">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
               </div>
               <div id="clp-body" class="clp-body">
                 <div class="clp-identity">
@@ -967,19 +969,27 @@
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14h4v7H4z"/><path d="M10 9h4v12h-4z"/><path d="M16 3h4v18h-4z"/></svg>
                 Refine
               </button>
-              <button id="btn-reuse-seed" class="btn-action" type="button">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.84"/></svg>
-                Reuse Seed
+              <button id="btn-send-to-layer" class="btn-action novelai-only" type="button" title="Send to layer" style="display:none">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 15h18"/></svg>
+                Send to Layer
               </button>
-              <button id="btn-download" class="btn-action btn-action--primary" type="button">
+              <button id="btn-set-as-source" class="btn-action" type="button" title="Set as source image" style="display:none">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                Set as Source
+              </button>
+              <button id="btn-download" class="btn-action" type="button">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Download
               </button>
               <div class="action-overflow">
-                <button id="btn-overflow-toggle" class="btn-action btn-action--danger-subtle" type="button" title="More actions">...</button>
+                <button id="btn-overflow-toggle" class="btn-action" type="button" title="More actions" aria-label="More actions">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+                </button>
                 <div id="overflow-menu" class="action-overflow-menu">
-                  <button id="btn-set-as-source" class="btn-action grok-only" type="button" title="Set as source image" style="display:none">Set as Source</button>
-                  <button id="btn-send-to-layer" class="btn-action novelai-only" type="button" title="Send to layer" style="display:none">Send to Layer</button>
+                  <button id="btn-reuse-seed" class="btn-action" type="button">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.84"/></svg>
+                    Reuse Seed
+                  </button>
                   <button id="btn-edit-in-grok" class="btn-action novelai-only" type="button" title="Edit in Grok" style="display:none">Edit in Grok</button>
                   <button id="btn-animate-in-grok" class="btn-action novelai-only" type="button" title="Animate in Grok" style="display:none">Animate in Grok</button>
                   <button id="btn-clear-canvas" class="btn-action btn-action--danger-subtle" type="button" title="Clear image">Clear</button>
@@ -1060,16 +1070,16 @@
     </div>
   </div>
 
-  <script src="js/state.js?v=121"></script>
-  <script src="js/provider.js?v=121"></script>
-  <script src="js/crop.js?v=121"></script>
-  <script src="js/tags.js?v=121"></script>
-  <script src="js/layers.js?v=121"></script>
-  <script src="js/generate.js?v=121"></script>
+  <script src="js/state.js?v=123"></script>
+  <script src="js/provider.js?v=123"></script>
+  <script src="js/crop.js?v=123"></script>
+  <script src="js/tags.js?v=123"></script>
+  <script src="js/layers.js?v=123"></script>
+  <script src="js/generate.js?v=123"></script>
 
-  <script src="js/gallery.js?v=121"></script>
-  <script src="js/explore.js?v=121"></script>
-  <script src="js/characters.js?v=121"></script>
-  <script src="js/app.js?v=121"></script>
+  <script src="js/gallery.js?v=123"></script>
+  <script src="js/explore.js?v=123"></script>
+  <script src="js/characters.js?v=123"></script>
+  <script src="js/app.js?v=123"></script>
 </body>
 </html>

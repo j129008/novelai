@@ -122,6 +122,8 @@ function setupCharacters() {
       card.appendChild(ta);
       card.appendChild(buildInteractionsSection(c));
       slotsEl.appendChild(card);
+      // Auto-grow to fit restored content
+      if (c.prompt) { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; }
     });
     if (accordion) accordion.open = true;
     updateCharacterUI();
@@ -217,7 +219,7 @@ function addCharacterSlot(slotsEl, updateCharacterUI) {
   // ── Textarea with auto-grow ──────────────────────────────
   const ta = document.createElement("textarea");
   ta.className = "char-slot-textarea field-textarea";
-  ta.rows = 2;
+  ta.rows = 3;
   ta.placeholder = "girl, blonde hair, blue eyes, waving";
   ta.spellcheck = false;
   ta.addEventListener("input", () => {
