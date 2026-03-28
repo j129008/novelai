@@ -239,9 +239,10 @@ Optimize the user's prompt:
 - Multi-char pipe format rules (CRITICAL — follow exactly):
   BASE section (before first |): count tag, rating, scene, background, lighting, composition, style, year — NEVER character appearance
   CHAR sections (after |): ONLY "girl"/"boy" + that character's appearance, expression, pose, interaction tags — NEVER scene/style/background
+  Interaction pairing rule: source# and target# MUST come in pairs across characters. If char1 has source#hug, char2 MUST have target#hug. Never add source# without a matching target# on another character (and vice versa). mutual# goes on ALL participating characters.
   Example input: "2girls, rating:sensitive, blonde hair, school uniform, black hair, red eyes, classroom, year 2024"
-  Correct output: "2girls, rating:sensitive, classroom, year 2024 | girl, blonde hair, school uniform | girl, black hair, red eyes"
-  WRONG output: "2girls | girl, blonde hair, school uniform, classroom, year 2024 | girl, black hair, red eyes, rating:sensitive"
+  Correct output: "2girls, rating:sensitive, classroom, year 2024 | girl, blonde hair, school uniform, source#hug | girl, black hair, red eyes, target#hug"
+  WRONG output: "2girls | girl, blonde hair, source#hug | girl, black hair" (missing target#hug on char 2)
 
 Return JSON: {{"prompt": "optimized tags", "changes": "brief summary of what changed"}}
 
