@@ -388,12 +388,12 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 
 /* Canvas tab system */
 .canvas { display: flex; flex-direction: column; padding: 0; gap: 0; background: var(--bg-deep); height: 100vh; position: relative; overflow: hidden; }
-.canvas-tabbar { position: absolute; top: 12px; left: 16px; z-index: 15; display: flex; align-items: center; gap: 12px; }
-.canvas-tabs { display: flex; background: rgba(42,42,42,0.85); backdrop-filter: blur(8px); border: 1px solid var(--border-muted); border-radius: var(--radius-md); padding: 3px; gap: 2px; flex-shrink: 0; }
-.canvas-tab { background: none; border: none; color: var(--text-tertiary); font-size: 0.8rem; font-weight: 600; font-family: inherit; letter-spacing: 0.03em; padding: 6px 16px; border-radius: 7px; cursor: pointer; transition: background 0.15s, color 0.15s; display: flex; align-items: center; gap: 7px; }
+.canvas-tabbar { position: absolute; top: 8px; left: 12px; z-index: 15; display: flex; align-items: center; gap: 8px; }
+.canvas-tabs { display: flex; background: rgba(42,42,42,0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 2px; gap: 1px; flex-shrink: 0; }
+.canvas-tab { background: none; border: none; color: var(--text-tertiary); font-size: 0.72rem; font-weight: 600; font-family: inherit; letter-spacing: 0.03em; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: background 0.15s, color 0.15s; display: flex; align-items: center; gap: 5px; }
 .canvas-tab:hover { color: var(--text-secondary); }
 .canvas-tab--active { background: var(--bg-overlay); color: var(--text-primary); }
-.gallery-count-badge { font-size: 0.68rem; font-weight: 700; background: var(--accent-dim); color: var(--accent-bright); border-radius: 10px; padding: 1px 7px; line-height: 1.5; display: none; }
+.gallery-count-badge { font-size: 0.6rem; font-weight: 700; background: var(--accent-dim); color: var(--accent-bright); border-radius: 8px; padding: 0px 5px; line-height: 1.4; display: none; }
 .gallery-count-badge.visible { display: inline-block; }
 .history-search-wrap { flex: 1; display: flex; align-items: center; gap: 8px; background: var(--bg-raised); border: 1px solid var(--border-muted); border-radius: var(--radius-md); padding: 7px 12px; max-width: 360px; transition: border-color 0.15s, box-shadow 0.15s; }
 .history-search-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
