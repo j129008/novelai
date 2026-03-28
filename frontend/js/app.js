@@ -1294,6 +1294,7 @@ function setupCanvasPromptBar() {
     if (sidebarTa !== activeSidebarTa) return;
     cpbTa.value = sidebarTa.value;
     autoGrow(cpbTa);
+    updateCollapsedText();
   }
 
   /* ── Wire bidirectional sync for one sidebar textarea ── */
