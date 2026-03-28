@@ -1558,7 +1558,8 @@ function setupCanvasPromptBar() {
     genSettingsPopover.style.zIndex = "200";
   }
   if (cpbGearBtn) {
-    cpbGearBtn.addEventListener("click", () => {
+    cpbGearBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
       if (!genSettingsPopover) return;
       const isOpen = genSettingsPopover.style.display !== "none";
       if (isOpen) {
@@ -1572,6 +1573,12 @@ function setupCanvasPromptBar() {
       genSettingsPopover.style.bottom = (window.innerHeight - rect.top + 8) + "px";
       genSettingsPopover.style.left = "auto";
       genSettingsPopover.style.top = "auto";
+    });
+    // Close on outside click
+    document.addEventListener("click", (e) => {
+      if (genSettingsPopover.style.display === "none") return;
+      if (genSettingsPopover.contains(e.target) || cpbGearBtn.contains(e.target)) return;
+      genSettingsPopover.style.display = "none";
     });
   }
 
