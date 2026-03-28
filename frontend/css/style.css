@@ -5673,20 +5673,22 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 
 .layer-strip-add {
   flex-shrink: 0;
-  width: 40px;
-  height: 72px;
-  border-radius: var(--radius-sm);
-  border: 1px dashed var(--border-muted);
-  background: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border-muted);
+  background: var(--bg-overlay);
   color: var(--text-tertiary);
-  font-size: 1.2rem;
+  font-size: 0.9rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.15s, color 0.15s;
+  align-self: center;
+  transition: all 0.15s;
+  opacity: 0.5;
 }
-.layer-strip-add:hover { border-color: var(--accent); color: var(--accent-bright); }
+.layer-strip-add:hover { border-color: var(--accent); color: var(--accent-bright); background: var(--accent-dim); opacity: 1; }
 
 .layer-strip-controls {
   display: flex;
