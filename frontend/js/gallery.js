@@ -894,6 +894,7 @@ async function setHistoryImageAsSource(url, meta) {
         const layerName = (meta && meta.prompt) ? meta.prompt.slice(0, 32) + "…" : "History Layer";
         layers.push({ id: Date.now(), name: layerName, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0, scale: 1.0 });
         renderLayerList();
+        renderLayerStrip();
         saveLayersToStorage();
         refreshCompositePreview();
         const accordion = document.getElementById("layers-accordion");
