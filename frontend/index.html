@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=127">
+  <link rel="stylesheet" href="css/style.css?v=128">
 </head>
 <body>
   <div class="app">
@@ -546,23 +546,23 @@
             <div class="prompt-tabs">
               <button class="prompt-tab active" data-target="prompt" type="button">Prompt<span id="scene-label" class="scene-label" style="display:none"> (Scene)</span></button>
               <button class="prompt-tab" data-target="negative-prompt" type="button">Undesired</button>
-              <div class="prompt-tab-actions">
-                <label class="pill-toggle" id="quality-tags-pill" title="Auto-prepend quality boost tags">
-                  <input type="checkbox" id="quality-tags" checked>
-                  <span class="pill-label">Quality</span>
-                </label>
-                <label class="pill-toggle" id="enhance-pill" title="When optimizing, also add atmospheric phrases to enhance storytelling">
-                  <input type="checkbox" id="enhance-toggle">
-                  <span class="pill-label">Enhance</span>
-                </label>
-                <select id="uc-preset" class="uc-preset-select" style="display:none" aria-label="Undesired content preset">
-                  <option value="human-focus">Human Focus</option>
-                  <option value="heavy">Heavy</option>
-                  <option value="light">Light</option>
-                  <option value="furry-focus">Furry Focus</option>
-                  <option value="none">None</option>
-                </select>
-              </div>
+            </div>
+            <div class="prompt-option-strip" id="prompt-option-strip">
+              <label class="pill-toggle" id="quality-tags-pill" title="Auto-prepend quality boost tags">
+                <input type="checkbox" id="quality-tags" checked>
+                <span class="pill-label">Quality</span>
+              </label>
+              <label class="pill-toggle" id="enhance-pill" title="When optimizing, also add atmospheric phrases to enhance storytelling">
+                <input type="checkbox" id="enhance-toggle">
+                <span class="pill-label">Enhance</span>
+              </label>
+              <select id="uc-preset" class="uc-preset-select" style="display:none" aria-label="Undesired content preset">
+                <option value="human-focus">Human Focus</option>
+                <option value="heavy">Heavy</option>
+                <option value="light">Light</option>
+                <option value="furry-focus">Furry Focus</option>
+                <option value="none">None</option>
+              </select>
             </div>
             <div class="prompt-history-wrap">
               <textarea id="prompt" class="field-textarea field-textarea--prompt" rows="6" placeholder="Describe your vision… e.g. a girl standing in a field of sunflowers at golden hour" spellcheck="false"></textarea>
