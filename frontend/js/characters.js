@@ -410,14 +410,22 @@ function renderCharacterMarkers() {
 
   if (!characters.length) return;
 
+  const count = characters.length;
   characters.forEach((charData, i) => {
     const marker = document.createElement("div");
     marker.className = "char-marker";
     if (charData.positionAuto) marker.classList.add("char-marker--auto");
     if (i === _activeMarkerIdx) marker.classList.add("char-marker--active");
     marker.textContent = String(i + 1);
-    marker.style.left = (charData.x * 100) + "%";
-    marker.style.top  = (charData.y * 100) + "%";
+    // Auto mode: distribute evenly instead of stacking at center
+    let displayX = charData.x;
+    let displayY = charData.y;
+    if (charData.positionAuto) {
+      displayX = count === 1 ? 0.5 : (0.2 + (0.6 * i / (count - 1)));
+      displayY = 0.5;
+    }
+    marker.style.left = (displayX * 100) + "%";
+    marker.style.top  = (displayY * 100) + "%";
     marker.setAttribute("role", "button");
     marker.setAttribute("aria-label", `Character ${i + 1} position. Double-click to toggle auto.`);
     marker.title = "Drag to set position. Double-click to reset to Auto.";
