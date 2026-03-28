@@ -171,6 +171,7 @@ function undoLayer() {
   _layerRedoStack.push({ label: entry.label, meta: _snapshotLayerMeta() });
   _applyLayerMeta(entry.meta);
   renderLayerList();
+  renderLayerStrip();
   saveLayersToStorage();
   refreshCompositePreview();
   showStatus("Undid: " + entry.label);
@@ -182,6 +183,7 @@ function redoLayer() {
   _layerUndoStack.push({ label: entry.label, meta: _snapshotLayerMeta() });
   _applyLayerMeta(entry.meta);
   renderLayerList();
+  renderLayerStrip();
   saveLayersToStorage();
   refreshCompositePreview();
   showStatus("Redid: " + entry.label);

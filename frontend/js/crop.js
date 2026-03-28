@@ -226,6 +226,7 @@ function applyImportedImage(b64, width, height, dataUrl) {
       const n = layers.length + 1;
       layers.push({ id: Date.now(), name: "Layer " + n, imageBase64: b64, maskBase64: null, inpaintMaskBase64: null, opacity: 1.0, visible: true, isOutputTarget: false, offsetX: 0, offsetY: 0, scale: 1.0 });
       renderLayerList();
+      renderLayerStrip();
       saveLayersToStorage();
       refreshCompositePreview();
       const accordion = document.getElementById("layers-accordion");
