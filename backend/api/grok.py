@@ -209,7 +209,8 @@ Order: Count → Rating → Character → Appearance → Action → Scene → St
 Example: 1boy, 1girl, rating:sensitive, blonde hair, blue eyes, smile, garden, soft lighting
 Rating: rating:general / rating:sensitive / rating:questionable / rating:explicit (ALWAYS use "rating:" prefix, never bare "explicit"/"nsfw")
 Emphasis: {boost}, [weaken], 1.5::weight::, -1::remove:: — preserve exactly as written
-Multi-char: base | char1 | char2 — base has count+scene+style, chars have "girl"/"boy"+appearance. Interactions: source#action, target#action, mutual#action
+Multi-char: base | char1 | char2 — base has count+scene+style, chars have "girl"/"boy"+appearance.
+Interactions (ONLY in character sections, NEVER in base): ONLY these 3 prefixes exist: source#action, target#action, mutual#action. Do NOT invent new prefixes. The # symbol is ONLY used for these interaction tags.
 Quality tags auto-appended by system — do NOT add: location, very aesthetic, masterpiece, no text
 Dataset prefixes (prompt start only): "fur dataset," or "background dataset,"
 Year tag: "year 2024" for style era. Renamed: v→peace sign, double v→double peace"""
