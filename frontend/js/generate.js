@@ -2,6 +2,19 @@
    GENERATE
    ═══════════════════════════════════════════════════════════ */
 
+// Clear output area without destroying static elements (image-actions, char-popover, markers)
+function clearOutput(outputEl) {
+  const keep = new Set(["image-actions", "char-popover"]);
+  Array.from(outputEl.children).forEach(child => {
+    if (!keep.has(child.id) && !child.classList.contains("char-marker") && !child.classList.contains("placeholder")) {
+      child.remove();
+    }
+  });
+  // Also remove placeholder
+  const ph = outputEl.querySelector(".placeholder");
+  if (ph) ph.remove();
+}
+
 function setGenerateButtonStop() {
   const btn = $("#generate-btn");
   btn.classList.remove("loading");
@@ -148,7 +161,7 @@ async function generate() {
     const img = document.createElement("img");
     img.src = `data:image/png;base64,${data.image}`;
     img.alt = "Generated image";
-    output.innerHTML = "";
+    clearOutput(output);
     output.appendChild(img);
     // Re-render character markers (cleared by innerHTML reset above)
     renderCharacterMarkers();
@@ -292,7 +305,7 @@ async function generateGrokImage() {
     const img = document.createElement("img");
     img.src = `data:image/png;base64,${data.image}`;
     img.alt = "Generated image";
-    output.innerHTML = "";
+    clearOutput(output);
     output.appendChild(img);
 
     const actions = $("#image-actions");
@@ -391,7 +404,7 @@ async function generateGrokVideo() {
     progressEl.appendChild(spinnerEl);
     progressEl.appendChild(progressMsg);
     progressEl.appendChild(progressBar);
-    output.innerHTML = "";
+    clearOutput(output);
     output.appendChild(progressEl);
   }
 
@@ -451,7 +464,7 @@ async function generateGrokVideo() {
     state.lastVideoBase64 = videoData;
 
     if (output) {
-      output.innerHTML = "";
+      clearOutput(output);
       const video = document.createElement("video");
       video.src = `data:video/mp4;base64,${videoData}`;
       video.autoplay = true;
