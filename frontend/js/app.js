@@ -1174,7 +1174,8 @@ function setupPromptOptimize() {
       if (!resp.ok) {
         const errBody = await resp.text();
         console.error("[optimize] API error:", resp.status, errBody);
-        const err = JSON.parse(errBody).detail || "Optimize failed";
+        let err = "Optimize failed";
+        try { err = JSON.parse(errBody).detail || err; } catch { err = errBody.substring(0, 200) || err; }
         throw new Error(err);
       }
       const data = await resp.json();
@@ -1359,7 +1360,8 @@ async function init() {
         if (!resp.ok) {
           const errBody = await resp.text();
           console.error("[refine] API error:", resp.status, errBody);
-          const err = JSON.parse(errBody).detail || "Refine failed";
+          let err = "Refine failed";
+          try { err = JSON.parse(errBody).detail || err; } catch { err = errBody.substring(0, 200) || err; }
           throw new Error(err);
         }
         const data = await resp.json();
