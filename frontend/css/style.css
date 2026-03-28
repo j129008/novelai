@@ -1615,7 +1615,8 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   text-overflow: ellipsis;
   min-width: 0;
 }
-.cpb-collapsed-gen { width: auto; padding: 6px 16px; font-size: 0.8rem; }
+.cpb-collapsed-gen { width: auto; padding: 6px 16px; font-size: 0.8rem; min-width: 90px; }
+.cpb-collapsed-gen.loading::after { width: 14px; height: 14px; margin: -7px 0 0 -7px; border-width: 2px; }
 
 /* Hide bar when non-canvas tabs are showing (set via JS class on section.canvas) */
 .canvas--non-canvas-tab .canvas-prompt-bar {
