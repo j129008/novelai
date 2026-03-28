@@ -341,7 +341,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* Output area */
-.output-area { flex: 1; background: var(--bg-deep); border: none; border-radius: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; min-height: 0; position: relative; }
+.output-area { flex: 1; height: 0; background: var(--bg-deep); border: none; border-radius: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
 .output-area img, .output-area video { max-width: 100%; max-height: 100%; display: block; border-radius: 0; -webkit-user-drag: none; user-drag: none; object-fit: contain; }
 .output-area video { object-fit: contain; width: auto; height: auto; }
 
