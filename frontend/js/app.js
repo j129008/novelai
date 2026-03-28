@@ -1429,6 +1429,11 @@ function setupCanvasPromptBar() {
     }
   }
 
+  /* ── App settings button ─────────────────────────────── */
+  document.getElementById("cpb-app-settings-btn")?.addEventListener("click", () => {
+    document.getElementById("settings-btn")?.click();
+  });
+
   /* ── Toolbar button delegates ──────────────────────── */
   document.getElementById("cpb-optimize-btn")?.addEventListener("click", () => {
     document.getElementById("prompt-optimize-btn")?.click();
