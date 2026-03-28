@@ -1579,15 +1579,43 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   left: 0;
   right: 0;
   z-index: 15;
-  background: rgba(42,42,42,0.9);
+  background: rgba(42,42,42,0.92);
   backdrop-filter: blur(12px);
   border-top: 1px solid var(--border-muted);
   padding: 10px 16px 12px;
   display: flex;
   flex-direction: column;
   gap: 0;
-  /* Only show when the canvas tab is active */
+  transition: padding 0.15s ease;
 }
+
+/* Collapsed state — single line preview */
+.canvas-prompt-bar--collapsed { padding: 6px 16px; background: rgba(42,42,42,0.75); }
+.canvas-prompt-bar--collapsed .cpb-main-row,
+.canvas-prompt-bar--collapsed .cpb-controls-row { display: none; }
+.canvas-prompt-bar--collapsed .cpb-collapsed-row { display: flex; }
+
+/* Expanded state */
+.canvas-prompt-bar:not(.canvas-prompt-bar--collapsed) .cpb-collapsed-row { display: none; }
+
+/* Collapsed row styling */
+.cpb-collapsed-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  min-height: 28px;
+}
+.cpb-collapsed-text {
+  flex: 1;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.cpb-collapsed-gen { width: auto; padding: 6px 16px; font-size: 0.8rem; }
 
 /* Hide bar when non-canvas tabs are showing (set via JS class on section.canvas) */
 .canvas--non-canvas-tab .canvas-prompt-bar {

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=139">
+  <link rel="stylesheet" href="css/style.css?v=140">
 </head>
 <body>
   <div class="app">
@@ -1052,9 +1052,18 @@
              CANVAS PROMPT BAR — floating prompt at bottom of canvas
              Mirrors #prompt / #negative-prompt (source of truth in sidebar)
              ═══════════════════════════════════════════════════════ -->
-        <div class="canvas-prompt-bar" id="canvas-prompt-bar">
+        <div class="canvas-prompt-bar canvas-prompt-bar--collapsed" id="canvas-prompt-bar">
 
-          <!-- Row 1: prompt input — tab pills + textarea + generate -->
+          <!-- Collapsed preview row — click to expand -->
+          <div class="cpb-collapsed-row" id="cpb-collapsed-row">
+            <span class="cpb-collapsed-text" id="cpb-collapsed-text">Describe your vision…</span>
+            <button class="btn-generate cpb-generate-btn cpb-collapsed-gen" id="cpb-collapsed-gen" type="button">
+              <span class="btn-generate-label">Generate</span>
+              <span class="btn-generate-hint">Enter</span>
+            </button>
+          </div>
+
+          <!-- Expanded: Row 1 — prompt input -->
           <div class="cpb-main-row">
             <div class="cpb-tab-pills" role="tablist" aria-label="Prompt type">
               <button class="cpb-pill cpb-pill--active" data-cpb-target="prompt" type="button" role="tab" aria-selected="true">Prompt</button>
@@ -1202,6 +1211,6 @@
   <script src="js/gallery.js?v=134"></script>
   <script src="js/explore.js?v=124"></script>
   <script src="js/characters.js?v=138"></script>
-  <script src="js/app.js?v=134"></script>
+  <script src="js/app.js?v=140"></script>
 </body>
 </html>

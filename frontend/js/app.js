@@ -1353,19 +1353,58 @@ function setupCanvasPromptBar() {
     });
   });
 
-  /* ── Focus state: show / hide toolbar row ──────────── */
-  cpbTa.addEventListener("focus", () => bar.classList.add("canvas-prompt-bar--focused"));
-  // Delay blur so clicks on toolbar buttons register before hiding
-  cpbTa.addEventListener("blur", () => setTimeout(() => {
-    // Keep focused if anything inside the bar still has focus
-    if (!bar.contains(document.activeElement)) {
-      bar.classList.remove("canvas-prompt-bar--focused");
-    }
-  }, 150));
+  /* ── Collapse / Expand prompt bar ────────────────────── */
+  const collapsedRow = document.getElementById("cpb-collapsed-row");
+  const collapsedText = document.getElementById("cpb-collapsed-text");
+  const collapsedGen = document.getElementById("cpb-collapsed-gen");
 
-  // Keep bar focused when clicking toolbar buttons
-  bar.querySelectorAll(".cpb-tool-btn, .cpb-seed-input, .cpb-seed-rand-btn").forEach((el) => {
-    el.addEventListener("mousedown", (e) => e.preventDefault()); // prevent blur on click
+  function expandBar() {
+    bar.classList.remove("canvas-prompt-bar--collapsed");
+    cpbTa.focus();
+  }
+
+  function collapseBar() {
+    bar.classList.add("canvas-prompt-bar--collapsed");
+    updateCollapsedText();
+  }
+
+  function updateCollapsedText() {
+    if (!collapsedText) return;
+    const val = cpbTa.value.trim();
+    collapsedText.textContent = val || "Describe your vision…";
+    collapsedText.style.color = val ? "var(--text-primary)" : "var(--text-tertiary)";
+  }
+
+  // Click collapsed row → expand
+  if (collapsedRow) collapsedRow.addEventListener("click", (e) => {
+    if (e.target.closest(".cpb-collapsed-gen")) return; // don't expand on generate click
+    expandBar();
+  });
+
+  // Collapsed generate button → fire generation
+  if (collapsedGen) collapsedGen.addEventListener("click", () => {
+    document.getElementById("generate-btn")?.click();
+  });
+
+  // Click outside bar → collapse
+  document.addEventListener("mousedown", (e) => {
+    if (bar.classList.contains("canvas-prompt-bar--collapsed")) return;
+    if (bar.contains(e.target)) return;
+    collapseBar();
+  });
+
+  // Escape → collapse
+  bar.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { collapseBar(); e.stopPropagation(); }
+  });
+
+  // Keep collapsed text in sync
+  cpbTa.addEventListener("input", updateCollapsedText);
+  updateCollapsedText();
+
+  // Prevent blur from collapsing when clicking toolbar buttons
+  bar.querySelectorAll(".cpb-tool-btn, .cpb-seed-input, .cpb-seed-rand-btn, .cpb-icon-btn, .cpb-pill-toggle, .cpb-meta-select").forEach((el) => {
+    el.addEventListener("mousedown", (e) => e.preventDefault());
   });
 
   /* ── Quality / Enhance checkbox mirrors ────────────── */
