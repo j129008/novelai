@@ -329,6 +329,38 @@ Return a JSON object with two fields:
 Return ONLY the JSON object, no markdown formatting."""
 
 
+def _parse_grok_json(text: str) -> dict:
+    """Robustly parse JSON from Grok response, handling markdown wrappers and malformed output."""
+    import re
+    text = re.sub(r"^```(?:json)?\s*", "", text.strip())
+    text = re.sub(r"\s*```$", "", text.strip())
+
+    # Direct parse
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Extract first JSON object
+    m = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
+    if m:
+        try:
+            return json.loads(m.group())
+        except json.JSONDecodeError:
+            pass
+
+    # Last resort: extract "prompt" and optional "changes" fields directly
+    pm = re.search(r'"prompt"\s*:\s*"((?:[^"\\]|\\.)*)"', text)
+    if pm:
+        result = {"prompt": pm.group(1).replace('\\"', '"')}
+        cm = re.search(r'"changes"\s*:\s*"((?:[^"\\]|\\.)*)"', text)
+        if cm:
+            result["changes"] = cm.group(1).replace('\\"', '"')
+        return result
+
+    raise RuntimeError(f"Failed to parse response: {text[:300]}")
+
+
 async def refine_prompt_with_image(api_key: str, current_prompt: str, image_b64: str, instructions: str = "") -> dict:
     """Analyze a generated image and refine the prompt based on the result."""
     import re
@@ -362,13 +394,7 @@ async def refine_prompt_with_image(api_key: str, current_prompt: str, image_b64:
             raise RuntimeError(f"{resp.status_code}: {resp.text[:500]}")
 
     text = resp.json()["choices"][0]["message"]["content"]
-    text = re.sub(r"^```(?:json)?\s*", "", text.strip())
-    text = re.sub(r"\s*```$", "", text.strip())
-
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        raise RuntimeError(f"Failed to parse response: {text[:200]}")
+    return _parse_grok_json(text)
 
 
 _PROMPT_ASSIST_EDIT = """You are a prompt assistant for Grok Imagine's IMAGE EDITING mode.
@@ -429,10 +455,4 @@ async def prompt_assist(api_key: str, direction: str, mode: str, current_prompt:
             raise RuntimeError(f"{resp.status_code}: {resp.text[:500]}")
 
     text = resp.json()["choices"][0]["message"]["content"]
-    text = re.sub(r"^```(?:json)?\s*", "", text.strip())
-    text = re.sub(r"\s*```$", "", text.strip())
-
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        raise RuntimeError(f"Failed to parse response: {text[:200]}")
+    return _parse_grok_json(text)
