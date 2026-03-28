@@ -1624,6 +1624,32 @@ function setupCanvasPromptBar() {
     scaleMirror.addEventListener("input", () => { scaleSource.value = scaleMirror.value; scaleSource.dispatchEvent(new Event("input", { bubbles: true })); if (scaleVal) scaleVal.textContent = parseFloat(scaleMirror.value).toFixed(1); });
   }
 
+  /* ── Add Character button ────────────────────────────── */
+  document.getElementById("cpb-add-char-btn")?.addEventListener("click", () => {
+    if (typeof characters === "undefined" || typeof addCharacterSlot === "undefined") return;
+    if (characters.length >= (typeof MAX_CHARACTERS !== "undefined" ? MAX_CHARACTERS : 6)) {
+      showStatus("Maximum characters reached");
+      return;
+    }
+    const slotsEl = document.getElementById("character-slots");
+    if (slotsEl && typeof _updateCharUI === "function") {
+      addCharacterSlot(slotsEl, _updateCharUI);
+    } else if (slotsEl) {
+      addCharacterSlot(slotsEl, () => {});
+    }
+    const newIdx = characters.length - 1;
+    // Auto distribute position
+    const count = characters.length;
+    characters[newIdx].x = count === 1 ? 0.5 : (0.2 + (0.6 * newIdx / (count - 1)));
+    characters[newIdx].y = 0.5;
+    characters[newIdx].positionAuto = true;
+    renderCharacterMarkers();
+    saveCharactersToCache();
+    // Open popover on new character
+    const markers = document.querySelectorAll(".char-marker");
+    if (markers[newIdx]) openCharacterPopover(newIdx, markers[newIdx]);
+  });
+
   /* ── App settings button ─────────────────────────────── */
   document.getElementById("cpb-app-settings-btn")?.addEventListener("click", () => {
     document.getElementById("settings-btn")?.click();
