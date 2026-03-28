@@ -1417,9 +1417,31 @@ function setupCanvasPromptBar() {
     e.stopPropagation();
     document.getElementById("btn-send-to-layer")?.click();
   });
+  // Reparent overflow menu to body so it works when sidebar is hidden
+  const overflowMenu = document.getElementById("overflow-menu");
+  if (overflowMenu && overflowMenu.parentElement !== document.body) {
+    document.body.appendChild(overflowMenu);
+    overflowMenu.style.position = "fixed";
+    overflowMenu.style.zIndex = "200";
+  }
   if (collapsedMore) collapsedMore.addEventListener("click", (e) => {
     e.stopPropagation();
-    document.getElementById("btn-overflow-toggle")?.click();
+    if (!overflowMenu) return;
+    const isOpen = overflowMenu.classList.contains("open");
+    overflowMenu.classList.toggle("open", !isOpen);
+    if (!isOpen) {
+      const rect = collapsedMore.getBoundingClientRect();
+      overflowMenu.style.right = (window.innerWidth - rect.right) + "px";
+      overflowMenu.style.bottom = (window.innerHeight - rect.top + 6) + "px";
+      overflowMenu.style.left = "auto";
+      overflowMenu.style.top = "auto";
+    }
+  });
+  // Close overflow menu on outside click
+  document.addEventListener("click", (e) => {
+    if (overflowMenu?.classList.contains("open") && !overflowMenu.contains(e.target) && !collapsedMore?.contains(e.target)) {
+      overflowMenu.classList.remove("open");
+    }
   });
 
   // Auto-generate toggle mirror
@@ -1527,19 +1549,30 @@ function setupCanvasPromptBar() {
     observer.observe(realGenerateBtn, { attributes: true, subtree: true, characterData: true, childList: true });
   }
 
-  /* ── Gear button ───────────────────────────────────── */
+  /* ── Gear button — reparent popover to body so it works when sidebar is hidden ── */
   const cpbGearBtn = document.getElementById("cpb-gear-btn");
+  const genSettingsPopover = document.getElementById("gen-settings-popover");
+  if (genSettingsPopover && genSettingsPopover.parentElement !== document.body) {
+    document.body.appendChild(genSettingsPopover);
+    genSettingsPopover.style.position = "fixed";
+    genSettingsPopover.style.zIndex = "200";
+  }
   if (cpbGearBtn) {
     cpbGearBtn.addEventListener("click", () => {
-      document.getElementById("gen-settings-btn")?.click();
+      if (!genSettingsPopover) return;
+      const isOpen = genSettingsPopover.style.display !== "none";
+      if (isOpen) {
+        genSettingsPopover.style.display = "none";
+        return;
+      }
+      // Position above the gear button
+      const rect = cpbGearBtn.getBoundingClientRect();
+      genSettingsPopover.style.display = "";
+      genSettingsPopover.style.right = (window.innerWidth - rect.right) + "px";
+      genSettingsPopover.style.bottom = (window.innerHeight - rect.top + 8) + "px";
+      genSettingsPopover.style.left = "auto";
+      genSettingsPopover.style.top = "auto";
     });
-    // Mirror active state from real gear button
-    const realGearBtn = document.getElementById("gen-settings-btn");
-    if (realGearBtn) {
-      new MutationObserver(() => {
-        cpbGearBtn.classList.toggle("active", realGearBtn.classList.contains("active"));
-      }).observe(realGearBtn, { attributes: true });
-    }
   }
 
   /* ── App settings button ─────────────────────────────── */
