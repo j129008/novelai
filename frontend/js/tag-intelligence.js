@@ -17,6 +17,7 @@ const TagIntelligence = (() => {
     if (!Array.isArray(_data.history)) _data.history = [];
     if (!Array.isArray(_data.knownTags)) _data.knownTags = [];
     if (!Array.isArray(_data.discoveries)) _data.discoveries = [];
+    if (!Array.isArray(_data.savedTags)) _data.savedTags = [];
     return _data;
   }
 
@@ -182,5 +183,30 @@ const TagIntelligence = (() => {
     return `${Math.floor(days / 30)}mo ago`;
   }
 
-  return { parseTags, parseTagSections, diffTags, recordChange, getHistory, getLastChange, getDiscoveries, fetchSuggestions, timeAgo };
+  // Saved tags (favorites)
+  function saveTag(tag) {
+    const data = _load();
+    const norm = _normalizeTag(tag);
+    if (!norm || data.savedTags.includes(norm)) return;
+    data.savedTags.push(norm);
+    if (data.savedTags.length > 100) data.savedTags = data.savedTags.slice(-100);
+    _save();
+  }
+
+  function removeSavedTag(tag) {
+    const data = _load();
+    const norm = _normalizeTag(tag);
+    data.savedTags = data.savedTags.filter(t => t !== norm);
+    _save();
+  }
+
+  function getSavedTags() {
+    return [..._load().savedTags];
+  }
+
+  function isTagSaved(tag) {
+    return _load().savedTags.includes(_normalizeTag(tag));
+  }
+
+  return { parseTags, parseTagSections, diffTags, recordChange, getHistory, getLastChange, getDiscoveries, fetchSuggestions, timeAgo, saveTag, removeSavedTag, getSavedTags, isTagSaved };
 })();
