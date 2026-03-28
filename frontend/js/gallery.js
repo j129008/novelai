@@ -966,15 +966,17 @@ function loadSettingsFromMeta(meta) {
     if (smeaDyn) smeaDyn.checked = !!meta.sm_dyn;
   }
 
-  // Restore characters only when metadata contains char_captions
+  // Clear existing characters and restore from metadata
   {
     const charCaptions = (meta.char_captions && Array.isArray(meta.char_captions)) ? meta.char_captions : [];
-    if (charCaptions.length > 0) {
     const slotsEl = $("#character-slots");
     if (slotsEl) {
+      // Always clear existing character blocks when loading settings
       characters.length = 0;
       slotsEl.innerHTML = "";
       _activeMarkerIdx = -1;
+    }
+    if (charCaptions.length > 0 && slotsEl) {
       charCaptions.forEach((cc) => {
         const charData = {
           prompt: cc.char_caption || "",
@@ -1094,7 +1096,20 @@ function loadSettingsFromMeta(meta) {
       }
       renderCharacterMarkers();
       saveCharactersToCache();
-    }
+    } else if (slotsEl) {
+      // No char_captions — update UI to reflect cleared characters
+      const accordion = $("#characters-accordion");
+      if (accordion) accordion.open = false;
+      const emptyState = $("#char-empty-state");
+      if (emptyState) emptyState.style.display = "flex";
+      const addBtnInline = $("#btn-add-character-inline");
+      if (addBtnInline) addBtnInline.style.display = "none";
+      const sceneLabel = $("#scene-label");
+      if (sceneLabel) sceneLabel.style.display = "none";
+      const badge = $("#char-count-badge");
+      if (badge) { badge.textContent = "0"; badge.style.display = "none"; }
+      renderCharacterMarkers();
+      saveCharactersToCache();
     }
   }
 }
