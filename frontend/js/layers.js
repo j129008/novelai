@@ -511,7 +511,6 @@ function renderLayerStrip() {
     tab.title = layer.name;
     tab.setAttribute("role", "button");
     tab.tabIndex = 0;
-    tab.draggable = true;
 
     // Dot for output target
     const dot = document.createElement("span");
@@ -522,61 +521,81 @@ function renderLayerStrip() {
     const label = document.createTextNode((idx + 1).toString());
     tab.appendChild(label);
 
-    // Click: select + toggle panel
-    tab.addEventListener("click", () => {
-      const wasActive = _activeLayerIdx === idx;
-      _activeLayerIdx = idx;
-      // Update active class
-      tabsList.querySelectorAll(".layer-tab").forEach((t, i) => {
-        t.classList.toggle("layer-tab--active", i === _activeLayerIdx);
-      });
-      // Toggle panel: if already active, toggle visibility; if new, show
-      const panel = document.getElementById("layer-tab-panel");
-      if (wasActive && panel && panel.style.display !== "none") {
-        panel.style.display = "none";
-      } else {
-        openLayerTabPanel(idx, tab);
+    // Pointer-based drag-to-reorder + click detection
+    let _ptrDown = false, _ptrMoved = false, _ptrStartY = 0;
+    tab.addEventListener("pointerdown", (e) => {
+      _ptrDown = true;
+      _ptrMoved = false;
+      _ptrStartY = e.clientY;
+      tab.setPointerCapture(e.pointerId);
+      tab.style.opacity = "0.5";
+      tab.style.zIndex = "10";
+    });
+    tab.addEventListener("pointermove", (e) => {
+      if (!_ptrDown) return;
+      if (Math.abs(e.clientY - _ptrStartY) > 4) _ptrMoved = true;
+      if (!_ptrMoved) return;
+      // Find which tab we're over
+      const tabs = Array.from(tabsList.querySelectorAll(".layer-tab"));
+      tabs.forEach(t => t.classList.remove("layer-tab--drag-over"));
+      for (const t of tabs) {
+        if (t === tab) continue;
+        const r = t.getBoundingClientRect();
+        if (e.clientY >= r.top && e.clientY <= r.bottom) {
+          t.classList.add("layer-tab--drag-over");
+          break;
+        }
       }
     });
-
-    // Drag-to-reorder
-    tab.addEventListener("dragstart", (e) => {
-      _layerDrag.active = true;
-      _layerDrag.fromId = layer.id;
-      e.dataTransfer.effectAllowed = "move";
-      tab.style.opacity = "0.4";
-    });
-    tab.addEventListener("dragend", () => {
-      _layerDrag.active = false;
-      _layerDrag.fromId = null;
+    tab.addEventListener("pointerup", (e) => {
+      if (!_ptrDown) return;
+      _ptrDown = false;
+      tab.releasePointerCapture(e.pointerId);
       tab.style.opacity = "";
+      tab.style.zIndex = "";
       tabsList.querySelectorAll(".layer-tab--drag-over").forEach(t => t.classList.remove("layer-tab--drag-over"));
+
+      if (_ptrMoved) {
+        // Find drop target
+        const tabs = Array.from(tabsList.querySelectorAll(".layer-tab"));
+        for (let ti = 0; ti < tabs.length; ti++) {
+          if (tabs[ti] === tab) continue;
+          const r = tabs[ti].getBoundingClientRect();
+          if (e.clientY >= r.top && e.clientY <= r.bottom) {
+            const fromIdx = idx;
+            const toIdx = ti;
+            if (fromIdx !== toIdx) {
+              pushLayerUndo("Reorder layers");
+              const [moved] = layers.splice(fromIdx, 1);
+              layers.splice(toIdx, 0, moved);
+              _activeLayerIdx = toIdx;
+              renderLayerList();
+              saveLayersToStorage();
+              refreshCompositePreview();
+            }
+            return;
+          }
+        }
+      } else {
+        // Click (no drag) — select + toggle panel
+        const wasActive = _activeLayerIdx === idx;
+        _activeLayerIdx = idx;
+        tabsList.querySelectorAll(".layer-tab").forEach((t, i) => {
+          t.classList.toggle("layer-tab--active", i === _activeLayerIdx);
+        });
+        const panel = document.getElementById("layer-tab-panel");
+        if (wasActive && panel && panel.style.display !== "none") {
+          panel.style.display = "none";
+        } else {
+          openLayerTabPanel(idx, tab);
+        }
+      }
     });
-    tab.addEventListener("dragover", (e) => {
-      if (!_layerDrag.active || _layerDrag.fromId === layer.id) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      // Visual feedback
-      tabsList.querySelectorAll(".layer-tab").forEach(t => t.classList.remove("layer-tab--drag-over"));
-      tab.classList.add("layer-tab--drag-over");
-    });
-    tab.addEventListener("dragleave", () => {
-      tab.classList.remove("layer-tab--drag-over");
-    });
-    tab.addEventListener("drop", (e) => {
-      e.preventDefault();
-      if (!_layerDrag.active || _layerDrag.fromId === layer.id) return;
-      const fromIdx = layers.findIndex((l) => l.id === _layerDrag.fromId);
-      const toIdx = layers.indexOf(layer);
-      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
-      pushLayerUndo("Reorder layers");
-      const [moved] = layers.splice(fromIdx, 1);
-      layers.splice(toIdx, 0, moved);
-      _layerDrag.active = false;
-      _layerDrag.fromId = null;
-      renderLayerList();
-      saveLayersToStorage();
-      refreshCompositePreview();
+    tab.addEventListener("pointercancel", () => {
+      _ptrDown = false;
+      tab.style.opacity = "";
+      tab.style.zIndex = "";
+      tabsList.querySelectorAll(".layer-tab--drag-over").forEach(t => t.classList.remove("layer-tab--drag-over"));
     });
 
     tabsList.appendChild(tab);
