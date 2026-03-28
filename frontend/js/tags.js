@@ -468,45 +468,66 @@ function setupTagBrowser() {
     });
   });
 
-  $("#prompt").addEventListener("blur", function() {
-    _savedCursor = { el: this, pos: this.selectionStart };
-  });
-  $("#negative-prompt").addEventListener("blur", function() {
-    _savedCursor = { el: this, pos: this.selectionStart };
-  });
+  // Track last focused textarea — includes character block textareas
+  let _lastFocusedTextarea = null;
+
+  function trackTextareaFocus(el) {
+    el.addEventListener("focus", function() { _lastFocusedTextarea = this; });
+    el.addEventListener("blur", function() {
+      _savedCursor = { el: this, pos: this.selectionStart };
+    });
+  }
+
+  trackTextareaFocus($("#prompt"));
+  trackTextareaFocus($("#negative-prompt"));
+
+  // Also track character block textareas (use MutationObserver for dynamically added ones)
+  const charSlotsEl = document.getElementById("character-slots");
+  if (charSlotsEl) {
+    const observer = new MutationObserver(() => {
+      charSlotsEl.querySelectorAll(".char-slot-textarea").forEach(ta => {
+        if (!ta._tiTracked) { ta._tiTracked = true; trackTextareaFocus(ta); }
+      });
+    });
+    observer.observe(charSlotsEl, { childList: true, subtree: true });
+    // Track any already existing
+    charSlotsEl.querySelectorAll(".char-slot-textarea").forEach(ta => {
+      if (!ta._tiTracked) { ta._tiTracked = true; trackTextareaFocus(ta); }
+    });
+  }
 
   function insertTag(tag, chipEl) {
-    const promptEl = _insertTarget === "negative" ? $("#negative-prompt") : $("#prompt");
-    const display = tag.replace(/_/g, " ");
-    const val = promptEl.value;
-    const pos = (_savedCursor.el === promptEl && _savedCursor.pos >= 0) ? _savedCursor.pos : val.length;
-    const atEnd = pos === val.length;
-
-    let insertedLen;
-    if (atEnd) {
-      const prefix = val.length > 0 && !val.trimEnd().endsWith(",") ? ", " : val.length > 0 ? " " : "";
-      const insert = prefix + display;
-      promptEl.value = val + insert;
-      insertedLen = val.length + insert.length;
+    // Determine target: use last focused textarea if it's a char-slot, otherwise use pill target
+    let promptEl;
+    if (_lastFocusedTextarea && _lastFocusedTextarea.classList.contains("char-slot-textarea")) {
+      promptEl = _lastFocusedTextarea;
     } else {
-      const before = val.slice(0, pos);
-      const after = val.slice(pos);
-      const prefix = before.length > 0 && !before.trimEnd().endsWith(",") ? ", " : before.length > 0 ? " " : "";
-      const suffix = after.length > 0 && !after.trimStart().startsWith(",") ? ", " : "";
-      const insert = prefix + display + suffix;
-      promptEl.value = before + insert + after;
-      insertedLen = before.length + insert.length;
+      promptEl = _insertTarget === "negative" ? $("#negative-prompt") : $("#prompt");
     }
 
-    _savedCursor = { el: promptEl, pos: insertedLen };
-    promptEl.dispatchEvent(new Event("input"));
+    const display = tag.replace(/_/g, " ");
+    const val = promptEl.value;
+
+    // Always append at end — simpler and avoids breaking tags in the middle
+    const prefix = val.length > 0 && !val.trimEnd().endsWith(",") ? ", " : val.length > 0 ? " " : "";
+    promptEl.value = val + prefix + display;
+
+    _savedCursor = { el: promptEl, pos: promptEl.value.length };
+    _lastFocusedTextarea = promptEl;
+    promptEl.dispatchEvent(new Event("input", { bubbles: true }));
+
+    // Auto-grow for char textareas
+    if (promptEl.classList.contains("char-slot-textarea")) {
+      promptEl.style.height = "auto";
+      promptEl.style.height = promptEl.scrollHeight + "px";
+    }
 
     if (chipEl) {
       chipEl.classList.add("tag-chip--inserted");
       setTimeout(() => chipEl.classList.remove("tag-chip--inserted"), 300);
     }
 
-    const box = promptEl.closest(".prompt-box");
+    const box = promptEl.closest(".prompt-box") || promptEl.closest(".char-slot-card");
     if (box) {
       box.style.borderColor = "var(--accent)";
       box.style.boxShadow = "0 0 0 3px var(--accent-dim)";
