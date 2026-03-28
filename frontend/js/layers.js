@@ -61,7 +61,7 @@ async function refreshCompositePreview() {
     if (layers.length > 0 && layersEnabled && layersEnabled.checked) {
       state.canvasImageBase64 = null;
       if (output) {
-        output.innerHTML = "";
+        clearOutput(output);
         const placeholder = document.createElement("div");
         placeholder.className = "placeholder";
         placeholder.innerHTML = '<p class="placeholder-sub">Add images to layers to preview</p>';
@@ -78,7 +78,7 @@ async function refreshCompositePreview() {
         const img = document.createElement("img");
         img.src = `data:image/png;base64,${state.lastGeneratedImageBase64}`;
         img.alt = "Generated image";
-        output.innerHTML = "";
+        clearOutput(output);
         output.appendChild(img);
         renderCharacterMarkers();
       }
@@ -114,7 +114,7 @@ async function refreshCompositePreview() {
     const img = document.createElement("img");
     img.src = `data:image/png;base64,${compositeBase64}`;
     img.alt = "Layer composite preview";
-    output.innerHTML = "";
+    clearOutput(output);
     output.appendChild(img);
     renderCharacterMarkers();
 
@@ -1609,7 +1609,7 @@ function setupCanvasViewToggle() {
           const img = document.createElement("img");
           img.src = "data:image/png;base64," + state.img2img;
           img.alt = "Source image";
-          output.innerHTML = "";
+          clearOutput(output);
           output.appendChild(img);
         }
       } else {
@@ -1623,7 +1623,7 @@ function setupCanvasViewToggle() {
           const img = document.createElement("img");
           img.src = "data:image/png;base64," + state.lastGeneratedImageBase64;
           img.alt = "Generated image";
-          output.innerHTML = "";
+          clearOutput(output);
           output.appendChild(img);
           renderCharacterMarkers();
         }
