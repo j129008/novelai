@@ -1257,6 +1257,327 @@ function clearError() {
   $("#error-slot").innerHTML = "";
 }
 
+/* ═══════════════════════════════════════════════════════════
+   CANVAS PROMPT BAR (CPB) — Phase 1 canvas-centric UI
+   The hidden #prompt / #negative-prompt in the sidebar remain
+   the source of truth for all generation logic. This bar
+   bidirectionally mirrors them.
+   ═══════════════════════════════════════════════════════════ */
+
+function setupCanvasPromptBar() {
+  const bar         = document.getElementById("canvas-prompt-bar");
+  const cpbTa       = document.getElementById("cpb-prompt-display");
+  const pills       = bar ? bar.querySelectorAll(".cpb-pill") : [];
+  const sidebarPrompt   = document.getElementById("prompt");
+  const sidebarNegative = document.getElementById("negative-prompt");
+
+  if (!bar || !cpbTa || !sidebarPrompt) return;
+
+  // Track which sidebar textarea is currently mirrored
+  let activeSidebarTa = sidebarPrompt;
+
+  /* ── Auto-grow helper ─────────────────────────────── */
+  function autoGrow(ta) {
+    ta.style.height = "auto";
+    ta.style.height = ta.scrollHeight + "px";
+  }
+
+  /* ── Sync cpb → sidebar ───────────────────────────── */
+  function cpbToSidebar() {
+    if (!activeSidebarTa) return;
+    activeSidebarTa.value = cpbTa.value;
+    activeSidebarTa.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  /* ── Sync sidebar → cpb ───────────────────────────── */
+  function sidebarToCpb(sidebarTa) {
+    if (sidebarTa !== activeSidebarTa) return;
+    cpbTa.value = sidebarTa.value;
+    autoGrow(cpbTa);
+  }
+
+  /* ── Wire bidirectional sync for one sidebar textarea ── */
+  function wireSidebarSync(sidebarTa) {
+    sidebarTa.addEventListener("input", () => sidebarToCpb(sidebarTa));
+  }
+
+  wireSidebarSync(sidebarPrompt);
+  if (sidebarNegative) wireSidebarSync(sidebarNegative);
+
+  cpbTa.addEventListener("input", () => {
+    cpbToSidebar();
+    autoGrow(cpbTa);
+  });
+
+  /* ── Tab pill switching ────────────────────────────── */
+  pills.forEach((pill) => {
+    pill.addEventListener("click", () => {
+      pills.forEach((p) => {
+        p.classList.remove("cpb-pill--active");
+        p.setAttribute("aria-selected", "false");
+      });
+      pill.classList.add("cpb-pill--active");
+      pill.setAttribute("aria-selected", "true");
+
+      const target = pill.dataset.cpbTarget;
+      activeSidebarTa = target === "negative-prompt" ? sidebarNegative : sidebarPrompt;
+
+      // Also click the corresponding hidden sidebar tab so Focus Mode opens the right field
+      const sidebarTab = document.querySelector(`.prompt-tab[data-target="${target}"]`);
+      if (sidebarTab) sidebarTab.click();
+
+      // Update display + placeholder
+      cpbTa.value = activeSidebarTa ? activeSidebarTa.value : "";
+      cpbTa.placeholder = target === "negative-prompt"
+        ? "What to exclude…"
+        : "Describe your vision… e.g. a girl standing in a field of sunflowers at golden hour";
+      autoGrow(cpbTa);
+      cpbTa.focus();
+    });
+  });
+
+  /* ── Also keep sidebar prompt-tabs in sync ─────────── */
+  // When the sidebar prompt tab changes, mirror it to the cpb pill
+  const sidebarTabBtns = document.querySelectorAll(".prompt-tab[data-target]");
+  sidebarTabBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = btn.dataset.target;
+      pills.forEach((p) => {
+        const match = p.dataset.cpbTarget === target;
+        p.classList.toggle("cpb-pill--active", match);
+        p.setAttribute("aria-selected", match ? "true" : "false");
+      });
+      activeSidebarTa = target === "negative-prompt" ? sidebarNegative : sidebarPrompt;
+      cpbTa.value = activeSidebarTa ? activeSidebarTa.value : "";
+      autoGrow(cpbTa);
+    });
+  });
+
+  /* ── Focus state: show / hide toolbar row ──────────── */
+  cpbTa.addEventListener("focus", () => bar.classList.add("canvas-prompt-bar--focused"));
+  // Delay blur so clicks on toolbar buttons register before hiding
+  cpbTa.addEventListener("blur", () => setTimeout(() => {
+    // Keep focused if anything inside the bar still has focus
+    if (!bar.contains(document.activeElement)) {
+      bar.classList.remove("canvas-prompt-bar--focused");
+    }
+  }, 150));
+
+  // Keep bar focused when clicking toolbar buttons
+  bar.querySelectorAll(".cpb-tool-btn, .cpb-seed-input, .cpb-seed-rand-btn").forEach((el) => {
+    el.addEventListener("mousedown", (e) => e.preventDefault()); // prevent blur on click
+  });
+
+  /* ── Quality / Enhance checkbox mirrors ────────────── */
+  const sidebarQuality  = document.getElementById("quality-tags");
+  const sidebarEnhance  = document.getElementById("enhance-toggle");
+  const cpbQuality      = document.getElementById("cpb-quality-tags");
+  const cpbEnhance      = document.getElementById("cpb-enhance-toggle");
+
+  function wireCheckboxMirror(source, mirror) {
+    if (!source || !mirror) return;
+    // Init mirror from source
+    mirror.checked = source.checked;
+    // source → mirror
+    source.addEventListener("change", () => { mirror.checked = source.checked; });
+    // mirror → source
+    mirror.addEventListener("change", () => {
+      source.checked = mirror.checked;
+      source.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+
+  wireCheckboxMirror(sidebarQuality, cpbQuality);
+  wireCheckboxMirror(sidebarEnhance, cpbEnhance);
+
+  /* ── Generate button ───────────────────────────────── */
+  const cpbGenerateBtn = document.getElementById("cpb-generate-btn");
+  if (cpbGenerateBtn) {
+    cpbGenerateBtn.addEventListener("click", () => {
+      document.getElementById("generate-btn")?.click();
+    });
+  }
+
+  // Mirror the loading / stopping state from the real generate button
+  const realGenerateBtn = document.getElementById("generate-btn");
+  if (realGenerateBtn && cpbGenerateBtn) {
+    const observer = new MutationObserver(() => {
+      cpbGenerateBtn.className = realGenerateBtn.className.replace(
+        "btn-generate",
+        "btn-generate cpb-generate-btn"
+      );
+      cpbGenerateBtn.disabled = realGenerateBtn.disabled;
+      const labelEl = cpbGenerateBtn.querySelector(".btn-generate-label");
+      const realLabelEl = realGenerateBtn.querySelector(".btn-generate-label");
+      if (labelEl && realLabelEl) labelEl.textContent = realLabelEl.textContent;
+    });
+    observer.observe(realGenerateBtn, { attributes: true, subtree: true, characterData: true, childList: true });
+  }
+
+  /* ── Gear button ───────────────────────────────────── */
+  const cpbGearBtn = document.getElementById("cpb-gear-btn");
+  if (cpbGearBtn) {
+    cpbGearBtn.addEventListener("click", () => {
+      document.getElementById("gen-settings-btn")?.click();
+    });
+    // Mirror active state from real gear button
+    const realGearBtn = document.getElementById("gen-settings-btn");
+    if (realGearBtn) {
+      new MutationObserver(() => {
+        cpbGearBtn.classList.toggle("active", realGearBtn.classList.contains("active"));
+      }).observe(realGearBtn, { attributes: true });
+    }
+  }
+
+  /* ── Toolbar button delegates ──────────────────────── */
+  document.getElementById("cpb-optimize-btn")?.addEventListener("click", () => {
+    document.getElementById("prompt-optimize-btn")?.click();
+  });
+  document.getElementById("cpb-assist-btn")?.addEventListener("click", () => {
+    document.getElementById("prompt-assist-btn")?.click();
+  });
+  document.getElementById("cpb-history-btn")?.addEventListener("click", () => {
+    document.getElementById("prompt-history-btn")?.click();
+  });
+  document.getElementById("cpb-expand-btn")?.addEventListener("click", () => {
+    document.getElementById("prompt-expand-btn")?.click();
+  });
+
+  // Mirror loading state on optimize btn
+  const realOptimizeBtn = document.getElementById("prompt-optimize-btn");
+  const cpbOptimizeBtn  = document.getElementById("cpb-optimize-btn");
+  if (realOptimizeBtn && cpbOptimizeBtn) {
+    new MutationObserver(() => {
+      cpbOptimizeBtn.disabled = realOptimizeBtn.disabled;
+      cpbOptimizeBtn.classList.toggle("loading", realOptimizeBtn.classList.contains("loading"));
+    }).observe(realOptimizeBtn, { attributes: true });
+  }
+
+  /* ── Seed bidirectional mirror ─────────────────────── */
+  const sidebarSeed = document.getElementById("seed");
+  const cpbSeed     = document.getElementById("cpb-seed");
+  const cpbRandBtn  = document.getElementById("cpb-seed-rand-btn");
+
+  if (sidebarSeed && cpbSeed) {
+    cpbSeed.value = sidebarSeed.value;
+    sidebarSeed.addEventListener("input", () => { cpbSeed.value = sidebarSeed.value; });
+    cpbSeed.addEventListener("input", () => {
+      sidebarSeed.value = cpbSeed.value;
+      sidebarSeed.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
+  if (cpbRandBtn) {
+    cpbRandBtn.addEventListener("click", () => {
+      document.getElementById("btn-random-seed")?.click();
+      if (cpbSeed) cpbSeed.value = 0;
+    });
+  }
+
+  /* ── Provider mirror ───────────────────────────────── */
+  const sidebarProvider = document.getElementById("provider");
+  const cpbProvider     = document.getElementById("cpb-provider");
+
+  if (sidebarProvider && cpbProvider) {
+    // Populate options from sidebar select
+    function syncProviderOptions() {
+      cpbProvider.innerHTML = sidebarProvider.innerHTML;
+      cpbProvider.value = sidebarProvider.value;
+    }
+    syncProviderOptions();
+
+    sidebarProvider.addEventListener("change", () => { cpbProvider.value = sidebarProvider.value; });
+    cpbProvider.addEventListener("change", () => {
+      sidebarProvider.value = cpbProvider.value;
+      sidebarProvider.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+
+  /* ── Resolution mirror ─────────────────────────────── */
+  const sidebarRes = document.getElementById("resolution");
+  const cpbRes     = document.getElementById("cpb-resolution");
+  const cpbMetaSep = document.getElementById("cpb-meta-sep");
+  const cpbCanvasField = document.getElementById("cpb-canvas-field");
+
+  if (sidebarRes && cpbRes) {
+    // Populate options after the API call has populated the sidebar select.
+    // We observe for option additions using MutationObserver.
+    function syncResolutionOptions() {
+      if (sidebarRes.options.length === 0) return;
+      cpbRes.innerHTML = sidebarRes.innerHTML;
+      cpbRes.value = sidebarRes.value;
+    }
+
+    // Try immediately (options may already be present)
+    syncResolutionOptions();
+
+    // Also observe in case options are added asynchronously
+    new MutationObserver(syncResolutionOptions).observe(sidebarRes, { childList: true });
+
+    sidebarRes.addEventListener("change", () => { cpbRes.value = sidebarRes.value; });
+    cpbRes.addEventListener("change", () => {
+      sidebarRes.value = cpbRes.value;
+      sidebarRes.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+
+  // Hide canvas field (and separator) when the sidebar hides it (Grok mode)
+  const sidebarCanvasField = document.getElementById("canvas-field");
+  if (sidebarCanvasField && cpbCanvasField && cpbMetaSep) {
+    function syncCanvasFieldVisibility() {
+      const hidden = sidebarCanvasField.style.display === "none";
+      cpbCanvasField.style.display = hidden ? "none" : "";
+      cpbMetaSep.style.display = hidden ? "none" : "";
+    }
+    syncCanvasFieldVisibility();
+    new MutationObserver(syncCanvasFieldVisibility).observe(sidebarCanvasField, { attributes: true });
+  }
+
+  /* ── Tag autocomplete ──────────────────────────────── */
+  if (typeof _tagAC !== "undefined") {
+    _tagAC.attach(cpbTa);
+  }
+
+  /* ── Enter key: generate (matching sidebar behavior) ── */
+  cpbTa.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
+      const dd = document.getElementById("tag-dropdown");
+      if (dd && dd.classList.contains("visible")) return;
+      e.preventDefault();
+      generate();
+    }
+    // Cmd/Ctrl+E — open Focus Mode from the CPB textarea
+    if ((e.metaKey || e.ctrlKey) && e.key === "e") {
+      e.preventDefault();
+      document.getElementById("prompt-expand-btn")?.click();
+    }
+  });
+
+  /* ── Initial population ────────────────────────────── */
+  cpbTa.value = sidebarPrompt.value;
+  autoGrow(cpbTa);
+
+  /* ── Show/hide bar based on which canvas tab is active ── */
+  // The bar is always in the DOM but we track the active tab.
+  // We toggle a class on section.canvas instead of display:none
+  // so transitions can be applied later.
+  const canvasSection = document.querySelector("section.canvas");
+  function updateBarVisibility() {
+    const panelCanvas = document.getElementById("panel-canvas");
+    const isCanvasTab = panelCanvas && panelCanvas.style.display !== "none";
+    if (canvasSection) {
+      canvasSection.classList.toggle("canvas--non-canvas-tab", !isCanvasTab);
+    }
+  }
+
+  // Observe panel-canvas display attribute changes
+  const panelCanvas = document.getElementById("panel-canvas");
+  if (panelCanvas) {
+    new MutationObserver(updateBarVisibility).observe(panelCanvas, { attributes: true });
+  }
+  updateBarVisibility();
+}
+
 async function init() {
   try {
     const resp = await fetch("/api/options");
@@ -1452,6 +1773,7 @@ async function init() {
   setupCanvasViewToggle();
   setupLayerMask();
   setupLayerDraw();
+  setupCanvasPromptBar();
 
   // Load recent characters at startup so autocomplete is populated immediately
   loadRecentCharacters();
