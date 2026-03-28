@@ -1615,7 +1615,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   text-overflow: ellipsis;
   min-width: 0;
 }
-.cpb-collapsed-gen { width: auto; padding: 6px 16px; font-size: 0.8rem; min-width: 90px; }
+.cpb-collapsed-gen { width: 90px; padding: 6px 0; font-size: 0.8rem; text-align: center; }
 .cpb-collapsed-gen.loading::after { width: 14px; height: 14px; margin: -7px 0 0 -7px; border-width: 2px; }
 
 /* Hide bar when non-canvas tabs are showing (set via JS class on section.canvas) */
@@ -1819,10 +1819,11 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 /* Generate button — inherits .btn-generate, override sizing for the compact bar */
 .cpb-generate-btn {
   flex-shrink: 0;
-  width: auto;       /* cancel btn-generate's width:100% */
-  padding: 0 18px;
+  width: 100px;
+  padding: 0;
   height: 36px;
   font-size: 0.83rem;
+  text-align: center;
 }
 
 /* ── Toolbar row ──────────────────────────────────── */
