@@ -356,7 +356,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 .error-msg { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger); padding: 12px 16px; border-radius: var(--radius-md); font-size: 0.83rem; line-height: 1.5; }
 
 /* Image actions */
-.image-actions { position: absolute; bottom: 48px; left: 50%; transform: translateX(-50%); z-index: 12; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: rgba(42,42,42,0.85); backdrop-filter: blur(8px); border: 1px solid var(--border-muted); border-radius: var(--radius-md); max-width: calc(100% - 24px); flex-wrap: wrap; justify-content: center; }
+.image-actions { display: none !important; /* replaced by collapsed bar inline actions */ }
 .seed-badge { font-size: 0.78rem; color: var(--text-tertiary); font-variant-numeric: tabular-nums; font-family: "SF Mono","Fira Code","Cascadia Code",monospace; padding-right: 12px; border-right: 1px solid var(--border-subtle); transition: color 0.15s; }
 .seed-badge:hover { color: var(--text-secondary); }
 .action-group { display: flex; gap: 8px; align-items: center; }
@@ -1619,6 +1619,36 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 .cpb-collapsed-gen.btn-generate.stopping { padding: 4px 0; height: 28px; width: 90px; box-shadow: none; }
 .cpb-collapsed-gen.loading::after { width: 14px; height: 14px; margin: -7px 0 0 -7px; border-width: 2px; }
 .cpb-generate-btn.btn-generate.stopping { width: 100px; height: 36px; padding: 0; box-shadow: none; }
+
+/* Collapsed inline actions (replaces floating image-actions) */
+.cpb-collapsed-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.cpb-collapsed-seed {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  font-family: "SF Mono","Fira Code",monospace;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cpb-collapsed-seed:hover { color: var(--text-secondary); }
+.cpb-collapsed-action {
+  background: none;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-family: inherit;
+  padding: 2px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+.cpb-collapsed-action:hover { border-color: var(--accent); color: var(--accent-bright); }
+.cpb-collapsed-more { padding: 2px 4px; }
 
 /* Hide bar when non-canvas tabs are showing (set via JS class on section.canvas) */
 .canvas--non-canvas-tab .canvas-prompt-bar {

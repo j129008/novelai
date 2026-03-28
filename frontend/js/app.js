@@ -1376,9 +1376,54 @@ function setupCanvasPromptBar() {
     collapsedText.style.color = val ? "var(--text-primary)" : "var(--text-tertiary)";
   }
 
-  // Click collapsed row → expand
+  // ── Collapsed inline actions (replaces floating image-actions) ──
+  const collapsedActions = document.getElementById("cpb-collapsed-actions");
+  const collapsedSeed = document.getElementById("cpb-collapsed-seed");
+  const collapsedRefine = document.getElementById("cpb-collapsed-refine");
+  const collapsedSendLayer = document.getElementById("cpb-collapsed-send-layer");
+  const collapsedMore = document.getElementById("cpb-collapsed-more");
+
+  // Show/update collapsed actions when image is generated
+  function updateCollapsedActions() {
+    if (!collapsedActions) return;
+    const seedEl = document.getElementById("info-seed");
+    const hasImage = !!seedEl?.textContent;
+    collapsedActions.style.display = hasImage ? "flex" : "none";
+    if (hasImage && collapsedSeed) {
+      collapsedSeed.textContent = seedEl.textContent;
+    }
+  }
+
+  // Observe #info-seed changes to detect generation complete
+  const infoSeed = document.getElementById("info-seed");
+  if (infoSeed) {
+    new MutationObserver(updateCollapsedActions).observe(infoSeed, { childList: true, characterData: true, subtree: true });
+  }
+  updateCollapsedActions();
+
+  // Seed click → copy
+  if (collapsedSeed) collapsedSeed.addEventListener("click", (e) => {
+    e.stopPropagation();
+    document.getElementById("info-seed")?.click();
+  });
+
+  // Delegate action buttons
+  if (collapsedRefine) collapsedRefine.addEventListener("click", (e) => {
+    e.stopPropagation();
+    document.getElementById("btn-refine-prompt")?.click();
+  });
+  if (collapsedSendLayer) collapsedSendLayer.addEventListener("click", (e) => {
+    e.stopPropagation();
+    document.getElementById("btn-send-to-layer")?.click();
+  });
+  if (collapsedMore) collapsedMore.addEventListener("click", (e) => {
+    e.stopPropagation();
+    document.getElementById("btn-overflow-toggle")?.click();
+  });
+
+  // Click collapsed row → expand (but not on action buttons)
   if (collapsedRow) collapsedRow.addEventListener("click", (e) => {
-    if (e.target.closest(".cpb-collapsed-gen")) return; // don't expand on generate click
+    if (e.target.closest(".cpb-collapsed-gen") || e.target.closest(".cpb-collapsed-actions")) return;
     expandBar();
   });
 

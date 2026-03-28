@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=143">
+  <link rel="stylesheet" href="css/style.css?v=144">
 </head>
 <body>
   <div class="app">
@@ -1057,6 +1057,14 @@
           <!-- Collapsed preview row — click to expand -->
           <div class="cpb-collapsed-row" id="cpb-collapsed-row">
             <span class="cpb-collapsed-text" id="cpb-collapsed-text">Describe your vision…</span>
+            <div class="cpb-collapsed-actions" id="cpb-collapsed-actions" style="display:none">
+              <span class="cpb-collapsed-seed" id="cpb-collapsed-seed"></span>
+              <button class="cpb-collapsed-action" id="cpb-collapsed-refine" type="button" title="Refine prompt">Refine</button>
+              <button class="cpb-collapsed-action" id="cpb-collapsed-send-layer" type="button" title="Send to layer">Layer</button>
+              <button class="cpb-collapsed-action cpb-collapsed-more" id="cpb-collapsed-more" type="button" title="More actions">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+              </button>
+            </div>
             <button class="btn-generate cpb-generate-btn cpb-collapsed-gen" id="cpb-collapsed-gen" type="button">
               <span class="btn-generate-label">Generate</span>
               <span class="btn-generate-hint">Enter</span>
@@ -1211,6 +1219,6 @@
   <script src="js/gallery.js?v=143"></script>
   <script src="js/explore.js?v=124"></script>
   <script src="js/characters.js?v=138"></script>
-  <script src="js/app.js?v=141"></script>
+  <script src="js/app.js?v=144"></script>
 </body>
 </html>
