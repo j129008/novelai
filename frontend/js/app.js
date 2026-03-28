@@ -1365,6 +1365,7 @@ function setupCanvasPromptBar() {
   }
 
   function collapseBar() {
+    cpbTa.blur();
     bar.classList.add("canvas-prompt-bar--collapsed");
     updateCollapsedText();
   }

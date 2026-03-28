@@ -1594,6 +1594,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 .canvas-prompt-bar--collapsed { padding: 6px 16px; background: rgba(42,42,42,0.75); }
 .canvas-prompt-bar--collapsed .cpb-main-row,
 .canvas-prompt-bar--collapsed .cpb-controls-row { display: none !important; }
+.canvas-prompt-bar--collapsed .cpb-textarea { visibility: hidden !important; height: 0 !important; position: absolute !important; }
 .canvas-prompt-bar--collapsed .cpb-collapsed-row { display: flex !important; }
 .canvas-prompt-bar:not(.canvas-prompt-bar--collapsed) .cpb-collapsed-row { display: none !important; }
 
