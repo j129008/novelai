@@ -1507,6 +1507,14 @@ function setupCanvasPromptBar() {
       const isDisabled = realGenerateBtn.disabled;
       const realLabel = realGenerateBtn.querySelector(".btn-generate-label")?.textContent || "Generate";
       // Mirror state to both buttons (toggle classes, don't overwrite className)
+      // Auto-collapse bar when generation finishes
+      const wasGenerating = bar.dataset.wasGenerating === "true";
+      const isGenerating = isLoading || isStopping;
+      bar.dataset.wasGenerating = isGenerating ? "true" : "false";
+      if (wasGenerating && !isGenerating) {
+        collapseBar();
+      }
+
       [cpbGenerateBtn, collapsedGenBtn].forEach(btn => {
         if (!btn) return;
         btn.classList.toggle("loading", isLoading);
