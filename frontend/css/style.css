@@ -1874,11 +1874,12 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 }
 
 /* Generate button — inherits .btn-generate, override sizing for the compact bar */
-.cpb-generate-btn {
+.cpb-generate-btn.btn-generate {
   flex-shrink: 0;
-  width: 100px;
-  padding: 0;
-  height: 36px;
+  width: 100px !important;
+  padding: 0 !important;
+  height: 36px !important;
+  box-shadow: none !important;
   font-size: 0.83rem;
   text-align: center;
 }
