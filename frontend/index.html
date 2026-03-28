@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=136">
+  <link rel="stylesheet" href="css/style.css?v=137">
 </head>
 <body>
   <div class="app">
@@ -1061,49 +1061,33 @@
              ═══════════════════════════════════════════════════════ -->
         <div class="canvas-prompt-bar" id="canvas-prompt-bar">
 
-          <!-- Main row: tab pills + textarea + right cluster -->
+          <!-- Row 1: prompt input — tab pills + textarea + generate -->
           <div class="cpb-main-row">
             <div class="cpb-tab-pills" role="tablist" aria-label="Prompt type">
               <button class="cpb-pill cpb-pill--active" data-cpb-target="prompt" type="button" role="tab" aria-selected="true">Prompt</button>
               <button class="cpb-pill" data-cpb-target="negative-prompt" type="button" role="tab" aria-selected="false">Undesired</button>
             </div>
-
             <div class="cpb-textarea-wrap">
-              <textarea
-                id="cpb-prompt-display"
-                class="cpb-textarea"
-                rows="1"
-                spellcheck="false"
-                placeholder="Describe your vision… e.g. a girl standing in a field of sunflowers at golden hour"
-                aria-label="Prompt"
-              ></textarea>
+              <textarea id="cpb-prompt-display" class="cpb-textarea" rows="1" spellcheck="false" placeholder="Describe your vision…" aria-label="Prompt"></textarea>
             </div>
-
-            <div class="cpb-right-cluster">
-              <label class="cpb-pill-toggle" id="cpb-quality-pill" title="Auto-prepend quality boost tags">
-                <input type="checkbox" id="cpb-quality-tags" checked>
-                <span class="cpb-pill-label">Quality</span>
-              </label>
-              <label class="cpb-pill-toggle" id="cpb-enhance-pill" title="When optimizing, also add atmospheric phrases">
-                <input type="checkbox" id="cpb-enhance-toggle">
-                <span class="cpb-pill-label">Enhance</span>
-              </label>
-              <button class="cpb-gear-btn" id="cpb-gear-btn" type="button" title="Generation Settings">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.55.26.94.77 1 1.34V11a2 2 0 0 1 0 4h-.09c-.57.06-1.08.45-1.34 1z"/></svg>
-              </button>
-              <button class="cpb-gear-btn cpb-app-settings-btn" id="cpb-app-settings-btn" type="button" title="App Settings (output folder, guide)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-              </button>
-              <button class="btn-generate cpb-generate-btn" id="cpb-generate-btn" type="button">
-                <span class="btn-generate-label">Generate</span>
-                <span class="btn-generate-hint">Enter</span>
-              </button>
-            </div>
+            <button class="btn-generate cpb-generate-btn" id="cpb-generate-btn" type="button">
+              <span class="btn-generate-label">Generate</span>
+              <span class="btn-generate-hint">Enter</span>
+            </button>
           </div>
 
-          <!-- Toolbar row: shown on focus, hidden by default -->
-          <div class="cpb-toolbar-row">
-            <button class="cpb-tool-btn" id="cpb-optimize-btn" type="button" title="Optimize prompt (reorder tags, fix formatting)">
+          <!-- Row 2: all controls in one line -->
+          <div class="cpb-controls-row">
+            <label class="cpb-pill-toggle" id="cpb-quality-pill" title="Quality tags">
+              <input type="checkbox" id="cpb-quality-tags" checked>
+              <span class="cpb-pill-label">Quality</span>
+            </label>
+            <label class="cpb-pill-toggle" id="cpb-enhance-pill" title="Enhance mode">
+              <input type="checkbox" id="cpb-enhance-toggle">
+              <span class="cpb-pill-label">Enhance</span>
+            </label>
+            <div class="cpb-sep"></div>
+            <button class="cpb-tool-btn" id="cpb-optimize-btn" type="button" title="Optimize prompt">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14h4v7H4z"/><path d="M10 9h4v12h-4z"/><path d="M16 3h4v18h-4z"/></svg>
               Optimize
             </button>
@@ -1115,33 +1099,30 @@
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               History
             </button>
-
-            <div class="cpb-toolbar-spacer"></div>
-
-            <button class="cpb-tool-btn cpb-tool-btn--expand" id="cpb-expand-btn" type="button" title="Open in Focus Mode (Cmd+E)">
+            <button class="cpb-tool-btn" id="cpb-expand-btn" type="button" title="Focus Mode (Cmd+E)">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-              Expand
             </button>
-
+            <div class="cpb-sep"></div>
+            <div class="cpb-meta-field">
+              <select id="cpb-provider" class="cpb-meta-select" title="Provider"></select>
+            </div>
+            <div class="cpb-meta-field" id="cpb-canvas-field">
+              <select id="cpb-resolution" class="cpb-meta-select" title="Canvas size"></select>
+            </div>
+            <div class="cpb-sep"></div>
+            <button class="cpb-icon-btn" id="cpb-gear-btn" type="button" title="Generation Settings">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.55.26.94.77 1 1.34V11a2 2 0 0 1 0 4h-.09c-.57.06-1.08.45-1.34 1z"/></svg>
+            </button>
+            <button class="cpb-icon-btn" id="cpb-app-settings-btn" type="button" title="App Settings">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            </button>
+            <div class="cpb-sep"></div>
             <div class="cpb-seed-row">
               <label class="cpb-seed-label" for="cpb-seed">Seed</label>
               <input type="number" id="cpb-seed" class="cpb-seed-input" value="0" min="0" placeholder="0 = random">
-              <button class="cpb-seed-rand-btn" id="cpb-seed-rand-btn" type="button" title="Reset to random (0)">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+              <button class="cpb-seed-rand-btn" id="cpb-seed-rand-btn" type="button" title="Random seed">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
               </button>
-            </div>
-          </div>
-
-          <!-- Meta row: provider + resolution mirrors -->
-          <div class="cpb-meta-row">
-            <div class="cpb-meta-field">
-              <span class="cpb-meta-label">Provider</span>
-              <select id="cpb-provider" class="cpb-meta-select"></select>
-            </div>
-            <div class="cpb-meta-sep" id="cpb-meta-sep"></div>
-            <div class="cpb-meta-field" id="cpb-canvas-field">
-              <span class="cpb-meta-label">Canvas</span>
-              <select id="cpb-resolution" class="cpb-meta-select"></select>
             </div>
           </div>
 
