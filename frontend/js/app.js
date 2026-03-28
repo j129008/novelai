@@ -1323,25 +1323,40 @@ function setupPoseExplore() {
     }
   }
 
-  function stylize() {
+  async function stylize() {
     if (historyIdx < 0 || !history[historyIdx]) return;
     const b64 = history[historyIdx].b64;
-    // Set as img2img source
-    state.img2img = b64;
-    // Set transformation strength to 0.6
-    const strengthSlider = document.getElementById("strength");
-    if (strengthSlider) {
-      strengthSlider.value = "0.6";
-      strengthSlider.dispatchEvent(new Event("input", { bubbles: true }));
+
+    // Show loading state
+    stylizeBtn.disabled = true;
+    stylizeBtn.querySelector("span").textContent = "Extracting pose...";
+
+    try {
+      const resp = await fetch("/api/pose-to-tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: b64, current_prompt: "" }),
+      });
+      if (!resp.ok) throw new Error("Failed");
+      const data = await resp.json();
+      const poseTags = (data.tags || []).join(", ");
+
+      // Inject pose tags into prompt (prepend to existing)
+      const promptEl = document.getElementById("prompt");
+      if (promptEl && poseTags) {
+        const existing = promptEl.value.trim();
+        promptEl.value = existing ? poseTags + ", " + existing : poseTags;
+        promptEl.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+
+      close();
+      showStatus("Pose tags added: " + poseTags, 5000);
+    } catch {
+      showStatus("Failed to extract pose tags", 3000);
+    } finally {
+      stylizeBtn.disabled = false;
+      stylizeBtn.querySelector("span").textContent = "Use Pose Tags";
     }
-    // Switch to NovelAI
-    const provider = document.getElementById("provider");
-    if (provider) {
-      provider.value = "novelai";
-      provider.dispatchEvent(new Event("change", { bubbles: true }));
-    }
-    close();
-    showStatus("Pose loaded as source \u2014 hit Generate to stylize", 4000);
   }
 
   openBtn.addEventListener("click", (e) => { e.stopPropagation(); open(); });

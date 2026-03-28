@@ -370,6 +370,17 @@ If the user asks for multiple changes, pick the most impactful one. They can run
 Return ONLY the JSON object, no markdown formatting."""
 
 
+_POSE_TO_TAGS_PROMPT = """Extract composition and pose tags from this image for NovelAI (anime image generator).
+
+Return ONLY tags about: pose, body position, camera angle, composition, framing, lighting direction, mood.
+Do NOT include: character appearance (hair, eyes, clothing), scene/background details, or art style.
+Use danbooru-style tags with spaces (not underscores).
+
+Return JSON: {"tags": ["tag1", "tag2", ...], "description": "one sentence describing the pose and composition"}
+
+Example output: {"tags": ["sitting", "hand on chin", "looking at viewer", "from above", "dramatic lighting", "upper body"], "description": "A person sitting with hand on chin, viewed from slightly above, with dramatic side lighting"}"""
+
+
 _CRITIQUE_SYSTEM_PROMPT = """You are an expert anime art director reviewing a NovelAI generated image.
 
 You are given:
@@ -389,6 +400,34 @@ Return JSON:
 
 Focus on: composition, lighting, pose, expression, anatomy issues, mood, missing details.
 Never suggest tags already in the current prompt. Maximum 3 bullets."""
+
+
+async def pose_to_tags(api_key: str, image_b64: str) -> dict:
+    """Analyze a reference image and extract pose/composition tags for NovelAI."""
+    analysis = await analyze_image_vision(api_key, image_b64)
+    desc_str = analysis.get("description", "")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": "grok-3-mini",
+        "messages": [
+            {"role": "system", "content": _POSE_TO_TAGS_PROMPT},
+            {"role": "user", "content": f"Image description: {desc_str}"},
+        ],
+        "temperature": 0.5,
+        "response_format": {"type": "json_object"},
+    }
+
+    async with httpx.AsyncClient(timeout=90.0) as client:
+        resp = await client.post(CHAT_URL, json=payload, headers=headers)
+        if resp.status_code != 200:
+            raise RuntimeError(f"{resp.status_code}: {resp.text[:500]}")
+
+    text = resp.json()["choices"][0]["message"]["content"]
+    return _parse_grok_json(text)
 
 
 async def critique_image(api_key: str, image_b64: str, current_prompt: str) -> dict:

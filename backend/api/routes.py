@@ -1627,6 +1627,20 @@ async def pose_explore(req: PoseExploreRequest):
     return PoseExploreResponse(image=base64.b64encode(image_data).decode())
 
 
+@router.post("/pose-to-tags")
+async def pose_to_tags_endpoint(req: CritiqueRequest):
+    """Extract pose/composition tags from a reference image."""
+    if not XAI_API_KEY:
+        raise HTTPException(status_code=503, detail="XAI_API_KEY not configured")
+
+    from api.grok import pose_to_tags
+    try:
+        result = await pose_to_tags(XAI_API_KEY, req.image)
+        return result
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
 @router.post("/critique", response_model=CritiqueResponse)
 async def critique(req: CritiqueRequest):
     if not XAI_API_KEY:
