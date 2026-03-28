@@ -200,24 +200,59 @@ async def analyze_image_vision(api_key: str, image_b64: str) -> dict:
     return result
 
 
-_NOVELAI_GUIDE = """NovelAI V4.5 Prompt Guide:
-- Tag order: Count → Character/Series → Appearance → Action/Expression → Scene → Style
-- Example: 1girl, character name, blonde hair, blue eyes, smile, garden, soft lighting
-- Emphasis: {text} = boost x1.05, {{text}} = boost x1.10, [text] = weaken x0.95, 1.5::text:: = exact weight
-- Multi-character: separate with | — base prompt | character 1 | character 2
-  - Base: count (2girls), scene (park), style (watercolor, year 2024), composition (from above)
-  - Character: use girl/boy only (no number), appearance, expression, character name
-  - Interactions: source#hug (initiator), target#hug (receiver), mutual#holding hands (both)
-- Special: "fur dataset," prefix for furry, "background dataset," for scenery, "year 2024" for style era
-- Quality tags (auto-appended): location, very aesthetic, masterpiece, no text
-- Tags earlier = stronger influence. Limit ~512 tokens. No unicode/emoji."""
+_NOVELAI_GUIDE = """NovelAI V4.5 Prompt Guide (based on official docs at docs.novelai.net):
+
+TAG FORMAT:
+- Tags use SPACES, not underscores: "long hair" not "long_hair", "blue eyes" not "blue_eyes"
+- Tags are comma-separated: "1girl, long hair, blue eyes, smile"
+- Tags earlier in the prompt have stronger influence
+
+TAG ORDER: Count → Rating → Character/Series → Appearance → Action/Expression → Scene → Style
+Example: 1girl, rating:sensitive, hatsune miku, blonde hair, blue eyes, smile, garden, soft lighting
+
+RATING TAGS (special meta tags — ALWAYS use "rating:" prefix):
+- rating:general, rating:sensitive, rating:questionable, rating:explicit
+- NEVER use bare "explicit", "nsfw", or "sfw" — always use "rating:" prefix
+
+EMPHASIS SYNTAX (preserve exactly — do NOT modify or remove):
+- {text} = boost x1.05 per brace. {{text}} = x1.10
+- [text] = weaken x0.95 per bracket
+- number::text:: = exact weight. Example: "1.5::rain, night ::, 0.5::coat ::"
+- Negative emphasis: "-1::hat ::" removes objects, "-1::monochrome ::" adds color
+- :: alone closes any open emphasis section
+
+MULTI-CHARACTER (pipe | format, up to 6 characters):
+- Format: base prompt | character 1 | character 2
+- Base: count (2girls), rating, scene, style, composition
+- Character: "girl"/"boy" (no number), appearance, expression
+- Characters render top-to-bottom, left-to-right in prompt order
+- Interactions: source#action (initiator), target#action (receiver), mutual#action (both)
+- Example: "2girls, indoors, factory, night | girl, purple eyes, short hair, smile, blonde hair, source#hug | girl, very long hair, purple hair, curly hair, target#hug"
+
+QUALITY TAGS (auto-appended by system — do NOT add manually):
+- V4.5 Full: "location, very aesthetic, masterpiece, no text"
+- V4.5 Curated: "location, masterpiece, no text, -0.8::feet::, rating:general"
+
+USEFUL TAGS:
+- Aesthetic: masterpiece, very aesthetic, aesthetic, displeasing, very displeasing
+- Year: "year 2024" adjusts art style era
+- Dataset prefixes (must be at very start): "fur dataset," for furry, "background dataset," for scenery
+- "location" = indoors/outdoors without specifying which
+- Renamed: "v" → "peace sign", "double v" → "double peace", "tachi-e" → "character image"
+
+RULES:
+- Use SPACES in tags, not underscores
+- Do NOT invent tags — use known danbooru/NovelAI vocabulary
+- No unicode or emoji
+- Keep emphasis markers exactly as user wrote them
+- Do NOT duplicate quality tags that the system auto-appends"""
 
 _PROMPT_ASSIST_TAGS = f"""You are a prompt tag assistant for NovelAI (an anime image generator that uses danbooru-style tags).
 
 {_NOVELAI_GUIDE}
 
 The user will describe what they want (and may include their current prompt for context). Generate a JSON object with one field:
-- "tags": an array of 15-30 danbooru-style tags following the guide's tag order. Use lowercase, underscored format. Include tags for: characters, hair, clothing, pose, expression, setting, lighting, composition, art style. Order by importance.
+- "tags": an array of 15-30 danbooru-style tags following the guide's tag order. Use lowercase with spaces (not underscores). Include tags for: characters, hair, clothing, pose, expression, setting, lighting, composition, art style. Order by importance.
 
 If a current prompt is provided, suggest COMPLEMENTARY tags that enhance it — do not repeat tags already in the prompt.
 
@@ -236,18 +271,20 @@ _PROMPT_OPTIMIZE = f"""You are a prompt optimizer for NovelAI (an anime image ge
 {_NOVELAI_GUIDE}
 
 The user will provide their current prompt. Your job is to OPTIMIZE it:
-1. Reorder tags following the correct tag order: Count → Character/Series → Appearance → Action/Expression → Scene → Style
-2. Fix formatting: lowercase, underscored where appropriate, remove duplicates
+1. Reorder tags following the correct tag order: Count → Rating → Character/Series → Appearance → Action/Expression → Scene → Style
+2. Fix formatting: use spaces (not underscores) in tags, remove duplicates
 3. Remove redundant or conflicting tags
 4. Add missing quality/style tags if beneficial (but don't drastically change the intent)
 5. Fix common misspellings of known danbooru tags
-6. Keep emphasis markers (curly braces, [brackets], weight::syntax::) intact and in place
-7. IMPORTANT: If the prompt describes multiple characters (2+ people), you MUST use the pipe | format:
-   - Base prompt (count, scene, style) | character 1 tags | character 2 tags
+6. Keep ALL emphasis markers ({braces}, [brackets], number::weight:: syntax, negative emphasis) exactly intact
+7. Fix rating tags: convert bare "explicit"/"nsfw"/"sfw" to proper "rating:explicit"/"rating:sensitive"/"rating:general" format
+8. Convert underscored tags to spaced format: "long_hair" → "long hair", "blue_eyes" → "blue eyes"
+9. IMPORTANT: If the prompt describes multiple characters (2+ people), you MUST use the pipe | format:
+   - Base prompt (count, rating, scene, style) | character 1 tags | character 2 tags
    - Each character section should use "girl"/"boy" (no number prefix), plus their appearance and expression
-   - The base prompt should contain the count tag (e.g. 2girls), scene, and style tags
+   - The base prompt should contain the count tag (e.g. 2girls), rating, scene, and style tags
    - Interactions go IN the character section: source#action (initiator), target#action (receiver), mutual#action (both)
-   - Example: "2girls, park, year 2024 | girl, blonde hair, blue eyes, smile, source#hug | girl, black hair, red eyes, serious, target#hug"
+   - Example: "2girls, rating:sensitive, park, year 2024 | girl, blonde hair, blue eyes, smile, source#hug | girl, black hair, red eyes, serious, target#hug"
 
 If the user provides additional instructions, follow them while optimizing.
 
