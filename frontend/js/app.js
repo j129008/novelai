@@ -1160,16 +1160,18 @@ function setupPromptOptimize() {
       ? [basePrompt, ...charPrompts].join(" | ")
       : basePrompt;
 
+    const enhance = document.getElementById("enhance-toggle")?.checked || false;
     btn.disabled = true;
     btn.classList.add("loading");
-    showStatus("Optimizing prompt…");
+    showStatus(enhance ? "Enhancing prompt…" : "Optimizing prompt…");
 
     try {
-      console.log("[optimize] sending:", fullPrompt.substring(0, 100));
+      const direction = enhance ? "After optimizing, append 1-2 short evocative phrases at the end to enhance atmosphere and storytelling. Keep them brief (under 10 words each). Do not remove any existing tags to make room." : "";
+      console.log("[optimize] sending:", fullPrompt.substring(0, 100), enhance ? "(enhance)" : "");
       const resp = await fetch("/api/prompt-assist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ direction: "", mode: "optimize", current_prompt: fullPrompt }),
+        body: JSON.stringify({ direction, mode: "optimize", current_prompt: fullPrompt }),
       });
       if (!resp.ok) {
         const errBody = await resp.text();
