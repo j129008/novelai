@@ -503,13 +503,14 @@ function renderLayerStrip() {
 
   // Build a tab for each layer
   layers.forEach((layer, idx) => {
-    const tab = document.createElement("button");
+    const tab = document.createElement("div");
     tab.className = "layer-tab" +
       (idx === _activeLayerIdx ? " layer-tab--active" : "") +
       (!layer.visible ? " layer-tab--hidden" : "") +
       (layer.isOutputTarget ? " layer-tab--target" : "");
-    tab.type = "button";
     tab.title = layer.name;
+    tab.setAttribute("role", "button");
+    tab.tabIndex = 0;
     tab.draggable = true;
 
     // Dot for output target
@@ -549,11 +550,18 @@ function renderLayerStrip() {
       _layerDrag.active = false;
       _layerDrag.fromId = null;
       tab.style.opacity = "";
+      tabsList.querySelectorAll(".layer-tab--drag-over").forEach(t => t.classList.remove("layer-tab--drag-over"));
     });
     tab.addEventListener("dragover", (e) => {
       if (!_layerDrag.active || _layerDrag.fromId === layer.id) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
+      // Visual feedback
+      tabsList.querySelectorAll(".layer-tab").forEach(t => t.classList.remove("layer-tab--drag-over"));
+      tab.classList.add("layer-tab--drag-over");
+    });
+    tab.addEventListener("dragleave", () => {
+      tab.classList.remove("layer-tab--drag-over");
     });
     tab.addEventListener("drop", (e) => {
       e.preventDefault();

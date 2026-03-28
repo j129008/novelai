@@ -5778,6 +5778,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   color: var(--accent-bright);
 }
 .layer-tab--hidden { opacity: 0.35; }
+.layer-tab--drag-over { border-top: 2px solid var(--accent-bright); }
 .layer-tab-dot {
   position: absolute;
   top: 3px;
