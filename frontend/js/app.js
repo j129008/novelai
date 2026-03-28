@@ -1443,22 +1443,18 @@ function setupCanvasPromptBar() {
   if (realGenerateBtn) {
     const observer = new MutationObserver(() => {
       const isLoading = realGenerateBtn.classList.contains("loading");
+      const isStopping = realGenerateBtn.classList.contains("stopping");
       const isDisabled = realGenerateBtn.disabled;
       const realLabel = realGenerateBtn.querySelector(".btn-generate-label")?.textContent || "Generate";
-      // Mirror to expanded button
-      if (cpbGenerateBtn) {
-        cpbGenerateBtn.className = realGenerateBtn.className.replace("btn-generate", "btn-generate cpb-generate-btn");
-        cpbGenerateBtn.disabled = isDisabled;
-        const lbl = cpbGenerateBtn.querySelector(".btn-generate-label");
+      // Mirror state to both buttons (toggle classes, don't overwrite className)
+      [cpbGenerateBtn, collapsedGenBtn].forEach(btn => {
+        if (!btn) return;
+        btn.classList.toggle("loading", isLoading);
+        btn.classList.toggle("stopping", isStopping);
+        btn.disabled = isDisabled;
+        const lbl = btn.querySelector(".btn-generate-label");
         if (lbl) lbl.textContent = realLabel;
-      }
-      // Mirror to collapsed button
-      if (collapsedGenBtn) {
-        collapsedGenBtn.classList.toggle("loading", isLoading);
-        collapsedGenBtn.disabled = isDisabled;
-        const lbl = collapsedGenBtn.querySelector(".btn-generate-label");
-        if (lbl) lbl.textContent = realLabel;
-      }
+      });
     });
     observer.observe(realGenerateBtn, { attributes: true, subtree: true, characterData: true, childList: true });
   }

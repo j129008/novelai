@@ -1616,7 +1616,9 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 }
 .cpb-collapsed-gen.btn-generate { width: 90px; padding: 4px 0; font-size: 0.78rem; height: 28px; box-shadow: none; gap: 6px; }
 .cpb-collapsed-gen.btn-generate::before { display: none; }
+.cpb-collapsed-gen.btn-generate.stopping { padding: 4px 0; height: 28px; width: 90px; box-shadow: none; }
 .cpb-collapsed-gen.loading::after { width: 14px; height: 14px; margin: -7px 0 0 -7px; border-width: 2px; }
+.cpb-generate-btn.btn-generate.stopping { width: 100px; height: 36px; padding: 0; box-shadow: none; }
 
 /* Hide bar when non-canvas tabs are showing (set via JS class on section.canvas) */
 .canvas--non-canvas-tab .canvas-prompt-bar {
