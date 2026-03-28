@@ -1241,6 +1241,29 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   color: var(--text-tertiary);
   margin-bottom: 2px;
 }
+.ti-diff-explanation {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  line-height: 1.4;
+  margin-bottom: 6px;
+  padding: 6px 8px;
+  background: var(--bg-float);
+  border-radius: var(--radius-sm);
+  border-left: 2px solid var(--accent-dim);
+}
+.ti-diff-section-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg-overlay);
+  flex-shrink: 0;
+  margin-left: auto;
+}
 .ti-diff-row {
   display: flex;
   align-items: center;

@@ -572,6 +572,9 @@ function populateCharactersFromPipe(promptText) {
   const base = parts[0];
   const charParts = parts.slice(1);
 
+  // Snapshot existing positions before clearing so we can restore them after optimize
+  const previousPositions = characters.map(c => ({ x: c.x, y: c.y, positionAuto: c.positionAuto }));
+
   // Clear existing characters
   const slotsEl = $("#character-slots");
   if (slotsEl) slotsEl.innerHTML = "";
@@ -595,8 +598,15 @@ function populateCharactersFromPipe(promptText) {
     const charData = characters[i];
     charData.prompt = cleanPrompt;
     charData.interactions = interactions;
-    charData.x = count === 1 ? 0.5 : (0.2 + (0.6 * i / (count - 1)));
-    charData.positionAuto = false;
+    // Restore user-set position if this slot existed before; use formula for new slots
+    if (previousPositions[i] !== undefined) {
+      charData.x = previousPositions[i].x;
+      charData.y = previousPositions[i].y;
+      charData.positionAuto = previousPositions[i].positionAuto;
+    } else {
+      charData.x = count === 1 ? 0.5 : (0.2 + (0.6 * i / (count - 1)));
+      charData.positionAuto = false;
+    }
 
     // Update the card UI
     const card = slotsEl.querySelectorAll(".char-slot-card")[i];
