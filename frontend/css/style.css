@@ -1684,17 +1684,16 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 /* ── Main row ─────────────────────────────────────── */
 .cpb-main-row {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 8px;
 }
 
 /* ── Tab pills ────────────────────────────────────── */
 .cpb-tab-pills {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  gap: 2px;
   flex-shrink: 0;
-  padding-bottom: 2px;
 }
 
 .cpb-pill {
