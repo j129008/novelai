@@ -479,7 +479,7 @@ function renderLayerStrip() {
 
   if (!tabsList || !tabsWrap) return;
 
-  if (provider !== "novelai" || layers.length === 0) {
+  if (provider !== "novelai") {
     tabsWrap.style.display = "none";
     const panel = document.getElementById("layer-tab-panel");
     if (panel) panel.style.display = "none";
@@ -488,6 +488,12 @@ function renderLayerStrip() {
 
   tabsWrap.style.display = "";
   tabsList.innerHTML = "";
+
+  if (layers.length === 0) {
+    const panel = document.getElementById("layer-tab-panel");
+    if (panel) panel.style.display = "none";
+    return;
+  }
 
   // Clamp active index
   if (layers.length > 0) {
