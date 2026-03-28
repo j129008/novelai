@@ -4,7 +4,7 @@
 
 // Clear output area without destroying static elements (image-actions, char-popover, markers)
 function clearOutput(outputEl) {
-  const keep = new Set(["image-actions", "char-popover"]);
+  const keep = new Set(["image-actions"]);
   Array.from(outputEl.children).forEach(child => {
     if (!keep.has(child.id) && !child.classList.contains("char-marker") && !child.classList.contains("placeholder")) {
       child.remove();

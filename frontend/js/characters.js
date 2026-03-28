@@ -340,7 +340,7 @@ function openCharacterPopover(idx, markerEl) {
   }
 
   // Position near marker
-  positionPopoverNearMarker(popover, markerEl, outputEl);
+  positionPopoverNearMarker(popover, markerEl, popover.parentElement || outputEl);
 
   // Show with animation replay (learnings: CSS animations on toggled elements only fire once)
   popover.style.display = "flex";
