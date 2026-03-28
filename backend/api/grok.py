@@ -238,12 +238,12 @@ Optimize the user's prompt:
 - Don't add quality tags the system auto-appends
 - Natural language handling: NovelAI is primarily tag-based but understands prose too. Convert clear descriptions to known danbooru tags when possible (e.g. "girl sitting on a bench in a park" → "1girl, sitting, bench, park"). But if a phrase has no obvious tag equivalent, keep it as-is — don't force awkward tag conversions. Vague descriptions like "beautiful scene" should become specific tags like "scenery, sunlight, grass"
 - Multi-char pipe format rules (CRITICAL — follow exactly):
-  BASE section (before first |): count tag, rating, scene, background, lighting, composition, style, year — NEVER character appearance
-  CHAR sections (after |): ONLY "girl"/"boy" + that character's appearance, expression, pose, interaction tags — NEVER scene/style/background
-  Interaction pairing rule: source# and target# MUST come in pairs across characters. If char1 has source#hug, char2 MUST have target#hug. Never add source# without a matching target# on another character (and vice versa). mutual# goes on ALL participating characters.
-  Example input: "2girls, rating:sensitive, blonde hair, school uniform, black hair, red eyes, classroom, year 2024"
-  Correct output: "2girls, rating:sensitive, classroom, year 2024 | girl, blonde hair, school uniform, source#hug | girl, black hair, red eyes, target#hug"
-  WRONG output: "2girls | girl, blonde hair, source#hug | girl, black hair" (missing target#hug on char 2)
+  BASE section (before first |): MUST be rich — include count, rating, scene, background, lighting, mood, weather, time of day, camera angle, composition, style, year. Infer and ADD atmospheric tags from context (e.g. if "classroom" → add "indoors, window, sunlight"). Base should have 8+ tags minimum.
+  CHAR sections (after |): ONLY "girl"/"boy" + that character's appearance, expression, pose, interaction — NEVER scene/style/background
+  Interactions: source# and target# MUST pair across characters. mutual# on ALL participants.
+  Example input: "2girls, rating:sensitive, blonde hair, school uniform, black hair, red eyes, classroom"
+  Correct output: "2girls, rating:sensitive, classroom, indoors, sunlight, window, desks, warm lighting, year 2024 | girl, blonde hair, school uniform, smile | girl, black hair, red eyes, serious"
+  WRONG output: "2girls, rating:sensitive, classroom | girl, blonde hair, school uniform, smile" (base too sparse — missing atmosphere)
 
 Return JSON: {{"prompt": "optimized tags", "changes": "brief summary of what changed"}}
 
