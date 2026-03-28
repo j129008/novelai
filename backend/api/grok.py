@@ -276,7 +276,7 @@ The user will provide their current prompt. Your job is to OPTIMIZE it:
 3. Remove redundant or conflicting tags
 4. Add missing quality/style tags if beneficial (but don't drastically change the intent)
 5. Fix common misspellings of known danbooru tags
-6. Keep ALL emphasis markers ({braces}, [brackets], number::weight:: syntax, negative emphasis) exactly intact
+6. Keep ALL emphasis markers (curly braces, square brackets, number::weight:: syntax, negative emphasis) exactly intact
 7. Fix rating tags: convert bare "explicit"/"nsfw"/"sfw" to proper "rating:explicit"/"rating:sensitive"/"rating:general" format
 8. Convert underscored tags to spaced format: "long_hair" → "long hair", "blue_eyes" → "blue eyes"
 9. IMPORTANT: If the prompt describes multiple characters (2+ people), you MUST use the pipe | format:
