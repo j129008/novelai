@@ -1194,6 +1194,132 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   transform: scale(1.05);
 }
 
+/* ─── Tag Intelligence Panel ─── */
+.ti-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-muted) transparent;
+}
+.ti-content::-webkit-scrollbar { width: 4px; }
+.ti-content::-webkit-scrollbar-thumb { background: var(--border-muted); border-radius: 4px; }
+
+.ti-section { display: flex; flex-direction: column; gap: 8px; }
+.ti-section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ti-count-badge {
+  font-size: 0.62rem;
+  background: var(--accent-dim);
+  color: var(--accent-bright);
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+.ti-empty {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+  padding: 8px 0;
+}
+
+/* What Changed — diff display */
+.ti-diff { display: flex; flex-direction: column; gap: 4px; }
+.ti-diff-meta {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  margin-bottom: 2px;
+}
+.ti-diff-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+}
+.ti-diff-icon {
+  width: 16px;
+  flex-shrink: 0;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+.ti-diff-icon--add { color: #50dc78; }
+.ti-diff-icon--remove { color: var(--danger); }
+.ti-diff-icon--reorder { color: var(--text-tertiary); }
+
+.ti-chip--added {
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: rgba(80,220,120,0.10);
+  border: 1px solid rgba(80,220,120,0.35);
+  color: #50dc78;
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.ti-chip--added:hover {
+  background: rgba(80,220,120,0.18);
+  border-color: rgba(80,220,120,0.5);
+}
+.ti-chip--removed {
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger);
+  font-size: 0.75rem;
+  font-family: inherit;
+  text-decoration: line-through;
+  cursor: default;
+  opacity: 0.7;
+}
+.ti-diff-reorder {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* Discoveries & suggestions grid */
+.ti-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ti-suggestions { display: flex; flex-direction: column; gap: 10px; }
+.ti-sub-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  opacity: 0.7;
+}
+.ti-sub-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.ti-refresh-btn {
+  align-self: flex-start;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  padding: 4px 10px;
+}
+
+/* Section entry animation */
+@keyframes tiFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.ti-section { animation: tiFadeIn 0.2s ease-out both; }
+.ti-section:nth-child(2) { animation-delay: 0.08s; }
+.ti-section:nth-child(3) { animation-delay: 0.16s; }
+
 /* Recent character badge inside autocomplete dropdown */
 .tag-item-recent-badge {
   background: var(--accent-dim);

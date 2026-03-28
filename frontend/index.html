@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=123">
+  <link rel="stylesheet" href="css/style.css?v=124">
 </head>
 <body>
   <div class="app">
@@ -865,14 +865,10 @@
           </div>
         </div>
 
-        <!-- Tag Browser Drawer -->
+        <!-- Tag Intelligence Drawer -->
         <div id="tag-browser" class="tag-browser" style="display:none">
           <div class="tag-browser-header">
-            <span class="tag-browser-title">Tag Browser</span>
-            <button id="btn-surprise-me" class="btn-action btn-action--primary tag-browser-surprise-btn" type="button" title="Insert a random tag from the current category">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-              Surprise Me
-            </button>
+            <span class="tag-browser-title">Tag Intelligence</span>
             <button id="tag-browser-close" class="guide-close" type="button">&times;</button>
           </div>
           <div class="tag-insert-target-row">
@@ -880,12 +876,33 @@
             <button class="tag-insert-pill active" data-target="prompt" type="button" id="tag-insert-prompt">Prompt</button>
             <button class="tag-insert-pill" data-target="negative" type="button" id="tag-insert-negative">Undesired</button>
           </div>
-          <div class="tag-browser-search-wrap">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="tag-browser-search" class="history-search" placeholder="Filter tags…" spellcheck="false">
+          <div id="ti-content" class="ti-content">
+            <!-- What Changed -->
+            <section class="ti-section" id="ti-what-changed">
+              <h3 class="ti-section-label">What Changed</h3>
+              <div id="ti-diff" class="ti-diff">
+                <p class="ti-empty">Run Optimize or Refine to see what the AI changed in your prompt.</p>
+              </div>
+            </section>
+            <!-- New Discoveries -->
+            <section class="ti-section" id="ti-discoveries">
+              <h3 class="ti-section-label">New Discoveries <span id="ti-disc-count" class="ti-count-badge" style="display:none">0</span></h3>
+              <div id="ti-disc-grid" class="ti-chip-grid">
+                <p class="ti-empty">New tags will appear here after your first Optimize or Refine.</p>
+              </div>
+            </section>
+            <!-- Add Next -->
+            <section class="ti-section" id="ti-add-next">
+              <h3 class="ti-section-label">Add Next</h3>
+              <div id="ti-suggestions" class="ti-suggestions">
+                <p class="ti-empty">Type a prompt to get tag suggestions.</p>
+              </div>
+              <button id="ti-refresh" class="btn-action ti-refresh-btn" type="button" style="display:none">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                Refresh
+              </button>
+            </section>
           </div>
-          <div id="tag-browser-rail" class="tag-browser-rail"></div>
-          <div id="tag-browser-grid" class="tag-browser-grid"></div>
         </div>
 
         <div id="panel-canvas" class="canvas-panel">
@@ -1070,16 +1087,17 @@
     </div>
   </div>
 
-  <script src="js/state.js?v=123"></script>
-  <script src="js/provider.js?v=123"></script>
-  <script src="js/crop.js?v=123"></script>
-  <script src="js/tags.js?v=123"></script>
-  <script src="js/layers.js?v=123"></script>
-  <script src="js/generate.js?v=123"></script>
+  <script src="js/state.js?v=124"></script>
+  <script src="js/provider.js?v=124"></script>
+  <script src="js/crop.js?v=124"></script>
+  <script src="js/tag-intelligence.js?v=124"></script>
+  <script src="js/tags.js?v=124"></script>
+  <script src="js/layers.js?v=124"></script>
+  <script src="js/generate.js?v=124"></script>
 
-  <script src="js/gallery.js?v=123"></script>
-  <script src="js/explore.js?v=123"></script>
-  <script src="js/characters.js?v=123"></script>
-  <script src="js/app.js?v=123"></script>
+  <script src="js/gallery.js?v=124"></script>
+  <script src="js/explore.js?v=124"></script>
+  <script src="js/characters.js?v=124"></script>
+  <script src="js/app.js?v=124"></script>
 </body>
 </html>

@@ -1181,6 +1181,7 @@ function setupPromptOptimize() {
       console.log("[optimize] response:", data);
       if (data.prompt) {
         window._savePromptToHistory?.();
+        TagIntelligence.recordChange("optimize", fullPrompt, data.prompt);
         const split = populateCharactersFromPipe(data.prompt);
         console.log("[optimize] split result:", split);
         if (split.applied) {
@@ -1363,6 +1364,7 @@ async function init() {
         console.log("[refine] response:", data);
         if (data.prompt) {
           window._savePromptToHistory?.();
+          TagIntelligence.recordChange("refine", fullPrompt, data.prompt);
           const split = populateCharactersFromPipe(data.prompt);
           console.log("[refine] split result:", split);
           if (split.applied) {
