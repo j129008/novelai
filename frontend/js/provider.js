@@ -22,7 +22,6 @@ function applyProvider(provider) {
     document.getElementById("auto-generate")?.closest(".toggle-switch"),
     document.getElementById("gen-settings-btn"),
     document.getElementById("layers-accordion"),
-    document.getElementById("cpb-explore-btn"),
   ];
 
   // Config bar NovelAI-specific fields (Canvas resolution select)

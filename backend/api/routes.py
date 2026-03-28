@@ -26,9 +26,6 @@ from models.schemas import (
     AnalyzedTag,
     CharacterUsage,
     CharacterUsageList,
-    CritiqueBullet,
-    CritiqueRequest,
-    CritiqueResponse,
     ExploreImage,
     ExploreLink,
     ExplorePageRequest,
@@ -50,8 +47,6 @@ from models.schemas import (
     LocalBrowseResponse,
     LocalTagsBatchResponse,
     LocalTagsCacheResponse,
-    PoseExploreRequest,
-    PoseExploreResponse,
     RecordCharactersRequest,
     SuggestTagsRequest,
     SuggestTagsResponse,
@@ -1578,91 +1573,6 @@ async def get_local_tags_batch(path: str = Query(default="")):
                 except (json.JSONDecodeError, OSError):
                     pass
     return LocalTagsBatchResponse(analyzed=analyzed)
-
-
-POSE_SEEDS = [
-    "young woman sitting in a sunlit cafe, leaning on table, looking out window, golden hour, film grain",
-    "couple standing in rain under one umbrella, back to camera, city street, neon reflections",
-    "girl reading book under a tree, summer afternoon, dappled light, low angle shot",
-    "figure silhouetted against sunset on rooftop, arms wide, wind in hair",
-    "woman lying on bed, morning light through curtains, soft focus, overhead shot",
-    "girl sitting on window sill, legs dangling, cityscape behind, twilight",
-    "two people facing each other across a table, candlelight, intimate close-up",
-    "woman walking through autumn leaves, looking back over shoulder, warm tones",
-    "girl crouching to pet a cat in an alley, side view, soft shadows",
-    "woman leaning against wall, one knee up, urban background, dramatic lighting",
-    "girl sitting on beach at sunset, hugging knees, waves in background",
-    "woman in kitchen, cooking, steam rising, warm indoor lighting, candid feel",
-    "couple dancing in empty room, window light, motion blur on edges",
-    "girl lying in grass field, looking up at sky, fish-eye perspective",
-    "woman at mirror doing makeup, reflection visible, vanity lighting",
-    "girl on bicycle, hair flowing, cherry blossom trees, motion feel",
-    "woman standing in doorway, half in shadow half in light, mystery mood",
-    "two friends laughing on park bench, casual pose, natural light",
-    "girl with umbrella on empty street, fog, streetlamp glow, cinematic",
-    "woman stretching in morning, bedroom, backlit by window, peaceful mood",
-    "girl sitting cross-legged on floor, surrounded by books, cozy room",
-    "couple on balcony overlooking city night, side by side, contemplative",
-    "woman running fingers through hair, close-up portrait, soft bokeh",
-    "girl curled up on couch with blanket, rainy window behind, moody",
-    "woman standing in flower field, arms behind back, looking at horizon",
-]
-
-
-@router.post("/pose-explore", response_model=PoseExploreResponse)
-async def pose_explore(req: PoseExploreRequest):
-    import random
-    if not XAI_API_KEY:
-        raise HTTPException(status_code=503, detail="XAI_API_KEY not configured")
-
-    seed = random.choice(POSE_SEEDS)
-    prompt = f"{seed}, {req.hint.strip()}" if req.hint.strip() else seed
-
-    try:
-        from api.grok import generate_image as grok_gen_image
-        image_data = await grok_gen_image(api_key=XAI_API_KEY, prompt=prompt)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Grok API error: {e}")
-
-    return PoseExploreResponse(image=base64.b64encode(image_data).decode())
-
-
-@router.post("/pose-to-tags")
-async def pose_to_tags_endpoint(req: CritiqueRequest):
-    """Extract pose/composition tags from a reference image."""
-    if not XAI_API_KEY:
-        raise HTTPException(status_code=503, detail="XAI_API_KEY not configured")
-
-    from api.grok import pose_to_tags
-    try:
-        result = await pose_to_tags(XAI_API_KEY, req.image)
-        return result
-    except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
-
-
-@router.post("/critique", response_model=CritiqueResponse)
-async def critique(req: CritiqueRequest):
-    if not XAI_API_KEY:
-        raise HTTPException(status_code=503, detail="XAI_API_KEY not configured")
-
-    from api.grok import critique_image
-    try:
-        result = await critique_image(XAI_API_KEY, req.image, req.current_prompt)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
-
-    raw_bullets = result.get("bullets", [])
-    bullets = [
-        CritiqueBullet(
-            text=b.get("text", ""),
-            add_tags=b.get("add_tags", []),
-            remove_tags=b.get("remove_tags", []),
-        )
-        for b in raw_bullets
-        if isinstance(b, dict)
-    ]
-    return CritiqueResponse(bullets=bullets)
 
 
 @router.post("/explore/local/analyze", response_model=LocalAnalyzeResponse)

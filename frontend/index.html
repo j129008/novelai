@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=159">
+  <link rel="stylesheet" href="css/style.css?v=160">
 </head>
 <body>
   <div class="app">
@@ -800,17 +800,6 @@
             <input type="checkbox" id="smea-dyn" style="display:none">
           </div>
           <div class="gen-settings-divider"></div>
-          <div class="gen-settings-section">
-            <div style="display:flex; align-items:center; justify-content:space-between">
-              <span class="field-label">Auto-Critique</span>
-              <label class="toggle-switch">
-                <input type="checkbox" id="auto-critique-toggle">
-                <span class="toggle-track"><span class="toggle-knob"></span></span>
-              </label>
-            </div>
-            <p style="font-size:0.72rem; color:var(--text-tertiary); margin-top:4px">AI art director reviews each generation</p>
-          </div>
-          <div class="gen-settings-divider"></div>
           <!-- Image to Image -->
           <div class="gen-settings-section" id="gen-settings-i2i">
             <span class="field-label">Image to Image</span>
@@ -1045,16 +1034,6 @@
               <textarea class="char-popover-textarea" id="char-popover-textarea" rows="3" placeholder="girl, blonde hair, blue eyes, waving" spellcheck="false"></textarea>
               <div id="char-popover-interactions"></div>
             </div>
-            <div class="critique-panel" id="critique-panel" style="display:none">
-              <div class="critique-header">
-                <span class="critique-title">Art Director</span>
-                <button class="critique-dismiss" id="critique-dismiss" type="button">&times;</button>
-              </div>
-              <div class="critique-body" id="critique-body">
-                <div class="critique-skeleton"></div>
-              </div>
-              <button class="btn-action btn-action--primary critique-apply-all" id="critique-apply-all" type="button" style="display:none">Apply All &amp; Regenerate</button>
-            </div>
             <div id="drop-hover-overlay" class="drop-hover-overlay" aria-hidden="true">
               <div class="drop-hover-inner">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
@@ -1176,10 +1155,6 @@
             <button class="cpb-tool-btn" id="cpb-expand-btn" type="button" title="Focus Mode (Cmd+E)">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
             </button>
-            <button class="cpb-tool-btn novelai-only" id="cpb-explore-btn" type="button" title="Explore poses for inspiration">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49"/></svg>
-              Explore
-            </button>
             <button class="cpb-tool-btn" id="cpb-add-char-btn" type="button" title="Add character (places a new character marker on canvas)">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
               + Char
@@ -1280,28 +1255,8 @@
     </div>
   </div>
 
-  <div id="pose-explore-overlay" class="pose-explore-overlay" style="display:none">
-    <div class="pose-explore-modal">
-      <div class="pose-explore-header">
-        <span class="pose-explore-title">Explore Pose</span>
-        <button id="pose-explore-close" class="guide-close" type="button">&times;</button>
-      </div>
-      <div class="pose-explore-img-area" id="pose-explore-img-area">
-        <div class="pose-explore-skeleton"></div>
-      </div>
-      <input type="text" id="pose-explore-hint" class="pose-explore-hint" placeholder="scene hint… (optional, e.g. girl, cafe)" spellcheck="false">
-      <div class="pose-explore-actions">
-        <button class="btn-action" id="pose-explore-prev" type="button" style="display:none">&larr; Previous</button>
-        <button class="btn-action btn-action--primary" id="pose-explore-next" type="button">Generate First</button>
-        <button class="btn-generate pose-explore-stylize" id="pose-explore-stylize" type="button" style="display:none">
-          <span>Use Pose Tags</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
   <script src="js/state.js?v=134"></script>
-  <script src="js/provider.js?v=124"></script>
+  <script src="js/provider.js?v=125"></script>
   <script src="js/crop.js?v=134"></script>
   <script src="js/tag-intelligence.js?v=127"></script>
   <script src="js/tags.js?v=127"></script>
@@ -1311,6 +1266,6 @@
   <script src="js/gallery.js?v=143"></script>
   <script src="js/explore.js?v=124"></script>
   <script src="js/characters.js?v=138"></script>
-  <script src="js/app.js?v=155"></script>
+  <script src="js/app.js?v=156"></script>
 </body>
 </html>
