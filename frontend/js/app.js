@@ -1421,9 +1421,22 @@ function setupCanvasPromptBar() {
     document.getElementById("btn-overflow-toggle")?.click();
   });
 
-  // Click collapsed row → expand (but not on action buttons)
+  // Auto-generate toggle mirror
+  const sidebarAutoGen = document.getElementById("auto-generate");
+  const cpbAutoGen = document.getElementById("cpb-collapsed-auto-gen");
+  if (sidebarAutoGen && cpbAutoGen) {
+    cpbAutoGen.checked = sidebarAutoGen.checked;
+    sidebarAutoGen.addEventListener("change", () => { cpbAutoGen.checked = sidebarAutoGen.checked; });
+    cpbAutoGen.addEventListener("change", (e) => {
+      e.stopPropagation();
+      sidebarAutoGen.checked = cpbAutoGen.checked;
+      sidebarAutoGen.dispatchEvent(new Event("change"));
+    });
+  }
+
+  // Click collapsed row → expand (but not on action buttons, auto-toggle, or generate)
   if (collapsedRow) collapsedRow.addEventListener("click", (e) => {
-    if (e.target.closest(".cpb-collapsed-gen") || e.target.closest(".cpb-collapsed-actions")) return;
+    if (e.target.closest(".cpb-collapsed-gen") || e.target.closest(".cpb-collapsed-actions") || e.target.closest(".cpb-collapsed-auto-toggle")) return;
     expandBar();
   });
 
