@@ -233,9 +233,13 @@ Optimize the user's prompt:
 - Reorder: Count → Rating → Character → Appearance → Action → Scene → Style
 - Fix: underscores→spaces, bare "explicit"→"rating:explicit", duplicates, misspellings
 - Preserve ALL emphasis markers exactly (curly braces, brackets, ::weight:: syntax)
-- Multi-char (2+ people): use pipe format "base | char1 | char2". Base=count+rating+scene+style. Char="girl"/"boy"+appearance+interactions
-- Per-character: order as gender→name→hair→eyes→clothing→expression→action→interaction. Add source#/target# interactions if scene implies contact
 - Don't add quality tags the system auto-appends
+- Multi-char pipe format rules (CRITICAL — follow exactly):
+  BASE section (before first |): count tag, rating, scene, background, lighting, composition, style, year — NEVER character appearance
+  CHAR sections (after |): ONLY "girl"/"boy" + that character's appearance, expression, pose, interaction tags — NEVER scene/style/background
+  Example input: "2girls, rating:sensitive, blonde hair, school uniform, black hair, red eyes, classroom, year 2024"
+  Correct output: "2girls, rating:sensitive, classroom, year 2024 | girl, blonde hair, school uniform | girl, black hair, red eyes"
+  WRONG output: "2girls | girl, blonde hair, school uniform, classroom, year 2024 | girl, black hair, red eyes, rating:sensitive"
 
 Return JSON: {{"prompt": "optimized tags", "changes": "brief summary of what changed"}}
 
