@@ -14,7 +14,7 @@ function setupCharacters() {
 
   if (!slotsEl) return;
 
-  // Show/hide markers when accordion opens/closes
+  // Re-render markers when accordion opens/closes (gate removed — markers always show when canvas tab active)
   if (accordion) {
     accordion.addEventListener("toggle", () => renderCharacterMarkers());
   }
@@ -129,6 +129,9 @@ function setupCharacters() {
     updateCharacterUI();
     renderCharacterMarkers();
   }
+
+  // Set up Alt+click canvas character adding
+  setupCanvasCharacterAdd();
 }
 
 function swapCharacterSlots(slotsEl, fromIdx, toIdx) {
@@ -251,10 +254,149 @@ function addCharacterSlot(slotsEl, updateCharacterUI) {
 // renderCharacterMarkers() is called whenever characters change.
 
 let _activeMarkerIdx = -1; // which marker is currently "selected" (highlighted)
+let _openPopoverIdx  = -1; // which character the popover is currently showing
+
+// ── Character Popover ────────────────────────────────────────
+
+function openCharacterPopover(idx, markerEl) {
+  const popover   = $("#char-popover");
+  const outputEl  = $("#output");
+  if (!popover || !outputEl || idx < 0 || idx >= characters.length) return;
+
+  _openPopoverIdx = idx;
+  const charData  = characters[idx];
+
+  // Label
+  const labelEl = $("#char-popover-label");
+  if (labelEl) labelEl.textContent = `Character ${idx + 1}`;
+
+  // Textarea sync
+  const ta = $("#char-popover-textarea");
+  if (ta) {
+    ta.value = charData.prompt;
+    // Remove old listener by cloning; attach fresh one
+    const freshTa = ta.cloneNode(true);
+    ta.parentNode.replaceChild(freshTa, ta);
+    freshTa.addEventListener("input", () => {
+      charData.prompt = freshTa.value;
+      // Sync the sidebar card textarea
+      const slotsEl = $("#character-slots");
+      if (slotsEl) {
+        const card = slotsEl.querySelectorAll(".char-slot-card")[idx];
+        const sidebarTa = card?.querySelector(".char-slot-textarea");
+        if (sidebarTa && sidebarTa !== freshTa) sidebarTa.value = charData.prompt;
+      }
+      saveCharactersToCache();
+    });
+    _tagAC.attach(freshTa);
+  }
+
+  // Auto button
+  const autoBtn = $("#char-popover-auto");
+  if (autoBtn) {
+    const freshAutoBtn = autoBtn.cloneNode(true);
+    autoBtn.parentNode.replaceChild(freshAutoBtn, autoBtn);
+    freshAutoBtn.classList.toggle("char-popover-auto-btn--active", !!charData.positionAuto);
+    freshAutoBtn.addEventListener("click", () => {
+      charData.positionAuto = !charData.positionAuto;
+      if (charData.positionAuto) { charData.x = 0.5; charData.y = 0.5; }
+      freshAutoBtn.classList.toggle("char-popover-auto-btn--active", charData.positionAuto);
+      renderCharacterMarkers();
+      // Re-open popover on same index since renderCharacterMarkers closes it
+      openCharacterPopover(idx, outputEl.querySelectorAll(".char-marker")[idx]);
+      saveCharactersToCache();
+    });
+  }
+
+  // Remove button — delegates to sidebar card's remove button
+  const removeBtn = $("#char-popover-remove");
+  if (removeBtn) {
+    const freshRemoveBtn = removeBtn.cloneNode(true); // deep clone preserves SVG child
+    removeBtn.parentNode.replaceChild(freshRemoveBtn, removeBtn);
+    freshRemoveBtn.addEventListener("click", () => {
+      closeCharacterPopover();
+      const slotsEl = $("#character-slots");
+      if (slotsEl) {
+        const card = slotsEl.querySelectorAll(".char-slot-card")[idx];
+        const sidebarRemove = card?.querySelector(".char-slot-remove");
+        if (sidebarRemove) sidebarRemove.click();
+      }
+    });
+  }
+
+  // Close button
+  const closeBtn = $("#char-popover-close");
+  if (closeBtn) {
+    const freshCloseBtn = closeBtn.cloneNode(true);
+    closeBtn.parentNode.replaceChild(freshCloseBtn, closeBtn);
+    freshCloseBtn.addEventListener("click", closeCharacterPopover);
+  }
+
+  // Interactions section
+  const interactionsEl = $("#char-popover-interactions");
+  if (interactionsEl) {
+    interactionsEl.innerHTML = "";
+    interactionsEl.appendChild(buildInteractionsSection(charData));
+  }
+
+  // Position near marker
+  positionPopoverNearMarker(popover, markerEl, outputEl);
+
+  // Show with animation replay (learnings: CSS animations on toggled elements only fire once)
+  popover.style.display = "flex";
+  popover.style.animation = "none";
+  void popover.offsetWidth; // force reflow
+  popover.style.animation = "";
+  popover.classList.add("char-popover--visible");
+
+  // Focus the textarea
+  const activeTa = $("#char-popover-textarea");
+  if (activeTa) activeTa.focus();
+}
+
+function closeCharacterPopover() {
+  const popover = $("#char-popover");
+  if (popover) {
+    popover.style.display = "none";
+    popover.classList.remove("char-popover--visible");
+  }
+  _openPopoverIdx = -1;
+}
+
+function positionPopoverNearMarker(popover, markerEl, outputEl) {
+  if (!markerEl || !outputEl) return;
+
+  const outRect    = outputEl.getBoundingClientRect();
+  const markRect   = markerEl.getBoundingClientRect();
+  const popW       = 260;
+  const popH       = 180; // estimated height
+  const gap        = 12;
+
+  // Marker center relative to outputEl
+  const markerCX = markRect.left - outRect.left + markRect.width / 2;
+  const markerCY = markRect.top  - outRect.top  + markRect.height / 2;
+
+  // Prefer above
+  let top = markerCY - markRect.height / 2 - gap - popH;
+  if (top < 4) {
+    // Place below
+    top = markerCY + markRect.height / 2 + gap;
+  }
+
+  // Center horizontally on marker, clamped within output bounds
+  let left = markerCX - popW / 2;
+  left = Math.max(4, Math.min(left, outRect.width - popW - 4));
+
+  popover.style.left = left + "px";
+  popover.style.top  = top  + "px";
+}
 
 function renderCharacterMarkers() {
   const outputEl = $("#output");
   if (!outputEl) return;
+
+  // Close any open popover before rebuilding markers (stale references)
+  closeCharacterPopover();
 
   // Grok has no character positioning — skip
   const provider = document.getElementById("provider")?.value || "novelai";
@@ -267,10 +409,6 @@ function renderCharacterMarkers() {
   outputEl.querySelectorAll(".char-marker").forEach((m) => m.remove());
 
   if (!characters.length) return;
-
-  // Only show markers when Characters accordion is open
-  const accordion = $("#characters-accordion");
-  if (accordion && !accordion.open) return;
 
   characters.forEach((charData, i) => {
     const marker = document.createElement("div");
@@ -335,7 +473,7 @@ function renderCharacterMarkers() {
         onDragEnd();
         document.removeEventListener("mousemove", onMove);
         document.removeEventListener("mouseup",   onUp);
-        // Select this character on click (no drag) — update classes in place
+        // Open popover on click (no drag) — update classes in place
         // (do NOT call renderCharacterMarkers here — it destroys the element
         //  and breaks dblclick detection on the second click)
         if (!dragMoved) {
@@ -349,6 +487,7 @@ function renderCharacterMarkers() {
               c.classList.toggle("char-slot-card--active", ci === i);
             });
           }
+          openCharacterPopover(i, marker);
         }
       };
       document.addEventListener("mousemove", onMove);
@@ -382,6 +521,7 @@ function renderCharacterMarkers() {
             c.classList.toggle("char-slot-card--active", ci === i);
           });
         }
+        openCharacterPopover(i, marker);
       }
     }, { passive: false });
 
@@ -397,12 +537,12 @@ function renderCharacterMarkers() {
       saveCharactersToCache();
     });
 
-    // Keyboard: Enter/Space to select, Delete to toggle auto
+    // Keyboard: Enter/Space to open popover, Delete to toggle auto
     marker.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         _activeMarkerIdx = i;
-        renderCharacterMarkers();
+        openCharacterPopover(i, marker);
       } else if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
         charData.positionAuto = !charData.positionAuto;
@@ -630,6 +770,63 @@ function populateCharactersFromPipe(promptText) {
   renderCharacterMarkers();
 
   return { applied: true, base, charCount: count };
+}
+
+// ── Alt+click on canvas to add character ─────────────────────
+
+function setupCanvasCharacterAdd() {
+  const outputEl = $("#output");
+  if (!outputEl) return;
+
+  outputEl.addEventListener("click", (e) => {
+    if (!e.altKey) return;
+
+    // Only fire on output itself or the placeholder — not on markers, popover, or image
+    const target = e.target;
+    if (target.closest(".char-marker")) return;
+    if (target.closest(".char-popover")) return;
+
+    const isBackground = target === outputEl ||
+      target.classList.contains("placeholder") ||
+      target.closest(".placeholder") !== null;
+
+    if (!isBackground) return;
+
+    if (characters.length >= MAX_CHARACTERS) return;
+
+    const slotsEl = $("#character-slots");
+    if (!slotsEl) return;
+
+    // Compute relative position
+    const rect = outputEl.getBoundingClientRect();
+    const rx = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const ry = Math.max(0, Math.min(1, (e.clientY - rect.top)  / rect.height));
+
+    // Ensure accordion is open
+    const accordion = $("#characters-accordion");
+    if (accordion && !accordion.open) accordion.open = true;
+
+    addCharacterSlot(slotsEl, _updateCharUI);
+    const newIdx = characters.length - 1;
+    characters[newIdx].x = rx;
+    characters[newIdx].y = ry;
+    characters[newIdx].positionAuto = false;
+
+    renderCharacterMarkers();
+    // Open popover on the newly created marker
+    const newMarker = outputEl.querySelectorAll(".char-marker")[newIdx];
+    if (newMarker) openCharacterPopover(newIdx, newMarker);
+  });
+
+  // Close popover when clicking outside (capture phase for breadth)
+  document.addEventListener("click", (e) => {
+    if (_openPopoverIdx === -1) return;
+    const popover = $("#char-popover");
+    if (!popover) return;
+    if (popover.contains(e.target)) return;
+    if (e.target.closest(".char-marker")) return;
+    closeCharacterPopover();
+  }, true);
 }
 
 // Helper to update character UI badges (exposed for populateCharactersFromPipe)

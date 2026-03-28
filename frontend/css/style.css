@@ -3139,12 +3139,12 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 
 .char-marker {
   position: absolute;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: var(--accent);
   border: 2.5px solid rgba(255,255,255,0.9);
-  color: #fff;
+  color: var(--text-primary);
   font-size: 0.78rem;
   font-weight: 700;
   display: flex;
@@ -3153,10 +3153,14 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   cursor: grab;
   user-select: none;
   transform: translate(-50%, -50%);
-  transition: width 0.15s, height 0.15s, box-shadow 0.15s, opacity 0.15s, background 0.15s;
+  transition: width 0.15s, height 0.15s, box-shadow 0.15s, opacity 0.15s, background 0.15s, transform 0.15s;
   z-index: 5;
   pointer-events: all;
   box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.char-marker:hover {
+  transform: translate(-50%, -50%) scale(1.15);
+  border-color: var(--accent-bright);
 }
 
 .char-marker:focus {
@@ -5466,4 +5470,131 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
     flex-wrap: wrap;
     gap: 8px;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CHARACTER POPOVER — canvas-anchored editor
+   ═══════════════════════════════════════════════════════════ */
+
+.char-popover {
+  position: absolute;
+  background: var(--bg-float);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 35;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.char-popover.char-popover--visible {
+  animation: cpopover-in 0.15s var(--ease-out);
+}
+@keyframes cpopover-in {
+  from { opacity: 0; transform: scale(0.94) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.char-popover-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.char-popover-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.char-popover-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.char-popover-auto-btn {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border-muted);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.char-popover-auto-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
+}
+.char-popover-auto-btn--active {
+  background: var(--accent-dim);
+  border-color: rgba(124,92,252,0.4);
+  color: var(--accent-bright);
+}
+
+.char-popover-remove {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  transition: color 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.char-popover-remove:hover {
+  color: var(--danger);
+}
+
+.char-popover-close {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 0 2px;
+  transition: color 0.12s;
+  font-family: inherit;
+}
+.char-popover-close:hover {
+  color: var(--text-primary);
+}
+
+.char-popover-textarea {
+  width: 100%;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 0.83rem;
+  font-family: inherit;
+  color: var(--text-primary);
+  resize: none;
+  min-height: 60px;
+  max-height: 120px;
+  overflow-y: auto;
+  line-height: 1.5;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+.char-popover-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+  outline: none;
+}
+
+/* Interactions section rendered inside the popover */
+#char-popover-interactions .char-interactions-details {
+  margin-top: 0;
 }
