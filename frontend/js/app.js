@@ -1597,6 +1597,14 @@ function setupCanvasPromptBar() {
     }
   });
 
+  /* ── Global Cmd/Ctrl+Enter: generate from anywhere ── */
+  document.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      generate();
+    }
+  });
+
   /* ── Initial population ────────────────────────────── */
   cpbTa.value = sidebarPrompt.value;
   autoGrow(cpbTa);
