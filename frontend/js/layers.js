@@ -468,27 +468,26 @@ function buildLayerRow(layer, realIdx) {
    ═══════════════════════════════════════════════════════════ */
 
 function renderLayerStrip() {
-  const scroll   = document.getElementById("layer-strip-scroll");
-  const strip    = document.getElementById("layer-strip");
+  // Render layer tabs (paper-edge style on right side of canvas)
+  const tabsList = document.getElementById("layer-tabs-list");
+  const tabsWrap = document.getElementById("layer-tabs");
   const provider = document.getElementById("provider")?.value || "novelai";
 
-  if (!scroll || !strip) return;
+  // Also handle legacy strip element
+  const legacyStrip = document.getElementById("layer-strip");
+  if (legacyStrip) legacyStrip.style.display = "none";
 
-  // Hide strip for non-NovelAI providers
-  if (provider !== "novelai") {
-    strip.style.display = "none";
+  if (!tabsList || !tabsWrap) return;
+
+  if (provider !== "novelai" || layers.length === 0) {
+    tabsWrap.style.display = "none";
+    const panel = document.getElementById("layer-tab-panel");
+    if (panel) panel.style.display = "none";
     return;
   }
 
-  // Show strip whenever layers are available (even with 0 layers — [+] still useful)
-  strip.style.display = "";
-
-  // Remove existing layer cards, keep [+] button last
-  const addBtn = document.getElementById("layer-strip-add");
-  // Clear everything except the add button
-  while (scroll.firstChild && scroll.firstChild !== addBtn) {
-    scroll.removeChild(scroll.firstChild);
-  }
+  tabsWrap.style.display = "";
+  tabsList.innerHTML = "";
 
   // Clamp active index
   if (layers.length > 0) {
@@ -496,143 +495,269 @@ function renderLayerStrip() {
     if (_activeLayerIdx < 0) _activeLayerIdx = 0;
   }
 
-  // Build a card for each layer (index 0 = leftmost = top of stack)
+  // Build a tab for each layer
   layers.forEach((layer, idx) => {
-    const card = document.createElement("div");
-    card.className = "layer-card" +
-      (idx === _activeLayerIdx ? " layer-card--active" : "") +
-      (layer.isOutputTarget ? " layer-card--output-target" : "");
-    card.dataset.layerId = String(layer.id);
-    card.draggable = true;
-    card.title = layer.name;
+    const tab = document.createElement("button");
+    tab.className = "layer-tab" +
+      (idx === _activeLayerIdx ? " layer-tab--active" : "") +
+      (!layer.visible ? " layer-tab--hidden" : "") +
+      (layer.isOutputTarget ? " layer-tab--target" : "");
+    tab.type = "button";
+    tab.title = layer.name;
+    tab.draggable = true;
 
-    // Thumbnail — small canvas element
-    const thumb = document.createElement("canvas");
-    thumb.className = "layer-card-thumb";
-    thumb.width  = 56;
-    thumb.height = 72;
-    thumb.setAttribute("aria-hidden", "true");
+    // Dot for output target
+    const dot = document.createElement("span");
+    dot.className = "layer-tab-dot";
+    tab.appendChild(dot);
 
-    if (layer.imageBase64) {
-      const img = new Image();
-      img.onload = () => {
-        const ctx = thumb.getContext("2d");
-        // object-fit: cover into 56x72
-        const thumbAR  = 56 / 72;
-        const imgAR    = img.naturalWidth / img.naturalHeight;
-        let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
-        if (imgAR > thumbAR) {
-          sw = sh * thumbAR;
-          sx = (img.naturalWidth - sw) / 2;
-        } else {
-          sh = sw / thumbAR;
-          sy = (img.naturalHeight - sh) / 2;
-        }
-        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, 56, 72);
-      };
-      img.src = "data:image/png;base64," + layer.imageBase64;
-    } else {
-      // Empty layer — draw a plus icon
-      const ctx = thumb.getContext("2d");
-      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--text-tertiary").trim() || "#60607a";
-      ctx.lineWidth = 1.5;
-      ctx.lineCap = "round";
-      ctx.beginPath(); ctx.moveTo(28, 22); ctx.lineTo(28, 50); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(14, 36); ctx.lineTo(42, 36); ctx.stroke();
-    }
+    // Short label
+    const label = document.createTextNode((idx + 1).toString());
+    tab.appendChild(label);
 
-    // Name label
-    const nameSpan = document.createElement("span");
-    nameSpan.className = "layer-card-name";
-    nameSpan.textContent = layer.name;
-
-    // Output-target badge dot
-    const badge = document.createElement("div");
-    badge.className = "layer-card-badge";
-    badge.setAttribute("aria-hidden", "true");
-    badge.title = "Output target";
-
-    card.appendChild(thumb);
-    card.appendChild(nameSpan);
-    card.appendChild(badge);
-
-    // Click: select layer, update strip in-place (no full re-render — avoids dblclick issue)
-    card.addEventListener("click", () => {
+    // Click: select + toggle panel
+    tab.addEventListener("click", () => {
+      const wasActive = _activeLayerIdx === idx;
       _activeLayerIdx = idx;
-      // Update active class on all cards in-place
-      document.querySelectorAll(".layer-card").forEach((c, i) => {
-        c.classList.toggle("layer-card--active", i === _activeLayerIdx);
-        c.querySelector(".layer-card-name")?.classList.toggle("layer-card-name--active", i === _activeLayerIdx);
+      // Update active class
+      tabsList.querySelectorAll(".layer-tab").forEach((t, i) => {
+        t.classList.toggle("layer-tab--active", i === _activeLayerIdx);
       });
-      setupLayerStripControls();
-      // Also sync sidebar rows
-      document.querySelectorAll(".layer-row").forEach((rowEl, i) => {
-        rowEl.classList.toggle("layer-row--selected", i === _activeLayerIdx);
-      });
+      // Toggle panel: if already active, toggle visibility; if new, show
+      const panel = document.getElementById("layer-tab-panel");
+      if (wasActive && panel && panel.style.display !== "none") {
+        panel.style.display = "none";
+      } else {
+        openLayerTabPanel(idx, tab);
+      }
     });
 
-    // HTML5 drag-to-reorder (reuse same _layerDrag state)
-    card.addEventListener("dragstart", (e) => {
+    // Drag-to-reorder
+    tab.addEventListener("dragstart", (e) => {
       _layerDrag.active = true;
       _layerDrag.fromId = layer.id;
       e.dataTransfer.effectAllowed = "move";
-      card.classList.add("layer-card--dragging");
+      tab.style.opacity = "0.4";
     });
-
-    card.addEventListener("dragend", () => {
+    tab.addEventListener("dragend", () => {
       _layerDrag.active = false;
       _layerDrag.fromId = null;
-      document.querySelectorAll(".layer-card--drag-over").forEach((el) => {
-        el.classList.remove("layer-card--drag-over");
-      });
-      card.classList.remove("layer-card--dragging");
+      tab.style.opacity = "";
     });
-
-    card.addEventListener("dragover", (e) => {
+    tab.addEventListener("dragover", (e) => {
       if (!_layerDrag.active || _layerDrag.fromId === layer.id) return;
       e.preventDefault();
-      e.stopPropagation();
       e.dataTransfer.dropEffect = "move";
-      document.querySelectorAll(".layer-card--drag-over").forEach((el) => {
-        if (el !== card) el.classList.remove("layer-card--drag-over");
-      });
-      card.classList.add("layer-card--drag-over");
     });
-
-    card.addEventListener("dragleave", () => {
-      card.classList.remove("layer-card--drag-over");
-    });
-
-    card.addEventListener("drop", (e) => {
+    tab.addEventListener("drop", (e) => {
       e.preventDefault();
-      e.stopPropagation();
       if (!_layerDrag.active || _layerDrag.fromId === layer.id) return;
       const fromIdx = layers.findIndex((l) => l.id === _layerDrag.fromId);
-      const toIdx   = layers.indexOf(layer);
+      const toIdx = layers.indexOf(layer);
       if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
       pushLayerUndo("Reorder layers");
       const [moved] = layers.splice(fromIdx, 1);
       layers.splice(toIdx, 0, moved);
       _layerDrag.active = false;
       _layerDrag.fromId = null;
-      renderLayerList(); // renderLayerList calls renderLayerStrip() internally
+      renderLayerList();
       saveLayersToStorage();
       refreshCompositePreview();
     });
 
-    // Insert before the [+] button
-    scroll.insertBefore(card, addBtn);
+    tabsList.appendChild(tab);
   });
 
-  // Update the controls row for the active layer
-  setupLayerStripControls();
+  // Keep panel in sync if open
+  const panel = document.getElementById("layer-tab-panel");
+  if (panel && panel.style.display !== "none" && _activeLayerIdx >= 0 && _activeLayerIdx < layers.length) {
+    const activeTab = tabsList.children[_activeLayerIdx];
+    if (activeTab) openLayerTabPanel(_activeLayerIdx, activeTab);
+  }
+}
 
-  // Scroll active card into view
-  const activeCard = scroll.querySelector(".layer-card--active");
-  if (activeCard) activeCard.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+// Open the floating panel next to a tab
+function openLayerTabPanel(idx, tabEl) {
+  const panel = document.getElementById("layer-tab-panel");
+  if (!panel || idx < 0 || idx >= layers.length) return;
+  // Reuse setupLayerStripControls to populate (it writes to #layer-strip-controls or #layer-tab-panel)
+  panel.style.display = "flex";
+  // Position next to the tab
+  const panelParent = panel.parentElement;
+  if (panelParent && tabEl) {
+    const pRect = panelParent.getBoundingClientRect();
+    const tRect = tabEl.getBoundingClientRect();
+    panel.style.top = Math.max(8, tRect.top - pRect.top - 20) + "px";
+  }
+  // Populate controls into the panel
+  _populateLayerPanel(panel, idx);
+}
+
+function _populateLayerPanel(container, idx) {
+  container.innerHTML = "";
+  if (idx < 0 || idx >= layers.length) return;
+  const layer = layers[idx];
+
+  // Header: name + close
+  const header = document.createElement("div");
+  header.className = "ltp-header";
+  const nameInput = document.createElement("input");
+  nameInput.className = "ltp-name";
+  nameInput.type = "text";
+  nameInput.value = layer.name;
+  nameInput.addEventListener("change", () => {
+    layer.name = nameInput.value.trim() || layer.name;
+    saveLayersToStorage();
+    renderLayerStrip();
+  });
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "ltp-close";
+  closeBtn.type = "button";
+  closeBtn.textContent = "\u00d7";
+  closeBtn.addEventListener("click", () => { container.style.display = "none"; });
+  header.appendChild(nameInput);
+  header.appendChild(closeBtn);
+  container.appendChild(header);
+
+  // Visibility + Target row
+  const toggleRow = document.createElement("div");
+  toggleRow.className = "ltp-actions";
+  const eyeBtn = document.createElement("button");
+  eyeBtn.className = "ltp-btn" + (layer.visible ? " ltp-btn--active" : "");
+  eyeBtn.textContent = layer.visible ? "Visible" : "Hidden";
+  eyeBtn.addEventListener("click", () => {
+    pushLayerUndo("Toggle visibility");
+    layer.visible = !layer.visible;
+    saveLayersToStorage();
+    refreshCompositePreview();
+    renderLayerStrip();
+  });
+  const targetBtn = document.createElement("button");
+  targetBtn.className = "ltp-btn" + (layer.isOutputTarget ? " ltp-btn--active" : "");
+  targetBtn.textContent = "Target";
+  targetBtn.addEventListener("click", () => {
+    pushLayerUndo("Toggle output target");
+    const was = layer.isOutputTarget;
+    layers.forEach(l => { l.isOutputTarget = false; });
+    layer.isOutputTarget = !was;
+    saveLayersToStorage();
+    renderLayerStrip();
+  });
+  toggleRow.appendChild(eyeBtn);
+  toggleRow.appendChild(targetBtn);
+  container.appendChild(toggleRow);
+
+  // Opacity
+  const opRow = document.createElement("div");
+  opRow.className = "ltp-row";
+  const opLabel = document.createElement("span");
+  opLabel.className = "ltp-label";
+  opLabel.textContent = "Opacity";
+  const opSlider = document.createElement("input");
+  opSlider.type = "range"; opSlider.className = "ltp-slider";
+  opSlider.min = "0"; opSlider.max = "1"; opSlider.step = "0.05"; opSlider.value = String(layer.opacity);
+  const opVal = document.createElement("span");
+  opVal.className = "ltp-val";
+  opVal.textContent = Math.round(layer.opacity * 100) + "%";
+  opSlider.addEventListener("input", () => {
+    layer.opacity = parseFloat(opSlider.value);
+    opVal.textContent = Math.round(layer.opacity * 100) + "%";
+    saveLayersToStorage();
+    clearTimeout(_previewDebounceTimer);
+    _previewDebounceTimer = setTimeout(refreshCompositePreview, 50);
+  });
+  opRow.appendChild(opLabel); opRow.appendChild(opSlider); opRow.appendChild(opVal);
+  container.appendChild(opRow);
+
+  // Scale
+  const scRow = document.createElement("div");
+  scRow.className = "ltp-row";
+  const scLabel = document.createElement("span");
+  scLabel.className = "ltp-label";
+  scLabel.textContent = "Scale";
+  const scSlider = document.createElement("input");
+  scSlider.type = "range"; scSlider.className = "ltp-slider";
+  scSlider.min = "0.25"; scSlider.max = "4"; scSlider.step = "0.05";
+  scSlider.value = String(layer.scale !== undefined ? layer.scale : 1.0);
+  const scVal = document.createElement("span");
+  scVal.className = "ltp-val";
+  scVal.textContent = Math.round((layer.scale || 1) * 100) + "%";
+  scSlider.addEventListener("input", () => {
+    layer.scale = parseFloat(scSlider.value);
+    scVal.textContent = Math.round(layer.scale * 100) + "%";
+    saveLayersToStorage();
+    clearTimeout(_previewDebounceTimer);
+    _previewDebounceTimer = setTimeout(refreshCompositePreview, 50);
+  });
+  scRow.appendChild(scLabel); scRow.appendChild(scSlider); scRow.appendChild(scVal);
+  container.appendChild(scRow);
+
+  // Tool actions
+  const tools = document.createElement("div");
+  tools.className = "ltp-actions";
+  function addTool(label, fn, isDanger) {
+    const btn = document.createElement("button");
+    btn.className = "ltp-btn" + (isDanger ? " ltp-btn--danger" : "");
+    btn.type = "button";
+    btn.textContent = label;
+    btn.addEventListener("click", fn);
+    tools.appendChild(btn);
+  }
+  addTool("Move", () => {
+    if (_movingLayer === layer) { _movingLayer = null; _disableCanvasMove(); }
+    else { _movingLayer = layer; _enableCanvasMove(layer); }
+    _populateLayerPanel(container, idx);
+  });
+  addTool("Draw", () => {
+    openLayerDrawEditor(layer, (b64) => {
+      layer.imageBase64 = b64;
+      refreshCompositePreview(); saveLayersToStorage(); renderLayerStrip();
+    });
+  });
+  addTool("Mask", () => {
+    pushLayerUndo("Edit visibility mask");
+    openLayerMaskEditor(layer, () => { refreshCompositePreview(); saveLayersToStorage(); });
+  });
+  if (layer.imageBase64) {
+    addTool("Inpaint", () => {
+      openLayerInpaintEditor(layer, (b64) => {
+        layer.imageBase64 = b64;
+        refreshCompositePreview(); saveLayersToStorage(); renderLayerStrip();
+      });
+    });
+  }
+  addTool("Delete", () => {
+    pushLayerUndo("Delete layer");
+    layers.splice(idx, 1);
+    container.style.display = "none";
+    renderLayerList(); saveLayersToStorage(); refreshCompositePreview();
+  }, true);
+  container.appendChild(tools);
 }
 
 function setupLayerStripControls() {
+  // Populate whichever container is available: tab panel or legacy strip controls
+  const panel = document.getElementById("layer-tab-panel");
+  const legacyControls = document.getElementById("layer-strip-controls");
+  const controls = (panel && panel.style.display !== "none") ? panel : legacyControls;
+  if (!controls) return;
+  // Don't clear panel if it's being managed by _populateLayerPanel
+  if (controls === panel) return;
+  if (legacyControls) legacyControls.innerHTML = "";
+
+  if (layers.length === 0) return;
+  if (_activeLayerIdx >= layers.length) _activeLayerIdx = layers.length - 1;
+  if (_activeLayerIdx < 0) _activeLayerIdx = 0;
+  // Legacy strip controls are hidden, so just return
+  return;
+}
+
+function _populateLayerPanelFull(container, idx) {
+  // This is a stub that calls _populateLayerPanel which was inserted above
+  _populateLayerPanel(container, idx);
+}
+
+function _setupLayerStripControlsLegacy() {
   const controls = document.getElementById("layer-strip-controls");
   if (!controls) return;
   controls.innerHTML = "";
@@ -927,9 +1052,9 @@ function setupLayerStripControls() {
 
 function setupLayerStrip() {
   const addBtn = document.getElementById("layer-strip-add");
-  if (!addBtn) return;
+  const tabsAddBtn = document.getElementById("layer-tabs-add");
 
-  addBtn.addEventListener("click", () => {
+  function addNewLayer() {
     if (layers.length >= MAX_LAYERS) {
       showStatus("Maximum of " + MAX_LAYERS + " layers reached.");
       return;
@@ -950,9 +1075,12 @@ function setupLayerStrip() {
       offsetY: 0,
       scale: 1.0,
     });
-    renderLayerList(); // renderLayerList calls renderLayerStrip() internally
+    renderLayerList();
     saveLayersToStorage();
-  });
+  }
+
+  if (addBtn) addBtn.addEventListener("click", addNewLayer);
+  if (tabsAddBtn) tabsAddBtn.addEventListener("click", addNewLayer);
 
   // File drop onto layer strip scroll area
   const scroll = document.getElementById("layer-strip-scroll");
@@ -998,6 +1126,15 @@ function setupLayerStrip() {
       reader.readAsDataURL(file);
     });
   }
+
+  // Close layer tab panel on outside click
+  document.addEventListener("click", (e) => {
+    const panel = document.getElementById("layer-tab-panel");
+    if (!panel || panel.style.display === "none") return;
+    if (panel.contains(e.target)) return;
+    if (e.target.closest(".layer-tab") || e.target.closest(".layer-tabs-add")) return;
+    panel.style.display = "none";
+  }, true);
 }
 
 function setupLayers() {

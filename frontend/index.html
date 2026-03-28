@@ -1039,21 +1039,16 @@
             </div>
           </div>
 
+          <!-- Layer tabs — paper-edge tabs on right side -->
+          <div class="layer-tabs novelai-only" id="layer-tabs" style="display:none">
+            <div class="layer-tabs-list" id="layer-tabs-list"></div>
+            <button class="layer-tabs-add" id="layer-tabs-add" type="button" title="Add layer">+</button>
+          </div>
+          <div class="layer-tab-panel" id="layer-tab-panel" style="display:none"></div>
+
         </div>
 
-        <!-- ═══════════════════════════════════════════════════════
-             LAYER STRIP — horizontal layer thumbnail strip
-             Shown only in NovelAI mode when layers feature is active
-             ═══════════════════════════════════════════════════════ -->
-        <div class="layer-strip novelai-only" id="layer-strip" style="display:none">
-          <div class="layer-strip-scroll" id="layer-strip-scroll">
-            <!-- layer cards rendered by JS -->
-            <button class="layer-strip-add" id="layer-strip-add" type="button" title="Add layer">+</button>
-          </div>
-          <div class="layer-strip-controls" id="layer-strip-controls">
-            <!-- populated by JS when a layer is active -->
-          </div>
-        </div>
+        <!-- ═════════════════════════════════════════════════════════
 
         <!-- ═══════════════════════════════════════════════════════
              CANVAS PROMPT BAR — floating prompt at bottom of canvas
@@ -1203,7 +1198,7 @@
   <script src="js/crop.js?v=134"></script>
   <script src="js/tag-intelligence.js?v=127"></script>
   <script src="js/tags.js?v=127"></script>
-  <script src="js/layers.js?v=134"></script>
+  <script src="js/layers.js?v=137"></script>
   <script src="js/generate.js?v=124"></script>
 
   <script src="js/gallery.js?v=134"></script>
