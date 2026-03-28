@@ -393,7 +393,7 @@ async def refine_prompt_with_image(api_key: str, current_prompt: str, image_b64:
         "temperature": 0.7,
     }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=90.0) as client:
         resp = await client.post(CHAT_URL, json=payload, headers=headers)
         if resp.status_code != 200:
             raise RuntimeError(f"{resp.status_code}: {resp.text[:500]}")
@@ -455,7 +455,7 @@ async def prompt_assist(api_key: str, direction: str, mode: str, current_prompt:
         "response_format": {"type": "json_object"},
     }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=90.0) as client:
         resp = await client.post(CHAT_URL, json=payload, headers=headers)
         if resp.status_code != 200:
             raise RuntimeError(f"{resp.status_code}: {resp.text[:500]}")
