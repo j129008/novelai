@@ -204,8 +204,9 @@ async def analyze_image_vision(api_key: str, image_b64: str) -> dict:
 
 
 _NOVELAI_GUIDE = """NovelAI V4.5 uses danbooru-style tags with SPACES (not underscores).
+Each tag is comma-separated. Count tags like "1boy", "1girl", "2girls" are SEPARATE tags — never merge them (e.g. "1boy, 1girl" NOT "1boy 1girl").
 Order: Count → Rating → Character → Appearance → Action → Scene → Style
-Example: 1girl, rating:sensitive, blonde hair, blue eyes, smile, garden, soft lighting
+Example: 1boy, 1girl, rating:sensitive, blonde hair, blue eyes, smile, garden, soft lighting
 Rating: rating:general / rating:sensitive / rating:questionable / rating:explicit (ALWAYS use "rating:" prefix, never bare "explicit"/"nsfw")
 Emphasis: {boost}, [weaken], 1.5::weight::, -1::remove:: — preserve exactly as written
 Multi-char: base | char1 | char2 — base has count+scene+style, chars have "girl"/"boy"+appearance. Interactions: source#action, target#action, mutual#action
