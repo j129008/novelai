@@ -236,6 +236,7 @@ Optimize the user's prompt:
 - Fix: underscores→spaces, bare "explicit"→"rating:explicit", duplicates, misspellings
 - Preserve ALL emphasis markers exactly (curly braces, brackets, ::weight:: syntax)
 - Don't add quality tags the system auto-appends
+- Natural language handling: NovelAI is primarily tag-based but understands prose too. Convert clear descriptions to known danbooru tags when possible (e.g. "girl sitting on a bench in a park" → "1girl, sitting, bench, park"). But if a phrase has no obvious tag equivalent, keep it as-is — don't force awkward tag conversions. Vague descriptions like "beautiful scene" should become specific tags like "scenery, sunlight, grass"
 - Multi-char pipe format rules (CRITICAL — follow exactly):
   BASE section (before first |): count tag, rating, scene, background, lighting, composition, style, year — NEVER character appearance
   CHAR sections (after |): ONLY "girl"/"boy" + that character's appearance, expression, pose, interaction tags — NEVER scene/style/background
