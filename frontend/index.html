@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=131">
+  <link rel="stylesheet" href="css/style.css?v=132">
 </head>
 <body>
   <div class="app">
@@ -591,8 +591,8 @@
 
         <div class="controls-scroll">
 
-        <!-- 1. Characters accordion — FIRST -->
-        <details class="accordion" id="characters-accordion">
+        <!-- 1. Characters accordion — FIRST (hidden: characters are now edited via canvas popovers) -->
+        <details class="accordion" id="characters-accordion" style="display:none">
           <summary class="accordion-header">
             <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2 4 6 8 10 4"/></svg>
             Characters
@@ -692,8 +692,8 @@
 
         </div><!-- /.controls-scroll -->
 
-        <!-- Config bar: Provider + Canvas (NovelAI) / Canvas (Grok combined) + gear button -->
-        <div class="config-bar">
+        <!-- Config bar: hidden — provider/resolution are in the canvas prompt bar meta row, settings in gen-settings popover -->
+        <div class="config-bar" style="display:none">
           <div class="config-bar-field">
             <span class="config-bar-label">Provider</span>
             <select id="provider" class="config-bar-select">
@@ -814,8 +814,8 @@
           </div>
         </div>
 
-        <!-- Quick sliders (surfaced from settings) -->
-        <div class="quick-sliders novelai-only">
+        <!-- Quick sliders — hidden: Steps and Scale are in the gen-settings popover -->
+        <div class="quick-sliders novelai-only" style="display:none">
           <div class="quick-slider-row">
             <label class="quick-slider-label" for="steps">Quality</label>
             <input type="range" id="steps" class="field-range" min="1" max="50" value="23">
@@ -828,7 +828,8 @@
           </div>
         </div>
 
-        <div class="controls-footer">
+        <!-- Controls footer — hidden: Generate button is in the canvas prompt bar; Seed is in the canvas bar toolbar -->
+        <div class="controls-footer" style="display:none">
           <div class="seed-footer-row" id="seed-footer-row">
             <label class="seed-footer-label" for="seed">Seed</label>
             <input type="number" id="seed" class="seed-footer-input" value="0" min="0" placeholder="0 = random">
