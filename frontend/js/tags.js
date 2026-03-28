@@ -546,8 +546,31 @@ function setupTagBrowser() {
     meta.textContent = `Last: ${sourceLabel}  ${TagIntelligence.timeAgo(last.ts)}`;
     container.appendChild(meta);
 
+    // AI explanation (from data.changes)
+    if (last.explanation) {
+      const expl = document.createElement("div");
+      expl.className = "ti-diff-explanation";
+      expl.textContent = last.explanation;
+      container.appendChild(expl);
+    }
+
+    // Helper: strip section prefix "s{n}:" and return { tag, sectionIndex }
+    function parseLabeled(raw) {
+      const m = raw.match(/^s(\d+):(.+)$/);
+      if (m) return { tag: m[2], sectionIndex: parseInt(m[1], 10) };
+      return { tag: raw, sectionIndex: -1 };
+    }
+
+    // Section label helper: "base" for s0, "char N" for s1+
+    function sectionLabel(idx) {
+      if (idx < 0) return null;
+      if (idx === 0) return "base";
+      return `char ${idx}`;
+    }
+
     // Added tags
-    for (const tag of last.added) {
+    for (const raw of last.added) {
+      const { tag, sectionIndex } = parseLabeled(raw);
       const row = document.createElement("div");
       row.className = "ti-diff-row";
       const icon = document.createElement("span");
@@ -560,11 +583,18 @@ function setupTagBrowser() {
       chip.addEventListener("click", () => insertTag(tag, chip));
       row.appendChild(icon);
       row.appendChild(chip);
+      if (last.hasMultiSection && sectionIndex >= 0) {
+        const label = document.createElement("span");
+        label.className = "ti-diff-section-label";
+        label.textContent = sectionLabel(sectionIndex);
+        row.appendChild(label);
+      }
       container.appendChild(row);
     }
 
     // Removed tags
-    for (const tag of last.removed) {
+    for (const raw of last.removed) {
+      const { tag, sectionIndex } = parseLabeled(raw);
       const row = document.createElement("div");
       row.className = "ti-diff-row";
       const icon = document.createElement("span");
@@ -575,6 +605,12 @@ function setupTagBrowser() {
       chip.textContent = tag.replace(/_/g, " ");
       row.appendChild(icon);
       row.appendChild(chip);
+      if (last.hasMultiSection && sectionIndex >= 0) {
+        const label = document.createElement("span");
+        label.className = "ti-diff-section-label";
+        label.textContent = sectionLabel(sectionIndex);
+        row.appendChild(label);
+      }
       container.appendChild(row);
     }
 

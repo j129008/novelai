@@ -1181,15 +1181,17 @@ function setupPromptOptimize() {
       console.log("[optimize] response:", data);
       if (data.prompt) {
         window._savePromptToHistory?.();
-        TagIntelligence.recordChange("optimize", fullPrompt, data.prompt);
+        const explanation = typeof data.changes === "string" ? data.changes.trim() : null;
+        TagIntelligence.recordChange("optimize", fullPrompt, data.prompt, explanation);
         const split = populateCharactersFromPipe(data.prompt);
         console.log("[optimize] split result:", split);
         if (split.applied) {
           promptEl.value = split.base;
-          showStatus(`Prompt optimized — ${split.charCount} character(s) moved to blocks`);
+          const statusMsg = explanation || `Prompt optimized — ${split.charCount} character(s) moved to blocks`;
+          showStatus(statusMsg);
         } else {
           promptEl.value = data.prompt;
-          showStatus("Tags reordered and cleaned");
+          showStatus(explanation || "Tags reordered and cleaned");
         }
         promptEl.dispatchEvent(new Event("input", { bubbles: true }));
         flashPromptTextarea();

@@ -286,10 +286,18 @@ The user will provide their current prompt. Your job is to OPTIMIZE it:
    - Interactions go IN the character section: source#action (initiator), target#action (receiver), mutual#action (both)
    - Example: "2girls, rating:sensitive, park, year 2024 | girl, blonde hair, blue eyes, smile, source#hug | girl, black hair, red eyes, serious, target#hug"
 
+CHARACTER SECTION OPTIMIZATION (apply to each character block separately):
+- Order character tags: gender word ("girl"/"boy") → character/series name → hair color/style → eye color → clothing → expression → action → interaction
+- Add interaction tags if the scene implies contact or relationship and no interaction tags exist: source#action for the initiator, target#action for the receiver (e.g. source#hug, target#hug; source#kiss, target#kiss; mutual#holding hands)
+- Remove redundant appearance tags that duplicate what is already in the base prompt
+- If a character block has fewer than 3 appearance tags and the base prompt implies distinct characters, add reasonable distinguishing appearance tags
+- If the base prompt has a count tag (2girls, 3boys) but character pipe sections are missing or incomplete, generate the missing character sections from context
+
 If the user provides additional instructions, follow them while optimizing.
 
-Return a JSON object with one field:
+Return a JSON object with two fields:
 - "prompt": the optimized prompt string (comma-separated tags, with | separators for multi-character)
+- "changes": one concise sentence summarizing what was changed and why (e.g. "Reordered tags to canonical order, added source#hug and target#hug interaction tags, and moved scene tags to base.")
 
 Return ONLY the JSON object, no markdown formatting."""
 
