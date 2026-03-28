@@ -370,6 +370,60 @@ If the user asks for multiple changes, pick the most impactful one. They can run
 Return ONLY the JSON object, no markdown formatting."""
 
 
+_CRITIQUE_SYSTEM_PROMPT = """You are an expert anime art director reviewing a NovelAI generated image.
+
+You are given:
+1. An analysis of what the image contains (tags and description)
+2. The prompt that was used to generate it
+
+Provide exactly 2-3 specific, actionable critique bullets. Each bullet must:
+- Point out ONE concrete issue or improvement opportunity
+- Suggest specific danbooru-style tags (spaces not underscores) to add or remove
+- Be actionable — not subjective praise like "looks good"
+
+Return JSON:
+{"bullets": [
+  {"text": "observation and suggestion", "add_tags": ["tag1", "tag2"], "remove_tags": ["tag3"]},
+  ...
+]}
+
+Focus on: composition, lighting, pose, expression, anatomy issues, mood, missing details.
+Never suggest tags already in the current prompt. Maximum 3 bullets."""
+
+
+async def critique_image(api_key: str, image_b64: str, current_prompt: str) -> dict:
+    """Analyze an image then produce 2-3 actionable critique bullets via grok-3-mini."""
+    # Step 1: Analyze the image with vision
+    analysis = await analyze_image_vision(api_key, image_b64)
+    tags_str = ", ".join(analysis.get("tags", [])[:20])
+    desc_str = analysis.get("description", "")
+
+    # Step 2: Ask grok-3-mini for structured critique
+    user_msg = f"Current prompt: {current_prompt}\n\nImage analysis:\n- Tags: {tags_str}\n- Description: {desc_str}"
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": "grok-3-mini",
+        "messages": [
+            {"role": "system", "content": _CRITIQUE_SYSTEM_PROMPT},
+            {"role": "user", "content": user_msg},
+        ],
+        "temperature": 0.7,
+        "response_format": {"type": "json_object"},
+    }
+
+    async with httpx.AsyncClient(timeout=90.0) as client:
+        resp = await client.post(CHAT_URL, json=payload, headers=headers)
+        if resp.status_code != 200:
+            raise RuntimeError(f"{resp.status_code}: {resp.text[:500]}")
+
+    text = resp.json()["choices"][0]["message"]["content"]
+    return _parse_grok_json(text)
+
+
 async def prompt_assist(api_key: str, direction: str, mode: str, current_prompt: str = "") -> dict:
     """Generate prompt suggestions. mode='tags' returns {"tags":[...]}, mode='description' returns {"description":"..."}."""
     import re

@@ -269,3 +269,34 @@ class LocalTagsCacheResponse(BaseModel):
 
 class LocalTagsBatchResponse(BaseModel):
     analyzed: dict[str, list[str]]  # filename -> ["wd", "grok"]
+
+
+# ---------------------------------------------------------------------------
+# Pose Explore — Grok reference image generation
+# ---------------------------------------------------------------------------
+
+class PoseExploreRequest(BaseModel):
+    hint: str = ""
+
+
+class PoseExploreResponse(BaseModel):
+    image: str  # base64
+
+
+# ---------------------------------------------------------------------------
+# Critique — image critique via Grok vision + chat
+# ---------------------------------------------------------------------------
+
+class CritiqueRequest(BaseModel):
+    image: str  # base64
+    current_prompt: str
+
+
+class CritiqueBullet(BaseModel):
+    text: str
+    add_tags: list[str] = Field(default_factory=list)
+    remove_tags: list[str] = Field(default_factory=list)
+
+
+class CritiqueResponse(BaseModel):
+    bullets: list[CritiqueBullet]

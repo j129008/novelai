@@ -3297,6 +3297,187 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   box-shadow: 0 0 8px var(--accent-dim);
 }
 
+/* ─────────────────────────────────────────────────────────
+   Pose Explore Modal
+   ───────────────────────────────────────────────────────── */
+.pose-explore-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(4,4,10,0.92);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pose-explore-modal {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-xl);
+  width: min(420px, 90vw);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.pose-explore-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.pose-explore-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.pose-explore-img-area {
+  aspect-ratio: 1 / 1;
+  background: var(--bg-deep);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pose-explore-img-area img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.pose-explore-skeleton {
+  width: 60%;
+  height: 8px;
+  background: var(--bg-overlay);
+  border-radius: 4px;
+  animation: skeletonPulse 1.2s ease-in-out infinite;
+}
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
+.pose-explore-hint {
+  background: var(--bg-deep);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  font-size: 0.83rem;
+  font-family: inherit;
+}
+.pose-explore-hint:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.pose-explore-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.pose-explore-stylize {
+  width: auto;
+  padding: 8px 16px;
+  font-size: 0.83rem;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Critique Panel
+   ───────────────────────────────────────────────────────── */
+.critique-panel {
+  position: absolute;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 14;
+  background: rgba(42,42,42,0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  max-width: min(500px, calc(100% - 32px));
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.critique-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.critique-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-tertiary);
+}
+.critique-dismiss {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 2px;
+}
+.critique-dismiss:hover { color: var(--text-primary); }
+.critique-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.critique-skeleton {
+  height: 60px;
+  background: var(--bg-overlay);
+  border-radius: var(--radius-sm);
+  animation: skeletonPulse 1.2s ease-in-out infinite;
+}
+.critique-bullet {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.critique-bullet-text {
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+.critique-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.critique-tag {
+  font-size: 0.7rem;
+  padding: 2px 7px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  transition: opacity 0.12s;
+}
+.critique-tag:hover { opacity: 0.8; }
+.critique-tag--add {
+  background: var(--accent-dim);
+  color: var(--accent-bright);
+}
+.critique-tag--remove {
+  background: var(--danger-bg);
+  color: var(--danger);
+  text-decoration: line-through;
+}
+.critique-tag--applied {
+  opacity: 0.4;
+}
+.critique-apply-all {
+  align-self: flex-end;
+  font-size: 0.78rem;
+  padding: 6px 14px;
+}
+
 .char-marker--auto {
   background: var(--bg-overlay);
   border: 2.5px dashed var(--text-tertiary);
