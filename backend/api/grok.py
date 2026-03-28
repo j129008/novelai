@@ -8,8 +8,11 @@ Video generation is asynchronous: submit a job, poll until done, download the re
 import asyncio
 import base64
 import json
+import logging
 
 import httpx
+
+logger = logging.getLogger("app")
 
 IMAGE_URL = "https://api.x.ai/v1/images/generations"
 IMAGE_EDIT_URL = "https://api.x.ai/v1/images/edits"
@@ -332,13 +335,15 @@ Return ONLY the JSON object, no markdown formatting."""
 def _parse_grok_json(text: str) -> dict:
     """Robustly parse JSON from Grok response, handling markdown wrappers and malformed output."""
     import re
+    logger.info(f"[grok parse] raw response ({len(text)} chars): {text[:500]}")
     text = re.sub(r"^```(?:json)?\s*", "", text.strip())
     text = re.sub(r"\s*```$", "", text.strip())
 
     # Direct parse
     try:
         return json.loads(text)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.warning(f"[grok parse] direct parse failed: {e}")
         pass
 
     # Extract first JSON object
@@ -447,6 +452,7 @@ async def prompt_assist(api_key: str, direction: str, mode: str, current_prompt:
             {"role": "user", "content": user_msg},
         ],
         "temperature": 0.7,
+        "response_format": {"type": "json_object"},
     }
 
     async with httpx.AsyncClient(timeout=30.0) as client:
