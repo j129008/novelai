@@ -406,12 +406,7 @@ function setupTagBrowser() {
   const btn = $("#btn-tag-browser");
   const drawer = $("#tag-browser");
   const closeBtn = $("#tag-browser-close");
-  const rail = $("#tag-browser-rail");
-  const grid = $("#tag-browser-grid");
-  const searchInput = $("#tag-browser-search");
   const canvas = drawer.closest(".canvas");
-
-  let activeCategory = "all";
 
   function isOpen() { return drawer.style.display !== "none" && !drawer.classList.contains("tag-browser--closing"); }
 
@@ -421,11 +416,7 @@ function setupTagBrowser() {
     canvas.classList.add("tag-browser-open");
     btn.classList.add("btn-action--primary");
     btn.setAttribute("aria-expanded", "true");
-    const fetchCategories = !_tagCategories.length ? loadTagCategories() : Promise.resolve();
-    fetchCategories.then(() => {
-      buildRail();
-      renderGrid();
-    });
+    renderTagIntelligence();
   }
 
   function close() {
@@ -444,130 +435,14 @@ function setupTagBrowser() {
   btn.addEventListener("click", () => { isOpen() ? close() : open(); });
   closeBtn.addEventListener("click", close);
 
-  // Close on outside click
   canvas.addEventListener("pointerdown", (e) => {
     if (!isOpen()) return;
     if (drawer.contains(e.target) || btn.contains(e.target)) return;
     close();
   });
 
-  function buildRail() {
-    rail.innerHTML = "";
-    const allBtn = document.createElement("button");
-    allBtn.className = "tag-browser-rail-btn active";
-    allBtn.textContent = "All";
-    allBtn.addEventListener("click", () => selectCategory("all"));
-    rail.appendChild(allBtn);
-
-    for (const cat of _tagCategories) {
-      const b = document.createElement("button");
-      b.className = "tag-browser-rail-btn";
-      b.textContent = cat.label;
-      b.dataset.id = cat.id;
-      b.addEventListener("click", () => selectCategory(cat.id));
-      rail.appendChild(b);
-    }
-  }
-
-  function selectCategory(id) {
-    activeCategory = id;
-    rail.querySelectorAll(".tag-browser-rail-btn").forEach((b) => {
-      b.classList.toggle("active", (b.dataset.id || "all") === id);
-    });
-    // First pill has no dataset.id, it's "all"
-    if (id === "all") rail.firstChild.classList.add("active");
-    renderGrid();
-  }
-
-  let _searchDebounce = null;
-  let _renderGen = 0;
-
-  function renderGrid() {
-    ++_renderGen;
-    const filter = searchInput.value.trim().toLowerCase().replace(/ /g, "_");
-    grid.innerHTML = "";
-
-    const cats = activeCategory === "all"
-      ? _tagCategories
-      : _tagCategories.filter((c) => c.id === activeCategory);
-
-    let anyTags = false;
-    for (const cat of cats) {
-      const tags = filter
-        ? cat.tags.filter((t) => t.includes(filter))
-        : cat.tags;
-      if (!tags.length) continue;
-      anyTags = true;
-
-      if (activeCategory === "all") {
-        const label = document.createElement("div");
-        label.className = "tag-browser-section-label";
-        label.textContent = cat.label;
-        grid.appendChild(label);
-      }
-
-      const wrap = document.createElement("div");
-      wrap.className = "tag-browser-chips";
-      for (const tag of tags) {
-        const chip = document.createElement("button");
-        chip.className = "tag-chip";
-        chip.textContent = tag.replace(/_/g, " ");
-        chip.addEventListener("click", () => insertBrowserTag(tag, chip));
-        wrap.appendChild(chip);
-      }
-      grid.appendChild(wrap);
-    }
-
-    // When filtering, also search the full 140K tag database
-    if (filter && filter.length >= 2) {
-      clearTimeout(_searchDebounce);
-      const gen = _renderGen;
-      _searchDebounce = setTimeout(() => fetchFullSearch(filter, anyTags, gen), 200);
-    } else if (!anyTags) {
-      const empty = document.createElement("p");
-      empty.className = "tag-browser-empty";
-      empty.textContent = "No tags found";
-      grid.appendChild(empty);
-    }
-  }
-
-  async function fetchFullSearch(query, hadCuratedResults, gen) {
-    try {
-      const resp = await fetch(`/api/tags?q=${encodeURIComponent(query)}&limit=30`);
-      if (!resp.ok || gen !== _renderGen) return;
-      const results = await resp.json();
-
-      // Dedupe against curated tags already shown
-      const curatedSet = new Set();
-      for (const cat of _tagCategories) for (const t of cat.tags) curatedSet.add(t);
-      const extra = results.filter((r) => !curatedSet.has(r.name));
-      if (!extra.length && !hadCuratedResults) {
-        grid.innerHTML = `<p class="tag-browser-empty">No tags found</p>`;
-        return;
-      }
-      if (!extra.length) return;
-
-      const label = document.createElement("div");
-      label.className = "tag-browser-section-label";
-      label.textContent = "More Results";
-      grid.appendChild(label);
-
-      const wrap = document.createElement("div");
-      wrap.className = "tag-browser-chips";
-      for (const r of extra) {
-        const chip = document.createElement("button");
-        chip.className = "tag-chip";
-        chip.textContent = r.name.replace(/_/g, " ");
-        chip.addEventListener("click", () => insertBrowserTag(r.name, chip));
-        wrap.appendChild(chip);
-      }
-      grid.appendChild(wrap);
-    } catch { /* silent */ }
-  }
-
-  // ── Insertion target lock (Spec 1A/1B) ─────────────────────
-  // Default: whichever prompt tab is active
-  let _insertTarget = "prompt"; // "prompt" or "negative"
+  // ── Insertion target lock ─────────────────────────────────
+  let _insertTarget = "prompt";
   let _savedCursor = { el: null, pos: -1 };
 
   const pillPrompt   = $("#tag-insert-prompt");
@@ -577,7 +452,6 @@ function setupTagBrowser() {
     _insertTarget = target;
     pillPrompt.classList.toggle("active", target === "prompt");
     pillNegative.classList.toggle("active", target === "negative");
-    // Sync saved cursor element
     _savedCursor = {
       el: target === "prompt" ? $("#prompt") : $("#negative-prompt"),
       pos: _savedCursor.pos,
@@ -587,7 +461,6 @@ function setupTagBrowser() {
   if (pillPrompt) pillPrompt.addEventListener("click", () => setInsertTarget("prompt"));
   if (pillNegative) pillNegative.addEventListener("click", () => setInsertTarget("negative"));
 
-  // When prompt tabs are switched, sync the insert target pill
   document.querySelectorAll(".prompt-tab").forEach((tab) => {
     tab.addEventListener("click", () => {
       if (tab.dataset.target === "prompt") setInsertTarget("prompt");
@@ -595,25 +468,18 @@ function setupTagBrowser() {
     });
   });
 
-  // Save cursor position on blur for accurate insertion
   $("#prompt").addEventListener("blur", function() {
     _savedCursor = { el: this, pos: this.selectionStart };
-    // Update pill if this was the active textarea
   });
   $("#negative-prompt").addEventListener("blur", function() {
     _savedCursor = { el: this, pos: this.selectionStart };
   });
 
-  function insertBrowserTag(tag, chipEl) {
-    // Use locked target, not visibility-based detection
+  function insertTag(tag, chipEl) {
     const promptEl = _insertTarget === "negative" ? $("#negative-prompt") : $("#prompt");
     const display = tag.replace(/_/g, " ");
     const val = promptEl.value;
-
-    // Use saved cursor if it belongs to this textarea, otherwise append
-    const pos = (_savedCursor.el === promptEl && _savedCursor.pos >= 0)
-      ? _savedCursor.pos
-      : val.length;
+    const pos = (_savedCursor.el === promptEl && _savedCursor.pos >= 0) ? _savedCursor.pos : val.length;
     const atEnd = pos === val.length;
 
     let insertedLen;
@@ -632,16 +498,14 @@ function setupTagBrowser() {
       insertedLen = before.length + insert.length;
     }
 
-    // Move cursor to just after insertion and save it
     _savedCursor = { el: promptEl, pos: insertedLen };
-
     promptEl.dispatchEvent(new Event("input"));
 
-    // Visual feedback — chip flash
-    chipEl.classList.add("tag-chip--inserted");
-    setTimeout(() => chipEl.classList.remove("tag-chip--inserted"), 300);
+    if (chipEl) {
+      chipEl.classList.add("tag-chip--inserted");
+      setTimeout(() => chipEl.classList.remove("tag-chip--inserted"), 300);
+    }
 
-    // Prompt box border flash
     const box = promptEl.closest(".prompt-box");
     if (box) {
       box.style.borderColor = "var(--accent)";
@@ -650,51 +514,215 @@ function setupTagBrowser() {
     }
   }
 
-  // ── Surprise Me button ──────────────────────────────────
-  const surpriseBtn = $("#btn-surprise-me");
-  if (surpriseBtn) {
-    surpriseBtn.addEventListener("click", () => {
-      const cats = activeCategory === "all"
-        ? _tagCategories
-        : _tagCategories.filter((c) => c.id === activeCategory);
+  // ── Tag Intelligence rendering ────────────────────────────
 
-      // Flatten all tags from relevant categories
-      const allTags = [];
-      for (const cat of cats) {
-        for (const tag of cat.tags) allTags.push(tag);
-      }
-      if (!allTags.length) return;
-
-      const pick = allTags[Math.floor(Math.random() * allTags.length)];
-
-      // Find chip in grid if visible, otherwise insert without visual feedback
-      const chips = grid.querySelectorAll(".tag-chip");
-      let targetChip = null;
-      for (const c of chips) {
-        if (c.textContent.trim().replace(/ /g, "_") === pick || c.textContent.trim() === pick.replace(/_/g, " ")) {
-          targetChip = c;
-          break;
-        }
-      }
-
-      if (targetChip) {
-        targetChip.scrollIntoView({ block: "nearest", behavior: "smooth" });
-        insertBrowserTag(pick, targetChip);
-      } else {
-        // Insert directly without chip visual feedback
-        const promptEl = _insertTarget === "negative" ? $("#negative-prompt") : $("#prompt");
-        const display = pick.replace(/_/g, " ");
-        const val = promptEl.value;
-        const prefix = val.length > 0 && !val.trimEnd().endsWith(",") ? ", " : val.length > 0 ? " " : "";
-        promptEl.value = val + prefix + display;
-        promptEl.dispatchEvent(new Event("input"));
-
-        // Flash the button as feedback
-        surpriseBtn.classList.add("btn-action--confirm");
-        setTimeout(() => surpriseBtn.classList.remove("btn-action--confirm"), 300);
-      }
-    });
+  function renderTagIntelligence() {
+    renderWhatChanged();
+    renderDiscoveries();
+    renderSuggestions();
   }
 
-  searchInput.addEventListener("input", renderGrid);
+  // Re-render when optimize/refine runs
+  document.addEventListener("tag-intelligence-updated", () => {
+    if (isOpen()) renderTagIntelligence();
+  });
+
+  // Section 1: What Changed
+  function renderWhatChanged() {
+    const container = $("#ti-diff");
+    if (!container) return;
+    const last = TagIntelligence.getLastChange();
+    if (!last) {
+      container.innerHTML = '<p class="ti-empty">Run Optimize or Refine to see what the AI changed in your prompt.</p>';
+      return;
+    }
+
+    container.innerHTML = "";
+
+    // Meta line
+    const meta = document.createElement("div");
+    meta.className = "ti-diff-meta";
+    const sourceLabel = last.source === "optimize" ? "Optimize" : "Refine";
+    meta.textContent = `Last: ${sourceLabel}  ${TagIntelligence.timeAgo(last.ts)}`;
+    container.appendChild(meta);
+
+    // Added tags
+    for (const tag of last.added) {
+      const row = document.createElement("div");
+      row.className = "ti-diff-row";
+      const icon = document.createElement("span");
+      icon.className = "ti-diff-icon ti-diff-icon--add";
+      icon.textContent = "+";
+      const chip = document.createElement("button");
+      chip.className = "ti-chip--added";
+      chip.type = "button";
+      chip.textContent = tag.replace(/_/g, " ");
+      chip.addEventListener("click", () => insertTag(tag, chip));
+      row.appendChild(icon);
+      row.appendChild(chip);
+      container.appendChild(row);
+    }
+
+    // Removed tags
+    for (const tag of last.removed) {
+      const row = document.createElement("div");
+      row.className = "ti-diff-row";
+      const icon = document.createElement("span");
+      icon.className = "ti-diff-icon ti-diff-icon--remove";
+      icon.textContent = "−";
+      const chip = document.createElement("span");
+      chip.className = "ti-chip--removed";
+      chip.textContent = tag.replace(/_/g, " ");
+      row.appendChild(icon);
+      row.appendChild(chip);
+      container.appendChild(row);
+    }
+
+    // Reorder notice
+    if (last.reordered && last.added.length === 0 && last.removed.length === 0) {
+      const row = document.createElement("div");
+      row.className = "ti-diff-row";
+      const icon = document.createElement("span");
+      icon.className = "ti-diff-icon ti-diff-icon--reorder";
+      icon.textContent = "↕";
+      const text = document.createElement("span");
+      text.className = "ti-diff-reorder";
+      text.textContent = "Tags reordered for better results";
+      row.appendChild(icon);
+      row.appendChild(text);
+      container.appendChild(row);
+    } else if (last.reordered) {
+      const note = document.createElement("div");
+      note.className = "ti-diff-reorder";
+      note.textContent = "↕ also reordered tags";
+      container.appendChild(note);
+    }
+
+    // If nothing changed at all
+    if (last.added.length === 0 && last.removed.length === 0 && !last.reordered) {
+      const note = document.createElement("p");
+      note.className = "ti-empty";
+      note.textContent = "No significant changes detected.";
+      container.appendChild(note);
+    }
+  }
+
+  // Section 2: New Discoveries
+  function renderDiscoveries() {
+    const container = $("#ti-disc-grid");
+    const countBadge = $("#ti-disc-count");
+    if (!container) return;
+
+    const discoveries = TagIntelligence.getDiscoveries();
+    const show = discoveries.slice(0, 20); // max 20
+
+    if (countBadge) {
+      if (discoveries.length > 0) {
+        countBadge.textContent = discoveries.length;
+        countBadge.style.display = "";
+      } else {
+        countBadge.style.display = "none";
+      }
+    }
+
+    if (!show.length) {
+      container.innerHTML = '<p class="ti-empty">New tags will appear here after your first Optimize or Refine.</p>';
+      return;
+    }
+
+    container.innerHTML = "";
+    for (const disc of show) {
+      const chip = document.createElement("button");
+      chip.className = "tag-chip";
+      chip.type = "button";
+      chip.textContent = disc.tag.replace(/_/g, " ");
+      chip.title = `Discovered via ${disc.source}  ${TagIntelligence.timeAgo(disc.ts)}`;
+      chip.addEventListener("click", () => insertTag(disc.tag, chip));
+      container.appendChild(chip);
+    }
+  }
+
+  // Section 3: Add Next (suggestions)
+  let _suggestionsLoading = false;
+
+  async function renderSuggestions() {
+    const container = $("#ti-suggestions");
+    const refreshBtn = $("#ti-refresh");
+    if (!container) return;
+
+    const promptText = $("#prompt")?.value?.trim() || "";
+    const tags = TagIntelligence.parseTags(promptText);
+
+    if (tags.length < 2) {
+      container.innerHTML = '<p class="ti-empty">Type a prompt to get tag suggestions.</p>';
+      if (refreshBtn) refreshBtn.style.display = "none";
+      return;
+    }
+
+    if (_suggestionsLoading) return;
+    _suggestionsLoading = true;
+    container.innerHTML = '<p class="ti-empty" style="color:var(--accent-bright)">Loading suggestions...</p>';
+
+    const data = await TagIntelligence.fetchSuggestions(promptText);
+    _suggestionsLoading = false;
+
+    if (!data) {
+      container.innerHTML = '<p class="ti-empty">Could not load suggestions.</p>';
+      if (refreshBtn) refreshBtn.style.display = "none";
+      return;
+    }
+
+    container.innerHTML = "";
+
+    // Boosters
+    if (data.boosters && data.boosters.length) {
+      const sub = buildSubGroup("Boosters", data.boosters.slice(0, 3));
+      container.appendChild(sub);
+    }
+
+    // Contrasts
+    if (data.contrasts && data.contrasts.length) {
+      const sub = buildSubGroup("Contrasts", data.contrasts.slice(0, 2));
+      container.appendChild(sub);
+    }
+
+    // Wildcards
+    if (data.wildcards && data.wildcards.length) {
+      const sub = buildSubGroup("Wildcards", data.wildcards.slice(0, 1));
+      container.appendChild(sub);
+    }
+
+    if (refreshBtn) refreshBtn.style.display = "";
+  }
+
+  function buildSubGroup(label, items) {
+    const wrap = document.createElement("div");
+
+    const lbl = document.createElement("div");
+    lbl.className = "ti-sub-label";
+    lbl.textContent = label;
+    wrap.appendChild(lbl);
+
+    const chips = document.createElement("div");
+    chips.className = "ti-sub-chips";
+    for (const item of items) {
+      const tag = typeof item === "string" ? item : (item.tag || item.name || item);
+      const chip = document.createElement("button");
+      chip.className = "tag-chip";
+      chip.type = "button";
+      chip.textContent = String(tag).replace(/_/g, " ");
+      chip.addEventListener("click", () => insertTag(String(tag), chip));
+      chips.appendChild(chip);
+    }
+    wrap.appendChild(chips);
+    return wrap;
+  }
+
+  // Refresh button
+  const refreshBtn = $("#ti-refresh");
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", () => {
+      renderSuggestions();
+    });
+  }
 }
