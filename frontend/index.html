@@ -547,9 +547,6 @@
               <button class="prompt-tab active" data-target="prompt" type="button">Prompt<span id="scene-label" class="scene-label" style="display:none"> (Scene)</span></button>
               <button class="prompt-tab" data-target="negative-prompt" type="button">Undesired</button>
               <div class="prompt-tab-actions">
-                <button id="prompt-expand-btn" class="btn-expand-prompt" type="button" title="Open in Focus Mode (Cmd+E)">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-                </button>
                 <label class="pill-toggle" id="quality-tags-pill" title="Auto-prepend quality boost tags">
                   <input type="checkbox" id="quality-tags" checked>
                   <span class="pill-label">Quality</span>
@@ -581,6 +578,9 @@
                 <button id="prompt-history-btn" class="prompt-tool-btn" type="button" title="Prompt history (Ctrl+H)">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                   History
+                </button>
+                <button id="prompt-expand-btn" class="btn-expand-prompt prompt-tool-btn" type="button" title="Open in Focus Mode (Cmd+E)" style="margin-left:auto">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
                 </button>
               </div>
             </div>
