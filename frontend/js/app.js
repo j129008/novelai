@@ -1597,13 +1597,7 @@ function setupCanvasPromptBar() {
     }
   });
 
-  /* ── Global Cmd/Ctrl+Enter: generate from anywhere ── */
-  document.addEventListener("keydown", (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-      e.preventDefault();
-      generate();
-    }
-  });
+  /* ── Global Cmd/Ctrl+Enter: generate — registered outside this scope ── */
 
   /* ── Initial population ────────────────────────────── */
   cpbTa.value = sidebarPrompt.value;
@@ -1988,5 +1982,13 @@ async function init() {
     }
   });
 }
+
+// Global Cmd/Ctrl+Enter → generate (works even when prompt bar is collapsed)
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+    e.preventDefault();
+    document.getElementById("generate-btn")?.click();
+  }
+});
 
 init();
