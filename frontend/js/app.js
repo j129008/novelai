@@ -375,10 +375,17 @@ function setupAutoSavePrompt() {
   if (savedPrompt !== null) prompt.value = savedPrompt;
   if (savedNegative !== null) negative.value = savedNegative;
 
+  function autoGrowPrompt() {
+    prompt.style.height = "auto";
+    prompt.style.height = Math.min(prompt.scrollHeight, 200) + "px";
+  }
   prompt.addEventListener("input", () => {
     localStorage.setItem(_promptKey(), prompt.value);
     _checkImageMention(prompt);
+    autoGrowPrompt();
   });
+  // Initial auto-grow on load
+  requestAnimationFrame(autoGrowPrompt);
 
   // ── @ Image Mention ───────────────────────────────────────
   let _mentionDropdown = null;
