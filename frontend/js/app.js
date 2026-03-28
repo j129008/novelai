@@ -1582,6 +1582,48 @@ function setupCanvasPromptBar() {
     });
   }
 
+  /* ── I2I sliders mirror (Transformation + Variation) ── */
+  function mirrorSlider(sourceId, mirrorId, valId) {
+    const source = document.getElementById(sourceId);
+    const mirror = document.getElementById(mirrorId);
+    const val = document.getElementById(valId);
+    if (!source || !mirror) return;
+    mirror.value = source.value;
+    if (val) val.textContent = parseFloat(source.value).toFixed(2);
+    source.addEventListener("input", () => {
+      mirror.value = source.value;
+      if (val) val.textContent = parseFloat(source.value).toFixed(2);
+    });
+    mirror.addEventListener("input", () => {
+      source.value = mirror.value;
+      source.dispatchEvent(new Event("input", { bubbles: true }));
+      if (val) val.textContent = parseFloat(mirror.value).toFixed(2);
+    });
+  }
+  mirrorSlider("strength", "cpb-strength", "cpb-strength-val");
+  mirrorSlider("noise", "cpb-noise", "cpb-noise-val");
+
+  // Steps mirror (integer display)
+  const stepsSource = document.getElementById("steps");
+  const stepsMirror = document.getElementById("cpb-steps");
+  const stepsVal = document.getElementById("cpb-steps-val");
+  if (stepsSource && stepsMirror) {
+    stepsMirror.value = stepsSource.value;
+    if (stepsVal) stepsVal.textContent = stepsSource.value;
+    stepsSource.addEventListener("input", () => { stepsMirror.value = stepsSource.value; if (stepsVal) stepsVal.textContent = stepsSource.value; });
+    stepsMirror.addEventListener("input", () => { stepsSource.value = stepsMirror.value; stepsSource.dispatchEvent(new Event("input", { bubbles: true })); if (stepsVal) stepsVal.textContent = stepsMirror.value; });
+  }
+  // Scale mirror
+  const scaleSource = document.getElementById("scale");
+  const scaleMirror = document.getElementById("cpb-scale");
+  const scaleVal = document.getElementById("cpb-scale-val");
+  if (scaleSource && scaleMirror) {
+    scaleMirror.value = scaleSource.value;
+    if (scaleVal) scaleVal.textContent = parseFloat(scaleSource.value).toFixed(1);
+    scaleSource.addEventListener("input", () => { scaleMirror.value = scaleSource.value; if (scaleVal) scaleVal.textContent = parseFloat(scaleSource.value).toFixed(1); });
+    scaleMirror.addEventListener("input", () => { scaleSource.value = scaleMirror.value; scaleSource.dispatchEvent(new Event("input", { bubbles: true })); if (scaleVal) scaleVal.textContent = parseFloat(scaleMirror.value).toFixed(1); });
+  }
+
   /* ── App settings button ─────────────────────────────── */
   document.getElementById("cpb-app-settings-btn")?.addEventListener("click", () => {
     document.getElementById("settings-btn")?.click();
