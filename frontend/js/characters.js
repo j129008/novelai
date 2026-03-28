@@ -580,19 +580,17 @@ function populateCharactersFromPipe(promptText) {
   if (slotsEl) slotsEl.innerHTML = "";
   characters.length = 0;
 
-  // Parse interactions (source#, target#, mutual#) out of each character prompt
-  const interactionRe = /\b(source#|target#|mutual#)(\S+)/g;
-
   const count = charParts.length;
   charParts.forEach((rawPrompt, i) => {
-    // Extract interactions
+    // Extract interactions (source#, target#, mutual#) — create fresh regex each iteration
     const interactions = [];
+    const interactionRe = /\b(source#|target#|mutual#)(\S+)/g;
     let match;
     while ((match = interactionRe.exec(rawPrompt)) !== null) {
       interactions.push({ directive: match[1], action: match[2].replace(/,$/, "") });
     }
     // Remove interaction tags from prompt text
-    const cleanPrompt = rawPrompt.replace(interactionRe, "").replace(/,\s*,/g, ",").replace(/,\s*$/, "").replace(/^\s*,/, "").trim();
+    const cleanPrompt = rawPrompt.replace(/\b(source#|target#|mutual#)\S+/g, "").replace(/,\s*,/g, ",").replace(/,\s*$/, "").replace(/^\s*,/, "").trim();
 
     addCharacterSlot(slotsEl, _updateCharUI);
     const charData = characters[i];
