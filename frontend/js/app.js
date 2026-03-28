@@ -1485,7 +1485,7 @@ function setupCanvasPromptBar() {
   updateCollapsedText();
 
   // Prevent blur from collapsing when clicking toolbar buttons
-  bar.querySelectorAll(".cpb-tool-btn, .cpb-seed-input, .cpb-seed-rand-btn, .cpb-icon-btn, .cpb-pill-toggle, .cpb-meta-select").forEach((el) => {
+  bar.querySelectorAll(".cpb-tool-btn, .cpb-seed-input, .cpb-seed-rand-btn, .cpb-icon-btn, .cpb-pill-toggle").forEach((el) => {
     el.addEventListener("mousedown", (e) => e.preventDefault());
   });
 
