@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=125">
+  <link rel="stylesheet" href="css/style.css?v=127">
 </head>
 <body>
   <div class="app">
@@ -554,6 +554,10 @@
                   <input type="checkbox" id="quality-tags" checked>
                   <span class="pill-label">Quality</span>
                 </label>
+                <label class="pill-toggle" id="enhance-pill" title="When optimizing, also add atmospheric phrases to enhance storytelling">
+                  <input type="checkbox" id="enhance-toggle">
+                  <span class="pill-label">Enhance</span>
+                </label>
                 <select id="uc-preset" class="uc-preset-select" style="display:none" aria-label="Undesired content preset">
                   <option value="human-focus">Human Focus</option>
                   <option value="heavy">Heavy</option>
@@ -570,10 +574,6 @@
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14h4v7H4z"/><path d="M10 9h4v12h-4z"/><path d="M16 3h4v18h-4z"/></svg>
                   Optimize
                 </button>
-                <label class="pill-toggle" id="enhance-pill" title="Add short narrative phrases to strengthen the prompt's storytelling">
-                  <input type="checkbox" id="enhance-toggle">
-                  <span class="pill-label">Enhance</span>
-                </label>
                 <button id="prompt-assist-btn" class="prompt-tool-btn" type="button" title="AI Prompt Assistant">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
                   AI Assist
@@ -895,6 +895,11 @@
                 <p class="ti-empty">New tags will appear here after your first Optimize or Refine.</p>
               </div>
             </section>
+            <!-- Saved Tags -->
+            <section class="ti-section" id="ti-saved" style="display:none">
+              <h3 class="ti-section-label">Saved Tags <span id="ti-saved-count" class="ti-count-badge">0</span></h3>
+              <div id="ti-saved-grid" class="ti-chip-grid"></div>
+            </section>
             <!-- Add Next -->
             <section class="ti-section" id="ti-add-next">
               <h3 class="ti-section-label">Add Next</h3>
@@ -1094,14 +1099,14 @@
   <script src="js/state.js?v=124"></script>
   <script src="js/provider.js?v=124"></script>
   <script src="js/crop.js?v=124"></script>
-  <script src="js/tag-intelligence.js?v=125"></script>
-  <script src="js/tags.js?v=126"></script>
+  <script src="js/tag-intelligence.js?v=127"></script>
+  <script src="js/tags.js?v=127"></script>
   <script src="js/layers.js?v=124"></script>
   <script src="js/generate.js?v=124"></script>
 
   <script src="js/gallery.js?v=124"></script>
   <script src="js/explore.js?v=124"></script>
   <script src="js/characters.js?v=126"></script>
-  <script src="js/app.js?v=126"></script>
+  <script src="js/app.js?v=127"></script>
 </body>
 </html>

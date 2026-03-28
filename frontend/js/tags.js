@@ -540,6 +540,7 @@ function setupTagBrowser() {
   function renderTagIntelligence() {
     renderWhatChanged();
     renderDiscoveries();
+    renderSavedTags();
     renderSuggestions();
   }
 
@@ -604,6 +605,28 @@ function setupTagBrowser() {
       chip.addEventListener("click", () => insertTag(tag, chip));
       row.appendChild(icon);
       row.appendChild(chip);
+      // Save/unsave button
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "ti-save-btn" + (TagIntelligence.isTagSaved(tag) ? " ti-save-btn--active" : "");
+      saveBtn.type = "button";
+      saveBtn.title = TagIntelligence.isTagSaved(tag) ? "Remove from saved" : "Save for future use";
+      saveBtn.textContent = TagIntelligence.isTagSaved(tag) ? "★" : "☆";
+      saveBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (TagIntelligence.isTagSaved(tag)) {
+          TagIntelligence.removeSavedTag(tag);
+          saveBtn.textContent = "☆";
+          saveBtn.classList.remove("ti-save-btn--active");
+          saveBtn.title = "Save for future use";
+        } else {
+          TagIntelligence.saveTag(tag);
+          saveBtn.textContent = "★";
+          saveBtn.classList.add("ti-save-btn--active");
+          saveBtn.title = "Remove from saved";
+        }
+        renderSavedTags();
+      });
+      row.appendChild(saveBtn);
       if (last.hasMultiSection && sectionIndex >= 0) {
         const label = document.createElement("span");
         label.className = "ti-diff-section-label";
@@ -699,7 +722,50 @@ function setupTagBrowser() {
     }
   }
 
-  // Section 3: Add Next (suggestions)
+  // Section: Saved Tags
+  function renderSavedTags() {
+    const section = $("#ti-saved");
+    const container = $("#ti-saved-grid");
+    const countBadge = $("#ti-saved-count");
+    if (!container || !section) return;
+
+    const saved = TagIntelligence.getSavedTags();
+    if (saved.length === 0) {
+      section.style.display = "none";
+      return;
+    }
+
+    section.style.display = "";
+    if (countBadge) countBadge.textContent = saved.length;
+    container.innerHTML = "";
+
+    for (const tag of saved) {
+      const wrap = document.createElement("span");
+      wrap.className = "ti-saved-chip";
+
+      const chip = document.createElement("button");
+      chip.className = "tag-chip";
+      chip.type = "button";
+      chip.textContent = tag.replace(/_/g, " ");
+      chip.addEventListener("click", () => insertTag(tag, chip));
+      wrap.appendChild(chip);
+
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "ti-saved-remove";
+      removeBtn.type = "button";
+      removeBtn.textContent = "\u00d7";
+      removeBtn.title = "Remove from saved";
+      removeBtn.addEventListener("click", () => {
+        TagIntelligence.removeSavedTag(tag);
+        renderSavedTags();
+        renderWhatChanged(); // refresh star states
+      });
+      wrap.appendChild(removeBtn);
+      container.appendChild(wrap);
+    }
+  }
+
+  // Section: Add Next (suggestions)
   let _suggestionsLoading = false;
 
   async function renderSuggestions() {

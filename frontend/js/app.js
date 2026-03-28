@@ -1166,7 +1166,15 @@ function setupPromptOptimize() {
     showStatus(enhance ? "Enhancing prompt…" : "Optimizing prompt…");
 
     try {
-      const direction = enhance ? "After optimizing, append 1-2 short evocative phrases at the end to enhance atmosphere and storytelling. Keep them brief (under 10 words each). Do not remove any existing tags to make room." : "";
+      // Build direction with enhance + saved tags
+      let direction = "";
+      if (enhance) {
+        direction += "IMPORTANT: After optimizing tags, you MUST append 2-3 short natural language phrases (NOT tags) at the end of the prompt to enhance atmosphere. These should be descriptive prose fragments like 'the warm golden light casting long shadows', 'petals drifting in the breeze', 'a quiet moment of contemplation'. They must be clearly different from tags — use articles, prepositions, adjectives in sentence fragments. Do NOT remove existing tags to make room.";
+      }
+      const saved = TagIntelligence.getSavedTags?.() || [];
+      if (saved.length > 0) {
+        direction += (direction ? " " : "") + "The user has marked these tags as favorites from previous optimizations — prefer including them when relevant: " + saved.join(", ");
+      }
       console.log("[optimize] sending:", fullPrompt.substring(0, 100), enhance ? "(enhance)" : "");
       const resp = await fetch("/api/prompt-assist", {
         method: "POST",
