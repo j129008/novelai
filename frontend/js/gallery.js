@@ -929,10 +929,12 @@ function loadSettingsFromMeta(meta) {
   }
 
   $("#prompt").value = prompt;
+  $("#prompt").dispatchEvent(new Event("input", { bubbles: true }));
   localStorage.setItem("nai-prompt", prompt);
 
   if (meta.uc) {
     $("#negative-prompt").value = meta.uc;
+    $("#negative-prompt").dispatchEvent(new Event("input", { bubbles: true }));
     localStorage.setItem("nai-negative", meta.uc);
   }
 
