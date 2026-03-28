@@ -387,7 +387,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 .settings-path { flex: 1; font-size: 0.82rem; font-family: "SF Mono","Fira Code",monospace; color: var(--text-secondary); background: var(--bg-deep); }
 
 /* Canvas tab system */
-.canvas { display: flex; flex-direction: column; padding: 20px 24px 0; gap: 0; background: var(--bg-base); height: 100vh; position: relative; overflow: hidden; }
+.canvas { display: flex; flex-direction: column; padding: 20px 24px 0; gap: 0; background: var(--bg-base); height: 100vh; position: relative; }
 .canvas-tabbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-shrink: 0; }
 .canvas-tabs { display: flex; background: var(--bg-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 3px; gap: 2px; flex-shrink: 0; }
 .canvas-tab { background: none; border: none; color: var(--text-tertiary); font-size: 0.8rem; font-weight: 600; font-family: inherit; letter-spacing: 0.03em; padding: 6px 16px; border-radius: 7px; cursor: pointer; transition: background 0.15s, color 0.15s; display: flex; align-items: center; gap: 7px; }
@@ -400,7 +400,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 .history-search-wrap svg { color: var(--text-tertiary); flex-shrink: 0; }
 .history-search { flex: 1; background: none; border: none; color: var(--text-primary); font-size: 0.83rem; font-family: inherit; outline: none; }
 .history-search::placeholder { color: var(--text-tertiary); }
-.canvas-panel { display: flex; flex-direction: column; flex: 1; gap: 12px; min-height: 0; overflow: hidden; position: relative; }
+.canvas-panel { display: flex; flex-direction: column; flex: 1; gap: 12px; min-height: 0; overflow: hidden; }
 
 /* History grid */
 #panel-history { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border-muted) transparent; }
