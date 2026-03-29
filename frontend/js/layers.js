@@ -55,12 +55,14 @@ async function refreshCompositePreview() {
   const layersEnabled = document.getElementById("layers-enabled");
   const hasVisibleLayer = (layersEnabled && layersEnabled.checked) && layers.some((l) => l.visible && l.imageBase64);
   const output = $("#output");
+  // Don't touch #output when user is viewing the Output tab
+  const showInOutput = _canvasView === "input";
 
   if (!hasVisibleLayer) {
     // If layers exist but none have images, show blank canvas (not old generated image)
     if (layers.length > 0 && layersEnabled && layersEnabled.checked) {
       state.canvasImageBase64 = null;
-      if (output) {
+      if (output && showInOutput) {
         clearOutput(output);
         const placeholder = document.createElement("div");
         placeholder.className = "placeholder";
@@ -73,15 +75,6 @@ async function refreshCompositePreview() {
     // No layers at all — fall back to last generated image
     if (state.lastGeneratedImageBase64) {
       state.canvasImageBase64 = state.lastGeneratedImageBase64;
-      const existingImg = output ? output.querySelector("img") : null;
-      if (output && (!existingImg || existingImg.src !== `data:image/png;base64,${state.lastGeneratedImageBase64}`)) {
-        const img = document.createElement("img");
-        img.src = `data:image/png;base64,${state.lastGeneratedImageBase64}`;
-        img.alt = "Generated image";
-        clearOutput(output);
-        output.appendChild(img);
-        renderCharacterMarkers();
-      }
     }
     _clearInpaintMaskOverlay();
     return;
@@ -110,7 +103,7 @@ async function refreshCompositePreview() {
 
   state.canvasImageBase64 = compositeBase64;
 
-  if (output) {
+  if (output && showInOutput) {
     const img = document.createElement("img");
     img.src = `data:image/png;base64,${compositeBase64}`;
     img.alt = "Layer composite preview";
@@ -124,6 +117,8 @@ async function refreshCompositePreview() {
       syncInpaintButtonVisibility();
     }
   }
+  // Mark Input button as changed when composite updates while on Output view
+  if (!showInOutput) _markInputChanged();
 
   // Draw inpaint mask overlay if any visible layer has one
   const inpaintLayer = layers.find((l) => l.visible && l.inpaintMaskBase64);
@@ -321,12 +316,134 @@ async function _extractAlphaMask(imageBase64) {
   }
   ctx.putImageData(mask, 0, 0);
 
-  // Slight blur for smoother edges
+  // Dilate mask: heavy blur → re-threshold at low value to expand the reveal area.
+  // This ensures generated content that extends beyond the exact brush strokes
+  // isn't cut off. Uses two passes for a wide, smooth expansion.
+  const expand = document.createElement("canvas");
+  expand.width = w; expand.height = h;
+  const eCtx = expand.getContext("2d");
+
+  // Pass 1: large blur to spread the white area outward
+  eCtx.filter = "blur(40px)";
+  eCtx.drawImage(c, 0, 0);
+
+  // Re-threshold: anything above ~10% becomes fully white → expands the mask
+  const eData = eCtx.getImageData(0, 0, w, h);
+  const ed = eData.data;
+  for (let i = 0; i < ed.length; i += 4) {
+    const v = ed[i];
+    ed[i] = ed[i + 1] = ed[i + 2] = v > 25 ? 255 : 0;
+    ed[i + 3] = 255;
+  }
+  eCtx.putImageData(eData, 0, 0);
+
+  // Pass 2: soften the expanded edges for natural blending
   const blurred = document.createElement("canvas");
   blurred.width = w; blurred.height = h;
   const bCtx = blurred.getContext("2d");
-  bCtx.filter = "blur(3px)";
-  bCtx.drawImage(c, 0, 0);
+  bCtx.filter = "blur(12px)";
+  bCtx.drawImage(expand, 0, 0);
+
+  return blurred.toDataURL("image/png").split(",")[1];
+}
+
+// Generate a reveal mask by comparing new output against the composite of all
+// layers BELOW the target layer. Areas that differ → reveal, similar → hide.
+async function _generateDiffMask(newImageBase64, targetLayer) {
+  // Build composite of all visible layers except the target
+  const resSel = document.getElementById("resolution");
+  let w = 832, h = 1216;
+  if (resSel && resSel.value) {
+    const parts = resSel.value.split("x");
+    if (parts.length === 2) {
+      const pw = parseInt(parts[0], 10);
+      const ph = parseInt(parts[1], 10);
+      if (!isNaN(pw) && !isNaN(ph)) { w = pw; h = ph; }
+    }
+  }
+
+  // Temporarily hide target layer to get background composite
+  const origVisible = targetLayer.visible;
+  const origImage = targetLayer.imageBase64;
+  targetLayer.visible = false;
+  const bgComposite = await compositeLayersToBase64(w, h);
+  targetLayer.visible = origVisible;
+  targetLayer.imageBase64 = origImage;
+
+  if (!bgComposite) return null;
+
+  // Load both images
+  const loadImg = (b64) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.src = "data:image/png;base64," + b64;
+  });
+  const [bgImg, newImg] = await Promise.all([loadImg(bgComposite), loadImg(newImageBase64)]);
+
+  // Draw both at target resolution
+  const c1 = document.createElement("canvas");
+  c1.width = w; c1.height = h;
+  const ctx1 = c1.getContext("2d");
+  ctx1.drawImage(bgImg, 0, 0, w, h);
+  const bgData = ctx1.getImageData(0, 0, w, h).data;
+
+  const c2 = document.createElement("canvas");
+  c2.width = w; c2.height = h;
+  const ctx2 = c2.getContext("2d");
+  // Cover-fit the new image (same as compositing)
+  const ar = newImg.naturalWidth / newImg.naturalHeight;
+  const car = w / h;
+  let sx, sy, sw, sh;
+  if (ar > car) { sh = newImg.naturalHeight; sw = sh * car; sx = (newImg.naturalWidth - sw) / 2; sy = 0; }
+  else { sw = newImg.naturalWidth; sh = sw / car; sx = 0; sy = (newImg.naturalHeight - sh) / 2; }
+  ctx2.drawImage(newImg, sx, sy, sw, sh, 0, 0, w, h);
+  const newData = ctx2.getImageData(0, 0, w, h).data;
+
+  // Build difference mask
+  const maskC = document.createElement("canvas");
+  maskC.width = w; maskC.height = h;
+  const mCtx = maskC.getContext("2d");
+  const maskImg = mCtx.createImageData(w, h);
+  const md = maskImg.data;
+
+  const threshold = 30;
+  let diffCount = 0;
+  for (let i = 0; i < bgData.length; i += 4) {
+    const dr = Math.abs(bgData[i] - newData[i]);
+    const dg = Math.abs(bgData[i + 1] - newData[i + 1]);
+    const db = Math.abs(bgData[i + 2] - newData[i + 2]);
+    const diff = Math.max(dr, dg, db);
+    const v = diff > threshold ? 255 : 0;
+    md[i] = md[i + 1] = md[i + 2] = v;
+    md[i + 3] = 255;
+    if (v) diffCount++;
+  }
+  mCtx.putImageData(maskImg, 0, 0);
+
+  const totalPixels = w * h;
+  // If almost everything changed (>85%) or almost nothing (<3%), no useful mask
+  if (diffCount / totalPixels > 0.85 || diffCount / totalPixels < 0.03) return null;
+
+  // Dilate: blur → re-threshold → soften edges (same as _extractAlphaMask)
+  const expand = document.createElement("canvas");
+  expand.width = w; expand.height = h;
+  const eCtx = expand.getContext("2d");
+  eCtx.filter = "blur(40px)";
+  eCtx.drawImage(maskC, 0, 0);
+
+  const eData = eCtx.getImageData(0, 0, w, h);
+  const ed = eData.data;
+  for (let i = 0; i < ed.length; i += 4) {
+    ed[i] = ed[i + 1] = ed[i + 2] = ed[i] > 25 ? 255 : 0;
+    ed[i + 3] = 255;
+  }
+  eCtx.putImageData(eData, 0, 0);
+
+  const blurred = document.createElement("canvas");
+  blurred.width = w; blurred.height = h;
+  const bCtx = blurred.getContext("2d");
+  bCtx.filter = "blur(12px)";
+  bCtx.drawImage(expand, 0, 0);
 
   return blurred.toDataURL("image/png").split(",")[1];
 }

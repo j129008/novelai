@@ -388,7 +388,7 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 
 /* Canvas tab system */
 .canvas { display: flex; flex-direction: column; padding: 0; gap: 0; background: var(--bg-deep); height: 100vh; position: relative; overflow: hidden; }
-.canvas-tabbar { position: absolute; top: 8px; left: 12px; z-index: 15; display: flex; align-items: center; gap: 8px; }
+.canvas-tabbar { position: absolute; top: 8px; left: 12px; right: 12px; z-index: 15; display: flex; align-items: center; gap: 8px; }
 .canvas-tabs { display: flex; background: rgba(42,42,42,0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 2px; gap: 1px; flex-shrink: 0; }
 .canvas-tab { background: none; border: none; color: var(--text-tertiary); font-size: 0.72rem; font-weight: 600; font-family: inherit; letter-spacing: 0.03em; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: background 0.15s, color 0.15s; display: flex; align-items: center; gap: 5px; }
 .canvas-tab:hover { color: var(--text-secondary); }
@@ -5210,34 +5210,35 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   color: var(--danger);
 }
 
-/* ─── Input/Output Toggle ─── */
+/* ─── Input/Output Toggle — sits in canvas-tabbar, pushed to right ─── */
 .canvas-view-toggle {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 30;
   display: flex;
-  background: var(--bg-raised);
-  border: 1px solid var(--border-muted);
-  border-radius: var(--radius-md);
-  overflow: hidden;
+  margin-left: auto;
+  background: rgba(42,42,42,0.7);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 1px;
 }
 
 .cvt-btn {
-  padding: 4px 12px;
+  padding: 4px 10px;
   font-size: 0.72rem;
   font-weight: 600;
   font-family: inherit;
+  letter-spacing: 0.03em;
   background: none;
   border: none;
-  color: var(--text-secondary);
+  border-radius: 6px;
+  color: var(--text-tertiary);
   cursor: pointer;
   position: relative;
   transition: color 0.15s, background 0.15s;
 }
 
 .cvt-btn:hover {
-  color: var(--text-primary);
+  color: var(--text-secondary);
 }
 
 .cvt-btn--active {

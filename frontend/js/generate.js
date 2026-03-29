@@ -174,23 +174,29 @@ async function generate() {
     // Output target layer: write result back into the designated layer
     const outputLayer = layers.find(l => l.isOutputTarget);
     if (outputLayer) {
-      // Before overwriting, extract alpha from drawn content as reveal mask
+      // Auto-mask: extract alpha from drawn content, or diff against background
       if (outputLayer.imageBase64 && typeof _extractAlphaMask === "function") {
-        const autoMask = await _extractAlphaMask(outputLayer.imageBase64);
-        if (autoMask) outputLayer.maskBase64 = autoMask;
+        const alphaMask = await _extractAlphaMask(outputLayer.imageBase64);
+        if (alphaMask) {
+          // Layer has transparent content (fresh drawing) → use alpha as mask
+          outputLayer.maskBase64 = alphaMask;
+        } else if (typeof _generateDiffMask === "function") {
+          // Layer is fully opaque (previous output) → diff new output vs background
+          const diffMask = await _generateDiffMask(data.image, outputLayer);
+          outputLayer.maskBase64 = diffMask; // null if no meaningful diff
+        }
       }
       outputLayer.imageBase64 = data.image;
       saveLayersToStorage();
       refreshCompositePreview();
     }
 
-    // Auto-switch canvas to Output view on generation complete
-    _canvasView = "output";
-    localStorage.setItem("nai-canvas-view", "output");
-    const cvtInput  = document.getElementById("cvt-input");
-    const cvtOutput = document.getElementById("cvt-output");
-    if (cvtInput)  { cvtInput.classList.remove("cvt-btn--active"); cvtInput.classList.remove("cvt-btn--changed"); }
-    if (cvtOutput) cvtOutput.classList.add("cvt-btn--active");
+    // Don't force-switch view — respect user's choice.
+    // If on Input view, mark Output as changed so they know a new image arrived.
+    if (_canvasView === "input") {
+      const cvtOutput = document.getElementById("cvt-output");
+      if (cvtOutput) cvtOutput.classList.add("cvt-btn--changed");
+    }
     updateCanvasPanel();
 
     loadGallery();
@@ -320,12 +326,11 @@ async function generateGrokImage() {
     const infoSeed = $("#info-seed");
     if (infoSeed) infoSeed.textContent = state.img2img ? "Grok (edit)" : "Grok";
 
-    // Auto-switch to Output view
-    _canvasView = "output";
-    const cvtInput = document.getElementById("cvt-input");
-    const cvtOutput = document.getElementById("cvt-output");
-    if (cvtInput) { cvtInput.classList.remove("cvt-btn--active"); cvtInput.classList.remove("cvt-btn--changed"); }
-    if (cvtOutput) cvtOutput.classList.add("cvt-btn--active");
+    // Don't force-switch view — respect user's choice
+    if (_canvasView === "input") {
+      const cvtOutput = document.getElementById("cvt-output");
+      if (cvtOutput) cvtOutput.classList.add("cvt-btn--changed");
+    }
 
     loadGallery();
     if (window._savePromptToHistory) window._savePromptToHistory();
