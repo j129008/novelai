@@ -926,19 +926,18 @@ function _populateLayerPanel(container, idx) {
     _populateLayerPanel(container, idx);
   });
   addTool("Draw", () => {
-    openLayerDrawEditor(layer, (b64) => {
-      layer.imageBase64 = b64;
+    enterLayerEditMode(layer, "draw", () => {
       refreshCompositePreview(); saveLayersToStorage(); renderLayerStrip();
     });
   });
   addTool("Mask", () => {
     pushLayerUndo("Edit visibility mask");
-    openLayerMaskEditor(layer, () => { refreshCompositePreview(); saveLayersToStorage(); });
+    enterLayerEditMode(layer, "mask", () => { refreshCompositePreview(); saveLayersToStorage(); });
   });
   if (layer.imageBase64) {
     addTool("Inpaint", () => {
-      openLayerInpaintEditor(layer, (b64) => {
-        layer.imageBase64 = b64;
+      pushLayerUndo("Edit inpaint mask");
+      enterLayerEditMode(layer, "inpaint", () => {
         refreshCompositePreview(); saveLayersToStorage(); renderLayerStrip();
       });
     });
@@ -1210,8 +1209,7 @@ function _setupLayerStripControlsLegacy() {
   // Draw
   const drawBtn = makeActionBtn("Draw", false, false);
   drawBtn.addEventListener("click", () => {
-    openLayerDrawEditor(layer, (base64) => {
-      layer.imageBase64 = base64;
+    enterLayerEditMode(layer, "draw", () => {
       refreshCompositePreview();
       saveLayersToStorage();
       _markInputChanged();
@@ -1224,7 +1222,7 @@ function _setupLayerStripControlsLegacy() {
   const maskBtn = makeActionBtn("Mask", false, false);
   maskBtn.addEventListener("click", () => {
     pushLayerUndo("Edit visibility mask");
-    openLayerMaskEditor(layer, () => {
+    enterLayerEditMode(layer, "mask", () => {
       saveLayersToStorage();
       refreshCompositePreview();
       _markInputChanged();
@@ -1236,7 +1234,7 @@ function _setupLayerStripControlsLegacy() {
   const inpaintBtn = makeActionBtn("Inpaint", false, false);
   inpaintBtn.addEventListener("click", () => {
     pushLayerUndo("Edit inpaint mask");
-    openLayerInpaintEditor(layer, () => {
+    enterLayerEditMode(layer, "inpaint", () => {
       saveLayersToStorage();
       refreshCompositePreview();
       _markInputChanged();
@@ -1744,8 +1742,7 @@ function setupCanvasLayerPanel() {
   document.getElementById("clp-draw")?.addEventListener("click", () => {
     if (layers.length === 0) return;
     const layer = layers[_activeLayerIdx];
-    openLayerDrawEditor(layer, (base64) => {
-      layer.imageBase64 = base64;
+    enterLayerEditMode(layer, "draw", () => {
       refreshCompositePreview();
       saveLayersToStorage();
       _markInputChanged();
@@ -1757,7 +1754,7 @@ function setupCanvasLayerPanel() {
     if (layers.length === 0) return;
     const layer = layers[_activeLayerIdx];
     pushLayerUndo("Edit visibility mask");
-    openLayerMaskEditor(layer, () => {
+    enterLayerEditMode(layer, "mask", () => {
       saveLayersToStorage();
       refreshCompositePreview();
       _markInputChanged();
@@ -1768,7 +1765,7 @@ function setupCanvasLayerPanel() {
     if (layers.length === 0) return;
     const layer = layers[_activeLayerIdx];
     pushLayerUndo("Edit inpaint mask");
-    openLayerInpaintEditor(layer, () => {
+    enterLayerEditMode(layer, "inpaint", () => {
       saveLayersToStorage();
       refreshCompositePreview();
       _markInputChanged();
@@ -1882,18 +1879,586 @@ function setupCanvasViewToggle() {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   LAYER MASK EDITOR — per-layer white/black mask painting
+   INLINE LAYER EDITOR — single unified editor replacing the three modal overlays
+   Modes: "draw" | "mask" | "inpaint"
+   enterLayerEditMode(layer, mode, onApply) replaces:
+     openLayerDrawEditor, openLayerMaskEditor, openLayerInpaintEditor
    ═══════════════════════════════════════════════════════════ */
 
-// openLayerMaskEditor is called from buildLayerRow's mask button.
-// onApply(layer) is called when the user confirms.
-function openLayerMaskEditor(layer, onApply) {
-  if (!layer.imageBase64) {
+function enterLayerEditMode(layer, mode, onApply) {
+  // ── DOM refs ──────────────────────────────────────────────
+  const bgCanvas      = document.getElementById("inline-edit-bg");
+  const editCanvas    = document.getElementById("inline-edit-canvas");
+  const cursorEl      = document.getElementById("inline-edit-cursor");
+  const toolbar       = document.getElementById("inline-edit-toolbar");
+  const modeBadge     = document.getElementById("iet-mode-badge");
+  const modeToggle    = document.getElementById("iet-mode-toggle");
+  const brushSlider   = document.getElementById("iet-brush-size");
+  const brushValEl    = document.getElementById("iet-brush-val");
+  const colorWrap     = document.getElementById("iet-color-wrap");
+  const colorInput    = document.getElementById("iet-color");
+  const fillBtn       = document.getElementById("iet-fill");
+  const invertBtn     = document.getElementById("iet-invert");
+  const clearBtn      = document.getElementById("iet-clear");
+  const undoBtn       = document.getElementById("iet-undo");
+  const cancelBtn     = document.getElementById("iet-cancel");
+  const applyBtn      = document.getElementById("iet-apply");
+  const dropTarget    = document.getElementById("canvas-drop-target");
+
+  if (!editCanvas || !toolbar || !dropTarget) return;
+
+  // Guard: mask/inpaint need an image to work with
+  if (mode === "mask" && !layer.imageBase64) {
     showStatus("Load an image into this layer first.");
     return;
   }
+  if (mode === "inpaint") {
+    const src = state.canvasImageBase64 || layer.imageBase64;
+    if (!src) {
+      showStatus("No image to inpaint — add images to layers first.");
+      return;
+    }
+  }
 
-  const overlay    = document.getElementById("layer-mask-overlay");
+  const editCtx = editCanvas.getContext("2d");
+
+  // Offscreen canvas — full resolution
+  const offscreen = document.createElement("canvas");
+  const offCtx    = offscreen.getContext("2d");
+
+  // AbortController for this editor session
+  const editorAC  = new AbortController();
+  const editorSig = { signal: editorAC.signal };
+
+  // Editor state
+  let brushSize = parseInt(brushSlider.value, 10) || 20;
+  let eraseMode = false;
+  let isDrawing = false;
+  let lastX = 0;
+  let lastY = 0;
+  let scaleX = 1;
+  let scaleY = 1;
+  const undoStack = [];
+  const MAX_UNDO  = 20;
+
+  // ── Configure toolbar for mode ────────────────────────────
+  toolbar.dataset.editMode = mode; // CSS can differentiate via [data-edit-mode]
+  if (mode === "draw") {
+    modeBadge.textContent = "Draw";
+    modeBadge.className = "iet-mode-badge";
+    colorWrap.style.display = "";
+    fillBtn.style.display   = "";
+    invertBtn.style.display = "none";
+    modeToggle.querySelector(".iet-mode-label").textContent = "Paint";
+    modeToggle.dataset.mode = "paint";
+  } else if (mode === "mask") {
+    modeBadge.textContent = "Mask";
+    modeBadge.className = "iet-mode-badge iet-mode-badge--mask";
+    colorWrap.style.display = "none";
+    fillBtn.style.display   = "none";
+    invertBtn.style.display = "";
+    modeToggle.querySelector(".iet-mode-label").textContent = "Reveal";
+    modeToggle.dataset.mode = "paint";
+  } else { // inpaint
+    modeBadge.textContent = "Inpaint";
+    modeBadge.className = "iet-mode-badge iet-mode-badge--inpaint";
+    colorWrap.style.display = "none";
+    fillBtn.style.display   = "none";
+    invertBtn.style.display = "none";
+    modeToggle.querySelector(".iet-mode-label").textContent = "Paint";
+    modeToggle.dataset.mode = "paint";
+  }
+
+  // ── Mode toggle ───────────────────────────────────────────
+  function setMode(paintOrErase) {
+    eraseMode = (paintOrErase === "erase");
+    modeToggle.dataset.mode = paintOrErase;
+    const iconPaint = modeToggle.querySelector(".iet-icon-paint");
+    const iconErase = modeToggle.querySelector(".iet-icon-erase");
+    const label     = modeToggle.querySelector(".iet-mode-label");
+    if (iconPaint) iconPaint.style.display = eraseMode ? "none" : "";
+    if (iconErase) iconErase.style.display = eraseMode ? "" : "none";
+
+    if (mode === "mask") {
+      if (label) label.textContent = eraseMode ? "Hide" : "Reveal";
+      cursorEl.style.borderColor = eraseMode ? "rgba(220,50,50,0.85)" : "rgba(255,255,255,0.85)";
+    } else if (mode === "draw") {
+      if (label) label.textContent = eraseMode ? "Erase" : "Paint";
+      cursorEl.style.borderColor = eraseMode ? "rgba(255,255,255,0.5)" : (colorInput.value || "rgba(255,255,255,0.85)");
+    } else { // inpaint
+      if (label) label.textContent = eraseMode ? "Erase" : "Paint";
+      cursorEl.style.borderColor = eraseMode ? "rgba(255,255,255,0.5)" : "rgba(240,80,80,0.85)";
+    }
+  }
+
+  modeToggle.addEventListener("click", () => setMode(eraseMode ? "paint" : "erase"), editorSig);
+
+  // ── Brush size ────────────────────────────────────────────
+  function updateBrushSize(val) {
+    brushSize = val;
+    brushSlider.value = val;
+    brushValEl.textContent = val;
+    // Cursor size must account for CSS scaling (canvas pixels → display pixels)
+    const rect = editCanvas.getBoundingClientRect();
+    const displayScale = rect.width / (editCanvas.width || 1);
+    const displaySize = Math.max(4, val * displayScale);
+    cursorEl.style.width  = displaySize + "px";
+    cursorEl.style.height = displaySize + "px";
+  }
+
+  brushSlider.addEventListener("input", () => updateBrushSize(parseInt(brushSlider.value, 10)), editorSig);
+
+  if (mode === "draw") {
+    colorInput.addEventListener("input", () => {
+      if (!eraseMode) cursorEl.style.borderColor = colorInput.value;
+    }, editorSig);
+  }
+
+  // ── Undo ──────────────────────────────────────────────────
+  function saveUndoSnapshot() {
+    if (editCanvas.width === 0 || editCanvas.height === 0) return;
+    const dispSnap = editCtx.getImageData(0, 0, editCanvas.width, editCanvas.height);
+    const offSnap  = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+    if (undoStack.length >= MAX_UNDO) undoStack.shift();
+    undoStack.push({ disp: dispSnap, off: offSnap });
+  }
+
+  function undo() {
+    if (undoStack.length === 0) return;
+    const snap = undoStack.pop();
+    editCtx.putImageData(snap.disp, 0, 0);
+    offCtx.putImageData(snap.off, 0, 0);
+  }
+
+  undoBtn.addEventListener("click", undo, editorSig);
+
+  // ── Paint helpers ─────────────────────────────────────────
+  function paintCircle(ctx, cx, cy, r) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function interpolatedStroke(ctx, x0, y0, x1, y1, r, isFirst) {
+    if (isFirst) {
+      paintCircle(ctx, x0, y0, r);
+      return;
+    }
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const dist = Math.hypot(dx, dy);
+    const step = Math.max(r * 0.4, 1);
+    const steps = Math.ceil(dist / step);
+    for (let i = 0; i <= steps; i++) {
+      const t = steps === 0 ? 0 : i / steps;
+      paintCircle(ctx, x0 + dx * t, y0 + dy * t, r);
+    }
+  }
+
+  function drawAt(dispX, dispY, isFirst) {
+    const r    = brushSize / 2;
+    const offX = dispX * scaleX;
+    const offY = dispY * scaleY;
+    const offR = r * Math.max(scaleX, scaleY);
+    const lOffX = lastX * scaleX;
+    const lOffY = lastY * scaleY;
+
+    // ── Display canvas paint ───────────────────────────────
+    editCtx.save();
+    if (mode === "draw") {
+      if (eraseMode) {
+        editCtx.globalCompositeOperation = "destination-out";
+      } else {
+        editCtx.globalCompositeOperation = "source-over";
+        editCtx.fillStyle = colorInput.value;
+      }
+    } else if (mode === "mask") {
+      if (eraseMode) {
+        // Hide: paint red tint
+        editCtx.globalCompositeOperation = "source-over";
+        editCtx.fillStyle = "rgba(220,50,50,0.45)";
+      } else {
+        // Reveal: cut out red tint
+        editCtx.globalCompositeOperation = "destination-out";
+        editCtx.fillStyle = "rgba(0,0,0,1)";
+      }
+    } else { // inpaint
+      if (eraseMode) {
+        editCtx.globalCompositeOperation = "destination-out";
+      } else {
+        editCtx.globalCompositeOperation = "source-over";
+        editCtx.fillStyle = "rgba(240,80,80,0.55)";
+      }
+    }
+    interpolatedStroke(editCtx, lastX, lastY, dispX, dispY, r, isFirst);
+    editCtx.restore();
+
+    // ── Offscreen paint ────────────────────────────────────
+    offCtx.save();
+    if (mode === "draw") {
+      if (eraseMode) {
+        offCtx.globalCompositeOperation = "destination-out";
+      } else {
+        offCtx.globalCompositeOperation = "source-over";
+        offCtx.fillStyle = colorInput.value;
+      }
+    } else if (mode === "mask") {
+      offCtx.globalCompositeOperation = "source-over";
+      offCtx.fillStyle = eraseMode ? "#000000" : "#ffffff";
+    } else { // inpaint
+      offCtx.globalCompositeOperation = "source-over";
+      offCtx.fillStyle = eraseMode ? "#000000" : "#ffffff";
+    }
+    interpolatedStroke(offCtx, lOffX, lOffY, offX, offY, offR, isFirst);
+    offCtx.restore();
+  }
+
+  // ── Sync visible display canvas from offscreen (mask mode) ──
+  function syncMaskDisplay() {
+    const tmpCanvas = document.createElement("canvas");
+    tmpCanvas.width  = offscreen.width;
+    tmpCanvas.height = offscreen.height;
+    const tmpCtx = tmpCanvas.getContext("2d");
+    const maskData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+    const d = maskData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const brightness = d[i];
+      d[i]     = 220;
+      d[i + 1] = 50;
+      d[i + 2] = 50;
+      d[i + 3] = Math.round((1 - brightness / 255) * 115);
+    }
+    tmpCtx.putImageData(maskData, 0, 0);
+    editCtx.clearRect(0, 0, editCanvas.width, editCanvas.height);
+    editCtx.drawImage(tmpCanvas, 0, 0, editCanvas.width, editCanvas.height);
+  }
+
+  // ── Clear button ──────────────────────────────────────────
+  clearBtn.addEventListener("click", () => {
+    saveUndoSnapshot();
+    if (mode === "draw") {
+      offCtx.clearRect(0, 0, offscreen.width, offscreen.height);
+      editCtx.clearRect(0, 0, editCanvas.width, editCanvas.height);
+    } else if (mode === "mask") {
+      // Reset to all black (hide everything)
+      offCtx.fillStyle = "#000000";
+      offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
+      syncMaskDisplay();
+    } else { // inpaint
+      offCtx.fillStyle = "#000000";
+      offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
+      editCtx.clearRect(0, 0, editCanvas.width, editCanvas.height);
+    }
+  }, editorSig);
+
+  // ── Fill button (draw mode only) ─────────────────────────
+  fillBtn.addEventListener("click", () => {
+    saveUndoSnapshot();
+    offCtx.fillStyle = colorInput.value;
+    offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
+    editCtx.fillStyle = colorInput.value;
+    editCtx.fillRect(0, 0, editCanvas.width, editCanvas.height);
+  }, editorSig);
+
+  // ── Invert button (mask mode only) ───────────────────────
+  invertBtn.addEventListener("click", () => {
+    saveUndoSnapshot();
+    const imgData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+    const d = imgData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      d[i]     = 255 - d[i];
+      d[i + 1] = 255 - d[i + 1];
+      d[i + 2] = 255 - d[i + 2];
+    }
+    offCtx.putImageData(imgData, 0, 0);
+    syncMaskDisplay();
+  }, editorSig);
+
+  // ── Pointer events ────────────────────────────────────────
+  function getEditCanvasPos(e) {
+    const rect = editCanvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (editCanvas.width / rect.width),
+      y: (e.clientY - rect.top)  * (editCanvas.height / rect.height),
+    };
+  }
+
+  editCanvas.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    editCanvas.setPointerCapture(e.pointerId);
+    saveUndoSnapshot();
+    isDrawing = true;
+    const pos = getEditCanvasPos(e);
+    lastX = pos.x;
+    lastY = pos.y;
+    drawAt(pos.x, pos.y, true);
+  }, editorSig);
+
+  editCanvas.addEventListener("pointermove", (e) => {
+    const dtRect = dropTarget.getBoundingClientRect();
+    cursorEl.style.display = "block";
+    cursorEl.style.left = (e.clientX - dtRect.left) + "px";
+    cursorEl.style.top  = (e.clientY - dtRect.top)  + "px";
+
+    if (!isDrawing) return;
+    e.preventDefault();
+    const pos = getEditCanvasPos(e);
+    drawAt(pos.x, pos.y, false);
+    lastX = pos.x;
+    lastY = pos.y;
+  }, editorSig);
+
+  editCanvas.addEventListener("pointerup",     () => { isDrawing = false; }, editorSig);
+  editCanvas.addEventListener("pointerleave",  () => { isDrawing = false; cursorEl.style.display = "none"; }, editorSig);
+  editCanvas.addEventListener("pointercancel", () => { isDrawing = false; cursorEl.style.display = "none"; }, editorSig);
+
+  // ── Keyboard shortcuts ────────────────────────────────────
+  document.addEventListener("keydown", (e) => {
+    if (toolbar.style.display === "none") return;
+    if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+      e.preventDefault();
+      undo();
+    } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      closeEditor(true);
+    } else if (e.key === "Escape") {
+      e.stopImmediatePropagation();
+      closeEditor(false);
+    } else if (e.key === "[") {
+      updateBrushSize(Math.max(4, brushSize - 2));
+    } else if (e.key === "]") {
+      updateBrushSize(Math.min(120, brushSize + 2));
+    }
+  }, editorSig);
+
+  // ── Cancel / Apply ────────────────────────────────────────
+  function tearDown() {
+    editorAC.abort();
+    toolbar.style.display      = "none";
+    editCanvas.style.display   = "none";
+    bgCanvas.style.display     = "none";
+    cursorEl.style.display     = "none";
+  }
+
+  function closeEditor(apply) {
+    if (apply) {
+      if (mode === "draw") {
+        const dataUrl = offscreen.toDataURL("image/png");
+        layer.imageBase64 = dataUrl.replace("data:image/png;base64,", "");
+      } else if (mode === "mask") {
+        const dataUrl = offscreen.toDataURL("image/png");
+        layer.maskBase64 = dataUrl.replace("data:image/png;base64,", "");
+      } else { // inpaint
+        // Check if any white pixels exist
+        const imgData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+        const d = imgData.data;
+        let hasWhite = false;
+        for (let i = 0; i < d.length; i += 4) {
+          if (d[i] > 128) { hasWhite = true; break; }
+        }
+        if (!hasWhite) {
+          layer.inpaintMaskBase64 = null;
+          tearDown();
+          if (onApply) onApply();
+          showStatus("Inpaint mask cleared");
+          return;
+        }
+        const dataUrl = offscreen.toDataURL("image/png");
+        layer.inpaintMaskBase64 = dataUrl.replace("data:image/png;base64,", "");
+      }
+      tearDown();
+      if (onApply) onApply();
+    } else {
+      tearDown();
+    }
+  }
+
+  cancelBtn.addEventListener("click", () => closeEditor(false), editorSig);
+  applyBtn.addEventListener("click",  () => closeEditor(true),  editorSig);
+
+  // ── Open: compute position & initialise ───────────────────
+  function positionCanvasOverImage() {
+    // Use the actual <img> inside #output for precise letterbox coordinates.
+    // For draw mode with no canvas image, fall back to the #output area itself.
+    let imgEl = document.querySelector("#output img");
+    if (!imgEl && mode === "draw") {
+      imgEl = document.getElementById("output");
+    }
+    if (!imgEl) return null;
+    const imgRect = imgEl.getBoundingClientRect();
+    const dtRect  = dropTarget.getBoundingClientRect();
+    const left = imgRect.left - dtRect.left;
+    const top  = imgRect.top  - dtRect.top;
+    const w    = imgRect.width;
+    const h    = imgRect.height;
+    return { left, top, w, h };
+  }
+
+  function applyCanvasPosition(canvas, pos, useOffscreenRes) {
+    canvas.style.left   = pos.left + "px";
+    canvas.style.top    = pos.top  + "px";
+    canvas.style.width  = pos.w + "px";
+    canvas.style.height = pos.h + "px";
+    // Canvas pixel resolution: use offscreen resolution to preserve aspect ratio,
+    // CSS width/height handles the display scaling
+    if (useOffscreenRes && offscreen) {
+      if (canvas.width !== offscreen.width || canvas.height !== offscreen.height) {
+        canvas.width  = offscreen.width;
+        canvas.height = offscreen.height;
+      }
+    } else {
+      if (canvas.width !== Math.round(pos.w) || canvas.height !== Math.round(pos.h)) {
+        canvas.width  = Math.round(pos.w);
+        canvas.height = Math.round(pos.h);
+      }
+    }
+  }
+
+  function openEditor() {
+    // Determine offscreen (full-pixel) resolution
+    let offW, offH;
+    if (mode === "mask") {
+      // Mask resolution matches the layer's image natural size
+      const tmpImg = new Image();
+      tmpImg.onload = () => {
+        offW = tmpImg.naturalWidth;
+        offH = tmpImg.naturalHeight;
+        finishOpen(offW, offH);
+      };
+      tmpImg.src = "data:image/png;base64," + layer.imageBase64;
+    } else {
+      // draw / inpaint: use #resolution dropdown
+      const resSel = document.getElementById("resolution");
+      const resParts = (resSel ? resSel.value : "832x1216").split("x").map(Number);
+      offW = resParts[0] || 832;
+      offH = resParts[1] || 1216;
+      finishOpen(offW, offH);
+    }
+  }
+
+  function finishOpen(offW, offH) {
+    offscreen.width  = offW;
+    offscreen.height = offH;
+
+    const pos = positionCanvasOverImage();
+    if (!pos) {
+      showStatus("No image on canvas to edit.");
+      return;
+    }
+
+    // Position and size the edit canvas over the displayed image
+    // Edit canvas uses offscreen resolution for pixel-perfect drawing
+    editCanvas.style.display = "block";
+    applyCanvasPosition(editCanvas, pos, true);
+
+    // Scale is now 1:1 since edit canvas matches offscreen resolution
+    scaleX = 1;
+    scaleY = 1;
+
+    // Background canvas: shows composite of other layers (draw mode)
+    if (mode === "draw") {
+      bgCanvas.style.display = "block";
+      applyCanvasPosition(bgCanvas, pos, true);
+      const bgCtx = bgCanvas.getContext("2d");
+      bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+      const otherLayers = layers.filter((l) => l.visible && l.imageBase64 && l.id !== layer.id);
+      [...otherLayers].reverse().forEach((other) => {
+        const img = new Image();
+        img.onload = () => {
+          bgCtx.globalAlpha = other.opacity;
+          bgCtx.drawImage(img, 0, 0, bgCanvas.width, bgCanvas.height);
+          bgCtx.globalAlpha = 1.0;
+        };
+        img.src = "data:image/png;base64," + other.imageBase64;
+      });
+    } else {
+      bgCanvas.style.display = "none";
+    }
+
+    // Initialise canvas content
+    if (mode === "draw") {
+      if (layer.imageBase64) {
+        const existImg = new Image();
+        existImg.onload = () => {
+          offCtx.drawImage(existImg, 0, 0, offW, offH);
+          editCtx.drawImage(existImg, 0, 0, editCanvas.width, editCanvas.height);
+          undoStack.length = 0;
+          setMode("paint");
+          updateBrushSize(brushSize);
+          cursorEl.style.borderColor = colorInput.value;
+        };
+        existImg.src = "data:image/png;base64," + layer.imageBase64;
+      } else {
+        offCtx.clearRect(0, 0, offW, offH);
+        editCtx.clearRect(0, 0, editCanvas.width, editCanvas.height);
+        undoStack.length = 0;
+        setMode("paint");
+        updateBrushSize(brushSize);
+        cursorEl.style.borderColor = colorInput.value;
+      }
+    } else if (mode === "mask") {
+      if (layer.maskBase64) {
+        const existMask = new Image();
+        existMask.onload = () => {
+          offCtx.drawImage(existMask, 0, 0, offW, offH);
+          syncMaskDisplay();
+          undoStack.length = 0;
+          setMode("paint");
+          updateBrushSize(brushSize);
+        };
+        existMask.src = "data:image/png;base64," + layer.maskBase64;
+      } else {
+        // Default: all black = hide everything, user paints white to reveal
+        offCtx.fillStyle = "#000000";
+        offCtx.fillRect(0, 0, offW, offH);
+        syncMaskDisplay();
+        undoStack.length = 0;
+        setMode("paint");
+        updateBrushSize(brushSize);
+      }
+    } else { // inpaint
+      // Fill black as base
+      offCtx.fillStyle = "#000000";
+      offCtx.fillRect(0, 0, offW, offH);
+      editCtx.clearRect(0, 0, editCanvas.width, editCanvas.height);
+
+      if (layer.inpaintMaskBase64) {
+        const existMask = new Image();
+        existMask.onload = () => {
+          offCtx.drawImage(existMask, 0, 0, offW, offH);
+          // Re-draw tint from offscreen pixel data
+          const od = offCtx.getImageData(0, 0, offW, offH).data;
+          editCtx.clearRect(0, 0, editCanvas.width, editCanvas.height);
+          for (let py = 0; py < editCanvas.height; py++) {
+            for (let px = 0; px < editCanvas.width; px++) {
+              const ox = Math.min(Math.round(px * scaleX), offW - 1);
+              const oy = Math.min(Math.round(py * scaleY), offH - 1);
+              if (od[(oy * offW + ox) * 4] > 128) {
+                editCtx.fillStyle = "rgba(240,80,80,0.55)";
+                editCtx.fillRect(px, py, 1, 1);
+              }
+            }
+          }
+          undoStack.length = 0;
+          setMode("paint");
+          updateBrushSize(brushSize);
+        };
+        existMask.src = "data:image/png;base64," + layer.inpaintMaskBase64;
+      } else {
+        undoStack.length = 0;
+        setMode("paint");
+        updateBrushSize(brushSize);
+      }
+    }
+
+    // Show toolbar
+    toolbar.style.display = "";
+  }
+
+  openEditor();
+}
+
+function _deadMaskEditor() {
   const btnCancel  = document.getElementById("layer-mask-cancel");
   const btnConfirm = document.getElementById("layer-mask-confirm");
   const btnClear   = document.getElementById("layer-mask-clear");
@@ -2983,19 +3548,6 @@ function setupInpaint() {
 
   // ── Cancel ────────────────────────────────────────────────
   btnCancel.addEventListener("click", closeInpaint);
-
-  // Expose open function so openLayerInpaintEditor can call it
-  setupInpaint._open = openInpaint;
-}
-
-// Called from buildLayerRow's inpaint button.
-// onConfirm() is called after the mask is saved to layer.inpaintMaskBase64.
-function openLayerInpaintEditor(layer, onConfirm) {
-  if (!setupInpaint._open) {
-    showStatus("Inpaint editor not ready — please wait.");
-    return;
-  }
-  setupInpaint._open(layer, onConfirm);
 }
 
 /* ═══════════════════════════════════════════════════════════

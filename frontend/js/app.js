@@ -2005,12 +2005,9 @@ async function init() {
   setupExplorePanel();
   setupPromptAssist();
   setupPromptOptimize();
-  setupInpaint();
   setupLayers();
   setupCanvasLayerPanel();
   setupCanvasViewToggle();
-  setupLayerMask();
-  setupLayerDraw();
   setupCanvasPromptBar();
 
   // Load recent characters at startup so autocomplete is populated immediately
