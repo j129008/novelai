@@ -60,7 +60,6 @@ The entire screen is your canvas. No sidebar. All controls float on top with gla
 
 Click **Optimize** to have Grok reorder, fix, and enhance your tags following NovelAI V4.5 best practices:
 - Reorders tags: Count -> Rating -> Character -> Appearance -> Action -> Scene -> Style
-- Converts `explicit` to `rating:explicit`, underscores to spaces
 - Multi-character prompts: splits into rich base section (8+ atmospheric tags) + per-character sections
 - **Enhance mode**: toggle on to append atmospheric prose fragments for stronger storytelling
 
