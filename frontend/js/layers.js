@@ -282,6 +282,55 @@ async function compositeLayersToBase64(targetW, targetH) {
   return offscreen.toDataURL("image/png").split(",")[1];
 }
 
+// Extract a reveal mask from a layer image's alpha channel.
+// Non-transparent pixels → white (reveal), transparent → black (hide).
+// Returns base64 mask, or null if the image is fully opaque (no useful mask).
+async function _extractAlphaMask(imageBase64) {
+  const img = new Image();
+  await new Promise((resolve) => {
+    img.onload = resolve;
+    img.src = "data:image/png;base64," + imageBase64;
+  });
+
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const ctx = c.getContext("2d");
+  ctx.drawImage(img, 0, 0);
+  const data = ctx.getImageData(0, 0, w, h);
+  const d = data.data;
+
+  // Check if there are any transparent pixels — if fully opaque, no mask needed
+  let hasTransparent = false;
+  let hasOpaque = false;
+  for (let i = 3; i < d.length; i += 4) {
+    if (d[i] < 128) hasTransparent = true;
+    else hasOpaque = true;
+    if (hasTransparent && hasOpaque) break;
+  }
+  if (!hasTransparent || !hasOpaque) return null; // fully opaque or fully transparent
+
+  // Build grayscale mask from alpha: opaque → white, transparent → black
+  const mask = ctx.createImageData(w, h);
+  const md = mask.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const v = d[i + 3] > 128 ? 255 : 0;
+    md[i] = md[i + 1] = md[i + 2] = v;
+    md[i + 3] = 255;
+  }
+  ctx.putImageData(mask, 0, 0);
+
+  // Slight blur for smoother edges
+  const blurred = document.createElement("canvas");
+  blurred.width = w; blurred.height = h;
+  const bCtx = blurred.getContext("2d");
+  bCtx.filter = "blur(3px)";
+  bCtx.drawImage(c, 0, 0);
+
+  return blurred.toDataURL("image/png").split(",")[1];
+}
+
 function updateLayersBadge() {
   const badge = document.getElementById("layers-badge");
   if (!badge) return;
@@ -1249,10 +1298,35 @@ function setupLayers() {
   });
 
   if (sendToLayer) {
-    sendToLayer.addEventListener("click", () => {
+    sendToLayer.addEventListener("click", async () => {
       if (!state.lastGeneratedImageBase64) return;
       if (layers.length >= MAX_LAYERS) return;
       pushLayerUndo("Send to layer");
+
+      // Auto-generate reveal mask from drawn content or inpaint mask.
+      // Priority: 1) inpaint mask, 2) alpha from drawn layer content, 3) none
+      let maskBase64 = null;
+      let maskSource = null;
+
+      const inpaintLayer = layers.find(l => l.inpaintMaskBase64);
+      if (inpaintLayer) {
+        // Use inpaint mask directly as reveal mask
+        maskBase64 = inpaintLayer.inpaintMaskBase64;
+        inpaintLayer.inpaintMaskBase64 = null;
+        maskSource = "inpaint";
+      } else {
+        // Scan all layers for one with transparent content (drawn layer)
+        for (const layer of layers) {
+          if (!layer.imageBase64) continue;
+          const extracted = await _extractAlphaMask(layer.imageBase64);
+          if (extracted) {
+            maskBase64 = extracted;
+            maskSource = "draw";
+            break;
+          }
+        }
+      }
+
       const outputLayers = layers.filter((l) => l.name.startsWith("Output"));
       const n = outputLayers.length;
       const name = n === 0 ? "Output" : "Output " + (n + 1);
@@ -1260,7 +1334,7 @@ function setupLayers() {
         id: Date.now(),
         name,
         imageBase64: state.lastGeneratedImageBase64,
-        maskBase64: null,
+        maskBase64,
         inpaintMaskBase64: null,
         opacity: 1.0,
         visible: true,
@@ -1275,7 +1349,12 @@ function setupLayers() {
       const accordion = document.getElementById("layers-accordion");
       if (accordion && !accordion.open) accordion.open = true;
 
-      showStatus("Canvas image sent to layer \"" + name + "\"");
+      const msg = maskSource === "inpaint"
+        ? "Sent to layer \"" + name + "\" — masked to inpaint area"
+        : maskSource === "draw"
+        ? "Sent to layer \"" + name + "\" — masked to drawn area"
+        : "Sent to layer \"" + name + "\"";
+      showStatus(msg);
     });
   }
 

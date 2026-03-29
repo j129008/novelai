@@ -174,6 +174,11 @@ async function generate() {
     // Output target layer: write result back into the designated layer
     const outputLayer = layers.find(l => l.isOutputTarget);
     if (outputLayer) {
+      // Before overwriting, extract alpha from drawn content as reveal mask
+      if (outputLayer.imageBase64 && typeof _extractAlphaMask === "function") {
+        const autoMask = await _extractAlphaMask(outputLayer.imageBase64);
+        if (autoMask) outputLayer.maskBase64 = autoMask;
+      }
       outputLayer.imageBase64 = data.image;
       saveLayersToStorage();
       refreshCompositePreview();
