@@ -517,18 +517,25 @@ function renderLayerStrip() {
     dot.className = "layer-tab-dot";
     tab.appendChild(dot);
 
-    // Thumbnail or name label
+    // Tab label — short stable identifier from layer name
+    const label = document.createElement("span");
+    label.className = "layer-tab-label";
+    // Extract a short label: "Layer 2" → "L2", "Output" → "O", "BG" → "BG"
+    const nameMatch = layer.name.match(/^(\w)\w*\s*(\d*)$/);
+    label.textContent = nameMatch
+      ? (nameMatch[1] + nameMatch[2]).toUpperCase()
+      : layer.name.slice(0, 2).toUpperCase();
+    tab.appendChild(label);
+
+    // Colored strip + hover preview for layers with images
     if (layer.imageBase64) {
-      const thumb = document.createElement("img");
-      thumb.className = "layer-tab-thumb";
-      thumb.src = "data:image/png;base64," + layer.imageBase64;
-      thumb.alt = layer.name;
-      tab.appendChild(thumb);
-    } else {
-      const label = document.createElement("span");
-      label.className = "layer-tab-label";
-      label.textContent = layer.name.replace(/^Layer\s*/, "L");
-      tab.appendChild(label);
+      tab.classList.add("layer-tab--has-image");
+      const preview = document.createElement("div");
+      preview.className = "layer-tab-preview";
+      preview.innerHTML =
+        '<img src="data:image/png;base64,' + layer.imageBase64 + '" alt="' + layer.name + '">' +
+        '<div class="layer-tab-preview-name">' + layer.name + '</div>';
+      tab.appendChild(preview);
     }
 
     // Pointer-based drag-to-reorder + click detection
