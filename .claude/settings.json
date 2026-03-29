@@ -4,20 +4,15 @@
       "Bash(*)",
       "Read",
       "Edit",
+      "Edit(.claude/**)",
       "Write",
+      "Write(.claude/**)",
       "Glob",
       "Grep",
       "Agent",
       "WebFetch",
       "WebSearch",
-      "Skill(update-config)",
-      "Skill(ship)",
-      "Skill(create-pr)",
-      "Skill(retro)",
-      "Skill(simplify)",
-      "Skill(ui-review)",
-      "Skill(design-system)",
-      "Skill(loop)"
+      "Skill"
     ],
     "deny": [
       "Bash(rm -rf /*)",
