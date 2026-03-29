@@ -6,6 +6,8 @@ A power-user frontend for [NovelAI](https://novelai.net/) and [xAI Grok](https:/
 >
 > This is the loop. Hundreds of times a day. Every click, every wait, every blank text box where autocomplete should be — that's friction. This app removes it.
 
+![Main interface — fullscreen canvas with floating prompt bar and character markers](docs/screenshots/main.png)
+
 ---
 
 ## 30 Seconds to Running
@@ -47,6 +49,8 @@ The entire screen is your canvas. No sidebar. All controls float on top with gla
 
 ### Prompt Bar
 
+![Expanded prompt bar with tabs, textarea, controls, and Generate button](docs/screenshots/prompt-bar.png)
+
 - **Collapsed**: one-line preview + Seed + Refine + Layer + Auto + Generate
 - **Expanded**: click to open full editor with PROMPT/UNDESIRED tabs, Quality/Enhance toggles, Optimize, AI Assist, History, provider/resolution selects, settings gear, seed control
 - **Auto-collapse**: bar collapses automatically after generation completes
@@ -63,6 +67,8 @@ Click **Optimize** to have Grok reorder, fix, and enhance your tags following No
 Changes are tracked in the **Tag Intelligence** panel (Tags tab) showing what was added/removed and new tag discoveries.
 
 ### Characters
+
+![Character popover editor with prompt textarea and interactions](docs/screenshots/character-popover.png)
 
 - Click **+Char** to add a character marker on canvas
 - Click any marker to open a **popover editor** with prompt textarea and interactions
@@ -85,6 +91,8 @@ Paper-edge tabs on the right side of canvas:
 
 ### Tag Intelligence
 
+![Tag Intelligence panel with What Changed, Discoveries, and Add Next sections](docs/screenshots/tag-intelligence.png)
+
 The Tags tab tracks your prompt evolution:
 - **What Changed**: diff of last Optimize/Refine showing added (green) and removed (red) tags
 - **New Discoveries**: tags you hadn't used before that AI introduced
@@ -92,6 +100,8 @@ The Tags tab tracks your prompt evolution:
 - **Add Next**: co-occurrence suggestions (boosters, contrasts, wildcards)
 
 ### Gallery
+
+![Gallery with folder navigation, image cards, and action buttons](docs/screenshots/gallery.png)
 
 Every generation auto-saves with full metadata in the PNG. The History tab lets you:
 - Browse all generations with filters (All/Image/Video/NovelAI/Grok)
@@ -102,6 +112,8 @@ Every generation auto-saves with full metadata in the PNG. The History tab lets 
 - Lightbox with slideshow mode
 
 ### Generation Settings
+
+![Settings popover with Style Reference, Quality, Advanced, and I2I controls](docs/screenshots/gen-settings.png)
 
 Click the gear icon to access:
 - **Style Reference**: upload vibe images to guide style
