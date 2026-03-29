@@ -517,9 +517,19 @@ function renderLayerStrip() {
     dot.className = "layer-tab-dot";
     tab.appendChild(dot);
 
-    // Short label
-    const label = document.createTextNode((idx + 1).toString());
-    tab.appendChild(label);
+    // Thumbnail or name label
+    if (layer.imageBase64) {
+      const thumb = document.createElement("img");
+      thumb.className = "layer-tab-thumb";
+      thumb.src = "data:image/png;base64," + layer.imageBase64;
+      thumb.alt = layer.name;
+      tab.appendChild(thumb);
+    } else {
+      const label = document.createElement("span");
+      label.className = "layer-tab-label";
+      label.textContent = layer.name.replace(/^Layer\s*/, "L");
+      tab.appendChild(label);
+    }
 
     // Pointer-based drag-to-reorder + click detection
     let _ptrDown = false, _ptrMoved = false, _ptrStartY = 0;
@@ -528,13 +538,15 @@ function renderLayerStrip() {
       _ptrMoved = false;
       _ptrStartY = e.clientY;
       tab.setPointerCapture(e.pointerId);
-      tab.style.opacity = "0.5";
-      tab.style.zIndex = "10";
     });
     tab.addEventListener("pointermove", (e) => {
       if (!_ptrDown) return;
       if (Math.abs(e.clientY - _ptrStartY) > 4) _ptrMoved = true;
       if (!_ptrMoved) return;
+      // Add dragging class on first move
+      if (!tab.classList.contains("layer-tab--dragging")) {
+        tab.classList.add("layer-tab--dragging");
+      }
       // Find which tab we're over
       const tabs = Array.from(tabsList.querySelectorAll(".layer-tab"));
       tabs.forEach(t => t.classList.remove("layer-tab--drag-over"));
@@ -547,13 +559,14 @@ function renderLayerStrip() {
         }
       }
     });
+    const _cleanupDrag = () => {
+      _ptrDown = false;
+      tab.classList.remove("layer-tab--dragging");
+      tabsList.querySelectorAll(".layer-tab--drag-over").forEach(t => t.classList.remove("layer-tab--drag-over"));
+    };
     tab.addEventListener("pointerup", (e) => {
       if (!_ptrDown) return;
-      _ptrDown = false;
       tab.releasePointerCapture(e.pointerId);
-      tab.style.opacity = "";
-      tab.style.zIndex = "";
-      tabsList.querySelectorAll(".layer-tab--drag-over").forEach(t => t.classList.remove("layer-tab--drag-over"));
 
       if (_ptrMoved) {
         // Find drop target
@@ -564,6 +577,7 @@ function renderLayerStrip() {
           if (e.clientY >= r.top && e.clientY <= r.bottom) {
             const fromIdx = idx;
             const toIdx = ti;
+            _cleanupDrag();
             if (fromIdx !== toIdx) {
               pushLayerUndo("Reorder layers");
               const [moved] = layers.splice(fromIdx, 1);
@@ -576,7 +590,9 @@ function renderLayerStrip() {
             return;
           }
         }
+        _cleanupDrag();
       } else {
+        _cleanupDrag();
         // Click (no drag) — select + toggle panel
         const wasActive = _activeLayerIdx === idx;
         _activeLayerIdx = idx;
@@ -591,12 +607,7 @@ function renderLayerStrip() {
         }
       }
     });
-    tab.addEventListener("pointercancel", () => {
-      _ptrDown = false;
-      tab.style.opacity = "";
-      tab.style.zIndex = "";
-      tabsList.querySelectorAll(".layer-tab--drag-over").forEach(t => t.classList.remove("layer-tab--drag-over"));
-    });
+    tab.addEventListener("pointercancel", _cleanupDrag);
 
     tabsList.appendChild(tab);
   });
