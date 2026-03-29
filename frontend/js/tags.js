@@ -199,6 +199,9 @@ const _tagAC = (() => {
 
   // ── Event handlers for a single element ─────────────────
   function handleInput(e) {
+    // Skip hidden elements (e.g. sidebar #prompt synced from focus mode)
+    // to avoid repositioning the dropdown off-screen and cancelling timers
+    if (!e.target.offsetParent && e.target.id !== "prompt-focus-textarea") return;
     clearTimeout(debounceTimer);
     activeEl = e.target;
     const { word } = getWordAtCursor(e.target);

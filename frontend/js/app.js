@@ -1394,6 +1394,9 @@ function setupCanvasPromptBar() {
     if (hasImage && collapsedSeed) {
       collapsedSeed.textContent = seedEl.textContent;
     }
+    // Show/hide clear button in tab bar
+    const cvtClear = document.getElementById("cvt-clear");
+    if (cvtClear) cvtClear.style.display = hasImage ? "" : "none";
   }
 
   // Observe #info-seed changes to detect generation complete
@@ -2089,20 +2092,32 @@ async function init() {
     overflowMenu.addEventListener("click", () => overflowMenu.classList.remove("open"));
   }
 
-  // "×" Clear canvas
-  const clearCanvasBtn = $("#btn-clear-canvas");
-  if (clearCanvasBtn) {
-    clearCanvasBtn.addEventListener("click", () => {
-      state.img2img = null;
-      state.canvasImageBase64 = null;
-      state.lastImageBase64 = null;
-      state.lastVideoBase64 = null;
-      const output = $("#output");
-      if (output) output.innerHTML = '<div class="placeholder"><div class="placeholder-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><p class="placeholder-title">Your creation awaits</p><p class="placeholder-sub">Press Generate or Enter</p><p class="placeholder-drop-hint">or drop / paste an image as source</p></div>';
-      const actions = $("#image-actions");
-      if (actions) actions.style.display = "none";
-    });
+  // "×" Clear canvas — works from both the old hidden button and the new tab bar button
+  function clearCanvas() {
+    state.img2img = null;
+    state.canvasImageBase64 = null;
+    state.lastImageBase64 = null;
+    state.lastGeneratedImageBase64 = null;
+    state.lastVideoBase64 = null;
+    const output = $("#output");
+    if (output) {
+      clearOutput(output);
+      output.innerHTML = '<div class="placeholder"><div class="placeholder-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><p class="placeholder-title">Your creation awaits</p><p class="placeholder-sub">Press Generate or Enter</p><p class="placeholder-drop-hint">or drop / paste an image as source</p></div>';
+    }
+    const actions = $("#image-actions");
+    if (actions) actions.style.display = "none";
+    // Hide collapsed actions and clear button
+    const collapsedActions = document.getElementById("cpb-collapsed-actions");
+    if (collapsedActions) collapsedActions.style.display = "none";
+    const cvtClear = document.getElementById("cvt-clear");
+    if (cvtClear) cvtClear.style.display = "none";
+    syncInpaintButtonVisibility();
+    updateCanvasPanel();
   }
+  const clearCanvasBtn = $("#btn-clear-canvas");
+  if (clearCanvasBtn) clearCanvasBtn.addEventListener("click", clearCanvas);
+  const cvtClearBtn = document.getElementById("cvt-clear");
+  if (cvtClearBtn) cvtClearBtn.addEventListener("click", clearCanvas);
 
   // Enter in prompt/negative textarea = generate (Shift+Enter = newline)
   const promptEl = $("#prompt");
