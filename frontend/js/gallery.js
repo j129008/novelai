@@ -201,22 +201,18 @@ function renderBreadcrumb() {
   if (!breadcrumb) return;
   breadcrumb.innerHTML = "";
 
-  // Root segment
+  // Only show breadcrumb when navigated into a subdirectory
+  if (!_galleryPath) return;
+
   const rootBtn = document.createElement("button");
   rootBtn.type = "button";
   rootBtn.textContent = "/";
-  if (!_galleryPath) {
-    rootBtn.className = "gallery-breadcrumb-current";
-  } else {
-    rootBtn.className = "gallery-breadcrumb-item";
-    rootBtn.addEventListener("click", () => {
-      _galleryPath = "";
-      loadGallery();
-    });
-  }
+  rootBtn.className = "gallery-breadcrumb-item";
+  rootBtn.addEventListener("click", () => {
+    _galleryPath = "";
+    loadGallery();
+  });
   breadcrumb.appendChild(rootBtn);
-
-  if (!_galleryPath) return;
 
   const segments = _galleryPath.split("/");
   segments.forEach((seg, i) => {
