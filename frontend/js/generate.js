@@ -64,15 +64,32 @@ async function generate() {
   const resVal = $("#resolution").value;
   const [width, height] = resVal ? resVal.split("x").map(Number) : [832, 1216];
 
-  const qualityTags = ", very aesthetic, masterpiece, no text";
   let finalPrompt = prompt;
   if ($("#quality-tags").checked) {
-    // Append quality tags to base prompt content (before first | separator)
-    const pipeMatch = prompt.match(/^([\s\S]*?\S)([\s\n]*\|[\s\S]*)$/);
-    if (pipeMatch) {
-      finalPrompt = pipeMatch[1] + qualityTags + pipeMatch[2];
+    // If prompt contains "text:" (user wants text in image), omit "no text"
+    // and insert quality tags before the "text:" tag so they don't get
+    // interpreted as text content.
+    const hasText = /\btext:/i.test(prompt);
+    const qualityTags = hasText
+      ? ", very aesthetic, masterpiece"
+      : ", very aesthetic, masterpiece, no text";
+
+    if (hasText) {
+      // Insert quality tags just before "text:" occurrence
+      const textIdx = prompt.search(/,?\s*\btext:/i);
+      if (textIdx > 0) {
+        finalPrompt = prompt.slice(0, textIdx).replace(/\s+$/, "") + qualityTags + prompt.slice(textIdx);
+      } else {
+        finalPrompt = prompt.replace(/\s+$/, "") + qualityTags;
+      }
     } else {
-      finalPrompt = prompt.replace(/\s+$/, "") + qualityTags;
+      // Append quality tags to base prompt content (before first | separator)
+      const pipeMatch = prompt.match(/^([\s\S]*?\S)([\s\n]*\|[\s\S]*)$/);
+      if (pipeMatch) {
+        finalPrompt = pipeMatch[1] + qualityTags + pipeMatch[2];
+      } else {
+        finalPrompt = prompt.replace(/\s+$/, "") + qualityTags;
+      }
     }
   }
 

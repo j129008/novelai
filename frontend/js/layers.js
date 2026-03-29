@@ -2279,19 +2279,43 @@ function enterLayerEditMode(layer, mode, onApply) {
   // ── Open: compute position & initialise ───────────────────
   function positionCanvasOverImage() {
     // Use the actual <img> inside #output for precise letterbox coordinates.
-    // For draw mode with no canvas image, fall back to the #output area itself.
-    let imgEl = document.querySelector("#output img");
-    if (!imgEl && mode === "draw") {
-      imgEl = document.getElementById("output");
+    const imgEl = document.querySelector("#output img");
+    const dtRect = dropTarget.getBoundingClientRect();
+
+    if (imgEl) {
+      const imgRect = imgEl.getBoundingClientRect();
+      return {
+        left: imgRect.left - dtRect.left,
+        top:  imgRect.top  - dtRect.top,
+        w:    imgRect.width,
+        h:    imgRect.height,
+      };
     }
-    if (!imgEl) return null;
-    const imgRect = imgEl.getBoundingClientRect();
-    const dtRect  = dropTarget.getBoundingClientRect();
-    const left = imgRect.left - dtRect.left;
-    const top  = imgRect.top  - dtRect.top;
-    const w    = imgRect.width;
-    const h    = imgRect.height;
-    return { left, top, w, h };
+
+    // No image (empty layer draw mode): compute a centered rect matching
+    // the offscreen aspect ratio within the drop target.
+    if (mode === "draw") {
+      const resSel = document.getElementById("resolution");
+      const parts = (resSel ? resSel.value : "832x1216").split("x").map(Number);
+      const imgAR = (parts[0] || 832) / (parts[1] || 1216);
+      const containerW = dtRect.width;
+      const containerH = dtRect.height;
+      let w, h;
+      if (containerW / containerH > imgAR) {
+        h = containerH;
+        w = h * imgAR;
+      } else {
+        w = containerW;
+        h = w / imgAR;
+      }
+      return {
+        left: (containerW - w) / 2,
+        top:  (containerH - h) / 2,
+        w, h,
+      };
+    }
+
+    return null;
   }
 
   function applyCanvasPosition(canvas, pos, useOffscreenRes) {
