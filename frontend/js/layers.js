@@ -2408,6 +2408,13 @@ function syncInpaintButtonVisibility() {
   const animGrokBtn = document.getElementById("btn-animate-in-grok");
   if (editGrokBtn) editGrokBtn.style.display = (hasGenerated && isNovelAI) ? "" : "none";
   if (animGrokBtn) animGrokBtn.style.display = (hasGenerated && isNovelAI) ? "" : "none";
+
+  // Update collapsed prompt bar button label for provider
+  const collapsedLayerBtn = document.getElementById("cpb-collapsed-send-layer");
+  if (collapsedLayerBtn) {
+    collapsedLayerBtn.textContent = isNovelAI ? "Layer" : "Iterate";
+    collapsedLayerBtn.title = isNovelAI ? "Send to layer" : "Use output as next input";
+  }
 }
 
 function setupInpaint() {

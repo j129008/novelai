@@ -1416,7 +1416,12 @@ function setupCanvasPromptBar() {
   });
   if (collapsedSendLayer) collapsedSendLayer.addEventListener("click", (e) => {
     e.stopPropagation();
-    document.getElementById("btn-send-to-layer")?.click();
+    const provider = document.getElementById("provider")?.value || "novelai";
+    if (provider === "grok") {
+      document.getElementById("btn-set-as-source")?.click();
+    } else {
+      document.getElementById("btn-send-to-layer")?.click();
+    }
   });
   // Reparent overflow menu to body so it works when sidebar is hidden
   const overflowMenu = document.getElementById("overflow-menu");
@@ -1891,6 +1896,7 @@ async function init() {
       state.img2img = state.lastGeneratedImageBase64;
       renderGrokImagesList();
       syncInpaintButtonVisibility();
+      updateCanvasPanel();
       showStatus("Output set as source — describe your next edit");
     });
   }
