@@ -1394,9 +1394,23 @@ function setupCanvasPromptBar() {
     if (hasImage && collapsedSeed) {
       collapsedSeed.textContent = seedEl.textContent;
     }
-    // Show/hide clear button in tab bar
+    // Show/hide and position clear button at image top-right corner
     const cvtClear = document.getElementById("cvt-clear");
-    if (cvtClear) cvtClear.style.display = hasImage ? "" : "none";
+    if (cvtClear) {
+      cvtClear.style.display = hasImage ? "" : "none";
+      if (hasImage) _positionClearButton();
+    }
+  }
+
+  function _positionClearButton() {
+    const cvtClear = document.getElementById("cvt-clear");
+    const img = document.querySelector("#output img");
+    const dt = document.getElementById("canvas-drop-target");
+    if (!cvtClear || !img || !dt) return;
+    const imgRect = img.getBoundingClientRect();
+    const dtRect = dt.getBoundingClientRect();
+    cvtClear.style.top  = (imgRect.top - dtRect.top + 6) + "px";
+    cvtClear.style.left = (imgRect.right - dtRect.left - 30) + "px";
   }
 
   // Observe #info-seed changes to detect generation complete
