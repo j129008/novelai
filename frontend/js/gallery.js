@@ -6,6 +6,7 @@ let _galleryData = [];
 let _galleryPath = "";
 let _galleryTypeFilter = "all";
 let _settingsLoadedToast = null;
+let _galleryDirs = [];
 
 function setupHistoryTabs() {
   const tabCanvas = $("#tab-canvas");
@@ -83,6 +84,8 @@ function setupHistoryTabs() {
       renderGallery(_galleryData, [], searchInput.value.toLowerCase());
     });
   }
+
+  setupOrganizeButton();
 
   // Gallery type filters
   document.querySelectorAll(".gallery-filter").forEach(btn => {
@@ -254,11 +257,15 @@ async function loadGallery() {
     const directories = Array.isArray(data) ? [] : (data.directories || []);
 
     _galleryData = files;
+    _galleryDirs = directories;
     if (count) {
       count.textContent = files.length || "";
       count.classList.toggle("visible", files.length > 0);
     }
     renderBreadcrumb();
+    // Show organize button only at root with flat files
+    const orgBtn = $("#gallery-organize-btn");
+    if (orgBtn) orgBtn.style.display = (!_galleryPath && files.length > 0) ? "" : "none";
     const searchVal = ($("#gallery-search")?.value || "").toLowerCase();
     renderGallery(files, directories, searchVal);
   } catch { /* ignore */ }
@@ -1110,5 +1117,87 @@ function loadSettingsFromMeta(meta) {
       renderCharacterMarkers();
       saveCharactersToCache();
     }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ORGANIZE — batch sort files into type-based subfolders
+   ═══════════════════════════════════════════════════════════ */
+
+function setupOrganizeButton() {
+  const btn = $("#gallery-organize-btn");
+  if (!btn) return;
+  btn.addEventListener("click", showOrganizePreview);
+}
+
+async function showOrganizePreview() {
+  try {
+    const resp = await fetch("/api/gallery/organize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: _galleryPath, dry_run: true }),
+    });
+    if (!resp.ok) { showError("Organize preview failed"); return; }
+    const data = await resp.json();
+
+    if (data.moved === 0) {
+      showStatus("No files to organize");
+      return;
+    }
+
+    // Build confirmation modal
+    document.querySelector(".organize-dialog-overlay")?.remove();
+    const overlay = document.createElement("div");
+    overlay.className = "move-dialog-overlay organize-dialog-overlay";
+
+    const dialog = document.createElement("div");
+    dialog.className = "move-dialog";
+
+    let groupsHtml = data.groups.map(g =>
+      `<div class="organize-group"><span class="organize-folder">${g.folder}/</span><span class="organize-count">${g.count} files</span></div>`
+    ).join("");
+
+    dialog.innerHTML = `
+      <div class="move-dialog-title">Organize ${data.moved} files</div>
+      <div class="organize-preview">${groupsHtml}</div>
+      <div class="organize-actions">
+        <button type="button" class="btn-action btn-action--primary organize-confirm">Organize</button>
+        <button type="button" class="btn-action organize-cancel">Cancel</button>
+      </div>
+    `;
+
+    dialog.querySelector(".organize-cancel").addEventListener("click", () => overlay.remove());
+    dialog.querySelector(".organize-confirm").addEventListener("click", async () => {
+      const confirmBtn = dialog.querySelector(".organize-confirm");
+      confirmBtn.textContent = "Organizing…";
+      confirmBtn.disabled = true;
+      try {
+        const execResp = await fetch("/api/gallery/organize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: _galleryPath, dry_run: false }),
+        });
+        if (execResp.ok) {
+          const result = await execResp.json();
+          overlay.remove();
+          showStatus(`Organized ${result.moved} files` + (result.skipped ? `, ${result.skipped} skipped` : ""));
+          loadGallery();
+        } else {
+          showError("Organize failed");
+          confirmBtn.textContent = "Organize";
+          confirmBtn.disabled = false;
+        }
+      } catch {
+        showError("Organize failed");
+        confirmBtn.textContent = "Organize";
+        confirmBtn.disabled = false;
+      }
+    });
+
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+  } catch {
+    showError("Organize preview failed");
   }
 }
