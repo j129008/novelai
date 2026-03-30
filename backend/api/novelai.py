@@ -41,11 +41,16 @@ from models.schemas import CharCaption, CharCenter, VibeImage
 
 API_URL = "https://image.novelai.net/ai/generate-image"
 
-
 # V4+ models require v4_prompt/v4_negative_prompt structure
 V4_MODELS = {
     "nai-diffusion-4-curated-preview",
     "nai-diffusion-4-full",
+    "nai-diffusion-4-5-curated",
+    "nai-diffusion-4-5-full",
+}
+
+# Models that do NOT support vibe transfer (NovelAI API returns 500)
+_NO_VIBE_MODELS = {
     "nai-diffusion-4-5-curated",
     "nai-diffusion-4-5-full",
 }
@@ -78,6 +83,11 @@ async def generate_image(
         reference_images = []
     if char_captions is None:
         char_captions = []
+    if reference_images and model in _NO_VIBE_MODELS:
+        raise RuntimeError(
+            f"Vibe transfer is not supported for {model}. "
+            "NovelAI V4.5 models do not support vibe transfer yet."
+        )
     if seed == 0:
         seed = random.randint(1, 0xFFFFFFFF)
 
