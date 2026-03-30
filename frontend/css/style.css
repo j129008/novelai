@@ -4962,22 +4962,18 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   height: 24px;
   border-radius: 50%;
   border: none;
-  background: transparent;
-  color: transparent;
+  background: none;
+  color: rgba(255,255,255,0.3);
   font-size: 0.85rem;
   line-height: 1;
   cursor: pointer;
-  transition: color 0.2s, background 0.2s, border-color 0.2s;
+  transition: color 0.15s, background 0.15s;
   padding: 0;
   font-family: inherit;
-}
-.canvas-drop-target:hover .cvt-clear {
-  color: rgba(255,255,255,0.5);
 }
 .cvt-clear:hover {
   color: #fff;
   background: rgba(200,60,60,0.8);
-  border: 1px solid rgba(255,255,255,0.15);
 }
 
 /* ─── AI Redraw Modal ─── */
