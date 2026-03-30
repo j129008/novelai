@@ -2206,4 +2206,12 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+// Global Cmd/Ctrl+E → open Prompt Editor
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "e") {
+    e.preventDefault();
+    document.getElementById("prompt-expand-btn")?.click();
+  }
+});
+
 init();
