@@ -301,7 +301,6 @@ async def generate(req: GenerateRequest):
             image=req.image,
             strength=req.strength,
             noise=req.noise,
-            reference_images=req.reference_images,
             char_captions=req.char_captions,
             use_coords=req.use_coords,
             mask=req.mask,

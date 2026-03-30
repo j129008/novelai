@@ -549,25 +549,8 @@
           </button>
         </div>
 
-        <!-- Hidden file input for vibe uploads — triggered programmatically -->
-        <input type="file" id="vibe-file-input" accept="image/*" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" aria-hidden="true" tabindex="-1">
-
-        <!-- Generation settings popover: Quality, Style Reference, Advanced -->
+        <!-- Generation settings popover: Quality, Advanced -->
         <div id="gen-settings-popover" class="gen-settings-popover" style="display:none">
-          <!-- Style Reference -->
-          <div class="gen-settings-section">
-            <div class="vibe-section-header">
-              <span class="field-label">Style Reference</span>
-              <button id="btn-add-vibe" class="btn-action btn-action--primary vibe-add-btn" type="button">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                Add Vibe
-              </button>
-            </div>
-            <div id="vibe-list" class="vibe-list">
-              <p class="vibe-empty-hint">No vibes added. Click "Add Vibe" to upload a style reference image.</p>
-            </div>
-          </div>
-          <div class="gen-settings-divider"></div>
           <!-- Quality -->
           <div class="gen-settings-section">
             <span class="field-label">Quality</span>

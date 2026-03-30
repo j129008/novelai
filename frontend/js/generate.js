@@ -130,14 +130,6 @@ async function generate() {
     body.image = state.img2img;
   }
 
-  if (vibes.length > 0) {
-    body.reference_images = vibes.map((v) => ({
-      image: v.base64,
-      information_extracted: v.infoExtracted,
-      strength: v.strength,
-    }));
-  }
-
   body.cfg_rescale = parseFloat($("#cfg-rescale").value);
   body.noise_schedule = $("#noise-schedule").value;
 

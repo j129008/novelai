@@ -32,10 +32,6 @@ const state = {
   grokOutputType: "image", // "image" | "video" — Grok output mode
 };
 
-// ── VIBES ─────────────────────────────────────────────────
-// Each entry: { base64, infoExtracted, strength }
-const vibes = [];
-
 // ── GROK REFERENCE IMAGES ─────────────────────────────────
 // Each entry: { base64 }  — ordered list, up to 5
 const grokRefs = [];

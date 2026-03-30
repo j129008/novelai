@@ -37,7 +37,7 @@ from typing import Optional
 import numpy as np
 from PIL import Image, ImageFilter
 
-from models.schemas import CharCaption, CharCenter, VibeImage
+from models.schemas import CharCaption, CharCenter
 
 API_URL = "https://image.novelai.net/ai/generate-image"
 
@@ -49,11 +49,6 @@ V4_MODELS = {
     "nai-diffusion-4-5-full",
 }
 
-# Models that do NOT support vibe transfer (NovelAI API returns 500)
-_NO_VIBE_MODELS = {
-    "nai-diffusion-4-5-curated",
-    "nai-diffusion-4-5-full",
-}
 
 async def generate_image(
     token: str,
@@ -74,20 +69,12 @@ async def generate_image(
     image: Optional[str] = None,
     strength: float = 0.7,
     noise: float = 0.0,
-    reference_images: Optional[list[VibeImage]] = None,
     char_captions: Optional[list[CharCaption]] = None,
     use_coords: Optional[bool] = None,
     mask: Optional[str] = None,
 ) -> tuple[bytes, int]:
-    if reference_images is None:
-        reference_images = []
     if char_captions is None:
         char_captions = []
-    if reference_images and model in _NO_VIBE_MODELS:
-        raise RuntimeError(
-            f"Vibe transfer is not supported for {model}. "
-            "NovelAI V4.5 models do not support vibe transfer yet."
-        )
     if seed == 0:
         seed = random.randint(1, 0xFFFFFFFF)
 
@@ -110,7 +97,6 @@ async def generate_image(
         "noise_schedule": noise_schedule,
         "uncond_scale": 0.0,
         "prefer_brownian": True,
-        "uncond_per_vibe": True,
     }
 
     # V4+ models require v4_prompt and v4_negative_prompt caption structures
@@ -169,11 +155,6 @@ async def generate_image(
         params["image"] = image
         params["strength"] = strength
         params["noise"] = noise
-
-    if reference_images:
-        params["reference_image_multiple"] = [v.image for v in reference_images]
-        params["reference_information_extracted_multiple"] = [v.information_extracted for v in reference_images]
-        params["reference_strength_multiple"] = [v.strength for v in reference_images]
 
     payload = {
         "input": prompt,

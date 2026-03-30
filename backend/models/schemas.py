@@ -21,12 +21,6 @@ VALID_SAMPLERS = Literal[
 ]
 
 
-class VibeImage(BaseModel):
-    image: str  # base64
-    information_extracted: float = Field(default=1.0, ge=0, le=1)
-    strength: float = Field(default=0.6, ge=0, le=1)
-
-
 class CharCenter(BaseModel):
     x: float = Field(default=0.5, ge=0.0, le=1.0)
     y: float = Field(default=0.5, ge=0.0, le=1.0)
@@ -56,8 +50,6 @@ class GenerateRequest(BaseModel):
     strength: float = Field(default=0.7, ge=0, le=1)
     noise: float = Field(default=0.0, ge=0, le=1)
     mask: Optional[str] = None  # base64 PNG — inpaint mask
-    # vibe transfer
-    reference_images: list[VibeImage] = Field(default_factory=list)
     # multi-character composer
     char_captions: list[CharCaption] = Field(default_factory=list)  # per-character prompts with positions
     use_coords: Optional[bool] = None  # explicit coordinate control; None = auto-detect from centers
