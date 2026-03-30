@@ -269,3 +269,24 @@ class LocalTagsCacheResponse(BaseModel):
 
 class LocalTagsBatchResponse(BaseModel):
     analyzed: dict[str, list[str]]  # filename -> ["wd", "grok"]
+
+
+# ---------------------------------------------------------------------------
+# Gallery Organize — batch sort files by type into numbered subfolders
+# ---------------------------------------------------------------------------
+
+class OrganizeRequest(BaseModel):
+    path: str = ""
+    dry_run: bool = True
+    bucket_size: int = Field(default=200, ge=10, le=10000)
+
+
+class OrganizeGroup(BaseModel):
+    folder: str
+    count: int
+
+
+class OrganizeResponse(BaseModel):
+    moved: int = 0
+    skipped: int = 0
+    groups: list[OrganizeGroup] = Field(default_factory=list)

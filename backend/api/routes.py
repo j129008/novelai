@@ -47,6 +47,9 @@ from models.schemas import (
     LocalBrowseResponse,
     LocalTagsBatchResponse,
     LocalTagsCacheResponse,
+    OrganizeGroup,
+    OrganizeRequest,
+    OrganizeResponse,
     RecordCharactersRequest,
     SuggestTagsRequest,
     SuggestTagsResponse,
@@ -759,6 +762,93 @@ async def create_gallery_folder(req: MoveFileRequest):
     folder = _resolve_gallery_path(out, req.dest_folder)
     folder.mkdir(parents=True, exist_ok=True)
     return {"created": req.dest_folder}
+
+
+@router.post("/gallery/organize", response_model=OrganizeResponse)
+async def organize_gallery(req: OrganizeRequest):
+    """Batch-organize flat files into type-based numbered subfolders."""
+    out = _get_output_dir()
+    target = _resolve_gallery_path(out, req.path)
+    if not target.is_dir():
+        raise HTTPException(status_code=404, detail="Directory not found")
+
+    media_exts = {".png", ".jpg", ".jpeg", ".webp", ".mp4"}
+    flat_files = sorted(
+        (f for f in target.iterdir()
+         if f.is_file() and f.suffix.lower() in media_exts and not f.name.startswith("._")),
+        key=lambda f: f.stat().st_mtime,
+    )
+
+    if not flat_files:
+        return OrganizeResponse()
+
+    # Categorize
+    buckets: dict[str, list[Path]] = {"video": [], "grok": [], "novelai": []}
+    for f in flat_files:
+        if f.suffix.lower() == ".mp4":
+            buckets["video"].append(f)
+        elif "-grok" in f.name or f.name.startswith("grok-") or f.name.startswith("xai-"):
+            buckets["grok"].append(f)
+        else:
+            buckets["novelai"].append(f)
+
+    # Build move plan, continuing from existing buckets
+    plan: list[tuple[Path, Path]] = []  # (src, dest)
+    groups: list[OrganizeGroup] = []
+    for cat, cat_files in buckets.items():
+        if not cat_files:
+            continue
+        cat_dir = target / cat
+        # Find the last existing numbered bucket and its file count
+        last_bucket = 0
+        last_bucket_count = 0
+        if cat_dir.is_dir():
+            for d in cat_dir.iterdir():
+                if d.is_dir() and d.name.isdigit():
+                    num = int(d.name)
+                    if num > last_bucket:
+                        last_bucket = num
+                        last_bucket_count = sum(
+                            1 for f in d.iterdir()
+                            if f.is_file() and f.suffix.lower() in media_exts
+                        )
+        # Start filling from the last bucket if it has room
+        remaining = cat_files[:]
+        bucket_num = max(last_bucket, 1)
+        slots = req.bucket_size - last_bucket_count if last_bucket > 0 else req.bucket_size
+        while remaining:
+            chunk = remaining[:slots]
+            remaining = remaining[slots:]
+            folder_name = f"{cat}/{bucket_num:03d}"
+            dest_dir = cat_dir / f"{bucket_num:03d}"
+            groups.append(OrganizeGroup(folder=folder_name, count=len(chunk)))
+            for f in chunk:
+                plan.append((f, dest_dir / f.name))
+            bucket_num += 1
+            slots = req.bucket_size
+
+    if req.dry_run:
+        return OrganizeResponse(moved=len(plan), skipped=0, groups=groups)
+
+    # Execute moves
+    moved = 0
+    skipped = 0
+    for src, dest in plan:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if dest.exists():
+            skipped += 1
+            continue
+        src.rename(dest)
+        # Move sidecar tag cache if it exists
+        tags_dir = target / ".tags"
+        tag_file = tags_dir / f"{src.name}.json"
+        if tag_file.exists():
+            dest_tags = dest.parent / ".tags"
+            dest_tags.mkdir(parents=True, exist_ok=True)
+            tag_file.rename(dest_tags / f"{dest.name}.json")
+        moved += 1
+
+    return OrganizeResponse(moved=moved, skipped=skipped, groups=groups)
 
 
 class SettingsUpdate(BaseModel):
