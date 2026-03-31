@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=161">
+  <link rel="stylesheet" href="css/style.css?v=162">
 </head>
 <body>
   <div class="app">
@@ -43,6 +43,15 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
               Open in Finder
             </button>
+          </section>
+          <section class="guide-section" id="grok-quota-section" style="display:none">
+            <h3>xAI API Credit</h3>
+            <div class="grok-quota-bar" id="grok-quota-bar" title="Click to refresh">
+              <div class="grok-quota-track">
+                <div class="grok-quota-fill" id="grok-quota-fill"></div>
+              </div>
+              <span class="grok-quota-label" id="grok-quota-label">—</span>
+            </div>
           </section>
           <section class="guide-section">
             <button id="guide-btn" class="btn-action" type="button" style="width:100%;justify-content:center">
@@ -347,14 +356,6 @@
       </button>
 
       <aside class="controls" id="sidebar" role="form" aria-label="Generation controls" style="display:none">
-
-        <!-- Grok quota HP bar -->
-        <div class="grok-quota-bar" id="grok-quota-bar" style="display:none" title="Click to refresh — xAI API quota">
-          <div class="grok-quota-track">
-            <div class="grok-quota-fill" id="grok-quota-fill"></div>
-          </div>
-          <span class="grok-quota-label" id="grok-quota-label">—</span>
-        </div>
 
         <div class="controls-prompt" style="display:none">
           <div class="prompt-box">
@@ -972,58 +973,78 @@
             </button>
           </div>
 
-          <!-- Row 2: all controls in one line -->
+          <!-- Row 2: logically grouped controls -->
           <div class="cpb-controls-row">
-            <label class="cpb-pill-toggle" id="cpb-quality-pill" title="Quality tags">
-              <input type="checkbox" id="cpb-quality-tags" checked>
-              <span class="cpb-pill-label">Quality</span>
-            </label>
-            <label class="cpb-pill-toggle" id="cpb-enhance-pill" title="Enhance mode">
-              <input type="checkbox" id="cpb-enhance-toggle">
-              <span class="cpb-pill-label">Enhance</span>
-            </label>
-            <div class="cpb-sep"></div>
-            <button class="cpb-tool-btn" id="cpb-optimize-btn" type="button" title="Optimize prompt">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14h4v7H4z"/><path d="M10 9h4v12h-4z"/><path d="M16 3h4v18h-4z"/></svg>
-              Optimize
-            </button>
-            <button class="cpb-tool-btn" id="cpb-assist-btn" type="button" title="AI Prompt Assistant">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-              AI Assist
-            </button>
-            <button class="cpb-tool-btn" id="cpb-history-btn" type="button" title="Prompt history (Ctrl+H)">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              History
-            </button>
-            <button class="cpb-tool-btn" id="cpb-expand-btn" type="button" title="Focus Mode (Cmd+E)">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-            </button>
-            <button class="cpb-tool-btn" id="cpb-add-char-btn" type="button" title="Add character (places a new character marker on canvas)">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
-              + Char
-            </button>
-            <div class="cpb-sep"></div>
-            <div class="cpb-meta-field">
-              <select id="cpb-provider" class="cpb-meta-select" title="Provider"></select>
+
+            <!-- Group A: Prompt modifiers -->
+            <div class="cpb-group cpb-group--modifiers">
+              <label class="cpb-pill-toggle" id="cpb-quality-pill" title="Quality tags">
+                <input type="checkbox" id="cpb-quality-tags" checked>
+                <span class="cpb-pill-label">Quality</span>
+              </label>
+              <label class="cpb-pill-toggle" id="cpb-enhance-pill" title="Enhance mode">
+                <input type="checkbox" id="cpb-enhance-toggle">
+                <span class="cpb-pill-label">Enhance</span>
+              </label>
             </div>
-            <div class="cpb-meta-field" id="cpb-canvas-field">
-              <select id="cpb-resolution" class="cpb-meta-select" title="Canvas size"></select>
-            </div>
-            <div class="cpb-sep"></div>
-            <button class="cpb-icon-btn" id="cpb-gear-btn" type="button" title="Generation Settings">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.55.26.94.77 1 1.34V11a2 2 0 0 1 0 4h-.09c-.57.06-1.08.45-1.34 1z"/></svg>
-            </button>
-            <button class="cpb-icon-btn" id="cpb-app-settings-btn" type="button" title="App Settings">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-            </button>
-            <div class="cpb-sep"></div>
-            <div class="cpb-seed-row">
-              <label class="cpb-seed-label" for="cpb-seed">Seed</label>
-              <input type="number" id="cpb-seed" class="cpb-seed-input" value="0" min="0" placeholder="0 = random">
-              <button class="cpb-seed-rand-btn" id="cpb-seed-rand-btn" type="button" title="Random seed">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+
+            <!-- Group B: AI tools -->
+            <div class="cpb-group cpb-group--ai-tools">
+              <button class="cpb-tool-btn" id="cpb-optimize-btn" type="button" title="Optimize prompt">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14h4v7H4z"/><path d="M10 9h4v12h-4z"/><path d="M16 3h4v18h-4z"/></svg>
+                Optimize
+              </button>
+              <button class="cpb-tool-btn" id="cpb-assist-btn" type="button" title="AI Prompt Assistant">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                AI Assist
+              </button>
+              <button class="cpb-tool-btn" id="cpb-history-btn" type="button" title="Prompt history (Ctrl+H)">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                History
               </button>
             </div>
+
+            <!-- Group C: Canvas tools (icon-only, secondary weight) -->
+            <div class="cpb-group cpb-group--canvas-tools">
+              <button class="cpb-tool-btn cpb-tool-btn--icon" id="cpb-add-char-btn" type="button" title="Add character (places a new character marker on canvas)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
+                + Char
+              </button>
+              <button class="cpb-icon-btn" id="cpb-expand-btn" type="button" title="Focus Mode (Cmd+E)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+              </button>
+            </div>
+
+            <!-- Spacer: pushes config + seed to the right -->
+            <div class="cpb-spacer"></div>
+
+            <!-- Group D: Generation config -->
+            <div class="cpb-group cpb-group--config">
+              <div class="cpb-meta-field">
+                <select id="cpb-provider" class="cpb-meta-select" title="Provider"></select>
+              </div>
+              <div class="cpb-meta-field" id="cpb-canvas-field">
+                <select id="cpb-resolution" class="cpb-meta-select" title="Canvas size"></select>
+              </div>
+              <button class="cpb-icon-btn" id="cpb-gear-btn" type="button" title="Generation Settings">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.55.26.94.77 1 1.34V11a2 2 0 0 1 0 4h-.09c-.57.06-1.08.45-1.34 1z"/></svg>
+              </button>
+              <button class="cpb-icon-btn" id="cpb-app-settings-btn" type="button" title="App Settings">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              </button>
+            </div>
+
+            <!-- Group E: Seed -->
+            <div class="cpb-group cpb-group--seed">
+              <div class="cpb-seed-row">
+                <label class="cpb-seed-label" for="cpb-seed">Seed</label>
+                <input type="number" id="cpb-seed" class="cpb-seed-input" value="0" min="0" placeholder="0 = random">
+                <button class="cpb-seed-rand-btn" id="cpb-seed-rand-btn" type="button" title="Random seed">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                </button>
+              </div>
+            </div>
+
           </div>
 
         </div>
@@ -1110,6 +1131,6 @@
   <script src="js/gallery.js?v=143"></script>
   <script src="js/explore.js?v=124"></script>
   <script src="js/characters.js?v=138"></script>
-  <script src="js/app.js?v=162"></script>
+  <script src="js/app.js?v=163"></script>
 </body>
 </html>

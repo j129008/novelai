@@ -1630,13 +1630,12 @@ function setupCanvasPromptBar() {
     });
   }
 
-  // Hide canvas field (and separator) when the sidebar hides it (Grok mode)
+  // Hide canvas field when the sidebar hides it (Grok mode)
   const sidebarCanvasField = document.getElementById("canvas-field");
-  if (sidebarCanvasField && cpbCanvasField && cpbMetaSep) {
+  if (sidebarCanvasField && cpbCanvasField) {
     function syncCanvasFieldVisibility() {
       const hidden = sidebarCanvasField.style.display === "none";
       cpbCanvasField.style.display = hidden ? "none" : "";
-      cpbMetaSep.style.display = hidden ? "none" : "";
     }
     syncCanvasFieldVisibility();
     new MutationObserver(syncCanvasFieldVisibility).observe(sidebarCanvasField, { attributes: true });

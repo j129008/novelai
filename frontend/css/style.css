@@ -16,6 +16,8 @@
   --accent-bright: #6cb4ff;
   --accent-dim:    rgba(74,158,255,0.15);
   --accent-glow:   rgba(74,158,255,0.30);
+  --warning:       #f59e0b;
+  --warning-bright:#fbbf24;
   --danger:        #e85050;
   --danger-bg:     rgba(232,80,80,0.10);
   --danger-border: rgba(232,80,80,0.30);
@@ -1714,17 +1716,94 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   color: var(--text-tertiary);
 }
 
-/* ── Controls row (single line of all tools + settings) ── */
+/* ── Controls row (logically grouped tools + settings) ── */
 .cpb-controls-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
   padding-top: 6px;
   overflow-x: auto;
   scrollbar-width: none;
 }
 .cpb-controls-row::-webkit-scrollbar { display: none; }
 .cpb-sep { width: 1px; height: 16px; background: var(--border-subtle); flex-shrink: 0; }
+
+/* Logical groups inside the controls row */
+.cpb-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 0 6px;
+  position: relative;
+}
+
+/* Vertical divider between groups via pseudo-element on all but the first */
+.cpb-group + .cpb-group::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 16px;
+  background: var(--border-subtle);
+}
+
+/* The spacer pushes groups D+E to the right */
+.cpb-spacer {
+  flex: 1;
+  min-width: 8px;
+}
+
+/* Groups after the spacer always get a left divider (spacer breaks the sibling chain) */
+.cpb-spacer + .cpb-group::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 16px;
+  background: var(--border-subtle);
+}
+
+/* Group A: Prompt modifiers — tighter spacing, no left padding for flush alignment */
+.cpb-group--modifiers {
+  padding-left: 0;
+  gap: 5px;
+}
+
+/* Group B: AI tools — slightly more visible weight */
+.cpb-group--ai-tools {
+  gap: 4px;
+}
+
+/* Group C: Canvas tools — secondary, dimmer */
+.cpb-group--canvas-tools .cpb-tool-btn,
+.cpb-group--canvas-tools .cpb-icon-btn {
+  color: var(--text-tertiary);
+  opacity: 0.8;
+}
+.cpb-group--canvas-tools .cpb-tool-btn:hover,
+.cpb-group--canvas-tools .cpb-icon-btn:hover {
+  opacity: 1;
+}
+
+/* Group D: Config — compact, no gap bloat between selects and icons */
+.cpb-group--config {
+  gap: 4px;
+}
+
+/* Group E: Seed — no extra padding needed, compact */
+.cpb-group--seed {
+  padding-right: 0;
+}
+
+/* Icon-only variant of cpb-tool-btn (used for +Char in canvas-tools group) */
+.cpb-tool-btn--icon {
+  padding: 3px 7px;
+}
 .cpb-icon-btn {
   background: none;
   border: 1px solid var(--border-muted);
@@ -2019,13 +2098,22 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 
 /* ── Responsive adjustments ───────────────────────── */
 @media (max-width: 860px) {
-  .cpb-pill-toggle:nth-child(n+2) { display: none; } /* hide Enhance on small screens */
+  /* Hide Enhance pill on small screens */
+  #cpb-enhance-pill { display: none; }
+
+  /* Hide History button to save space */
+  #cpb-history-btn { display: none; }
+
+  /* Hide +Char label, show icon only */
+  .cpb-group--canvas-tools .cpb-tool-btn--icon { padding: 3px 6px; }
 
   .cpb-meta-row { flex-wrap: wrap; }
 }
 
 @media (max-width: 480px) {
-  .cpb-right-cluster .cpb-pill-toggle { display: none; }
+  /* On mobile: hide AI tools group entirely, show only modifiers + config */
+  .cpb-group--ai-tools { display: none; }
+  .cpb-group--canvas-tools { display: none; }
 
   .cpb-generate-btn { padding: 0 12px; }
 }
@@ -3484,15 +3572,12 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 }
 .grok-quality-select:focus { border-color: var(--accent); }
 
-/* Grok quota HP bar */
+/* Grok quota — inside settings overlay */
 .grok-quota-bar {
   display: flex;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid var(--border-subtle);
-  padding: 6px 14px;
   cursor: pointer;
-  flex-shrink: 0;
 }
 /* Grok source image overlay on canvas */
 .grok-source-wrap {
@@ -3576,18 +3661,16 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   transition: width 0.4s ease, background 0.4s ease;
 }
 .grok-quota-fill.warning {
-  background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+  background: linear-gradient(90deg, var(--warning) 0%, var(--warning-bright) 100%);
 }
 .grok-quota-fill.danger {
-  background: linear-gradient(90deg, #ef4444 0%, #f87171 100%);
+  background: linear-gradient(90deg, var(--danger) 0%, #f87171 100%);
 }
 .grok-quota-label {
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   white-space: nowrap;
-  min-width: 90px;
-  text-align: right;
 }
 
 .output-type-toggle {

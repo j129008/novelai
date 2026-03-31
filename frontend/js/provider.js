@@ -122,8 +122,9 @@ async function fetchGrokUsage() {
     if (pct < 0.1) fill.classList.add("danger");
     else if (pct < 0.3) fill.classList.add("warning");
 
-    // Show bar regardless of provider
-    if (bar) bar.style.display = "";
+    // Show quota section in settings
+    const section = document.getElementById("grok-quota-section");
+    if (section) section.style.display = "";
 
     // Schedule next auto-refresh
     if (!fetchGrokUsage._timer) {
