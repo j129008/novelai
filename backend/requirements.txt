@@ -1,5 +1,5 @@
 # Web framework and server
-fastapi==0.115.6
+fastapi==0.135.2
 uvicorn==0.34.0
 
 # Environment variable loading (.env file support)
