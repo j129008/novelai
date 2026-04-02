@@ -134,7 +134,7 @@ def render_pose_image(figures, width: int, height: int) -> bytes:
     Uses RGBA with transparent background so it composites cleanly over
     layer images without washing out their colors.
     """
-    img = Image.new("RGBA", (width, height), color=(0, 0, 0, 0))
+    img = Image.new("RGB", (width, height), color=BACKGROUND_COLOR)
     draw = ImageDraw.Draw(img)
 
     for figure in figures:
@@ -142,9 +142,7 @@ def render_pose_image(figures, width: int, height: int) -> bytes:
         joint_map = joints.model_dump()
 
         skin_tone = getattr(figure, "skin_tone", "light")
-        color = SKIN_TONES.get(skin_tone, SKIN_TONES["light"])
-        # Add full alpha for RGBA
-        fill = color + (255,)
+        fill = SKIN_TONES.get(skin_tone, SKIN_TONES["light"])
         body_type = getattr(figure, "body_type", "male")
 
         pixel = {
@@ -161,9 +159,10 @@ def render_pose_image(figures, width: int, height: int) -> bytes:
         else:
             torso_h = height * 0.35
 
-        # Clean body shapes only — no joint circles, no outline (those are for canvas UI)
+        ol = OUTLINE_COLOR
+
         # 1. Torso
-        draw_torso(draw, pixel, body_type, fill, torso_h)
+        draw_torso(draw, pixel, body_type, fill, torso_h, outline=ol)
 
         # 2. Limbs
         for joint_a, joint_b, width_factor in BODY_PARTS_DRAW_ORDER:
@@ -171,15 +170,10 @@ def render_pose_image(figures, width: int, height: int) -> bytes:
             p2 = pixel.get(joint_b)
             if p1 and p2:
                 limb_width = torso_h * width_factor
-                draw_capsule(draw, p1, p2, limb_width, fill)
+                draw_capsule(draw, p1, p2, limb_width, fill, outline=ol)
 
         # 3. Head + neck
-        draw_head(draw, pixel, torso_h, fill)
-
-    # For pose-only (no layer images), flatten to RGB with white background.
-    # For compositing over layers, the frontend will handle the RGBA directly.
-    # Always output RGBA so the frontend can choose.
-    bg = img  # keep RGBA
+        draw_head(draw, pixel, torso_h, fill, outline=ol)
 
     buf = io.BytesIO()
     img.save(buf, format="PNG")

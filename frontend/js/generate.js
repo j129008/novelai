@@ -15,34 +15,21 @@ function clearOutput(outputEl) {
   if (ph) ph.remove();
 }
 
-// Composite a pose silhouette (RGBA, transparent bg) over the layer composite.
-// The pose image has transparent background — only the body shapes have pixels.
-// This means layer content (purple bg, etc.) shows through everywhere except the body.
+// Composite pose silhouette (RGB white bg) over layer composite.
 async function _compositePoseOverLayers(layerBase64, poseBase64, w, h) {
   const canvas = document.createElement("canvas");
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext("2d");
 
-  // Draw layer composite (background — fully visible)
   const layerImg = await _loadImg(`data:image/png;base64,${layerBase64}`);
   ctx.drawImage(layerImg, 0, 0, w, h);
 
-  // Draw pose silhouette on top — transparent bg means only body shapes appear
+  // Blend pose reference on top at 50% — enough for model to see body shape
   const poseImg = await _loadImg(`data:image/png;base64,${poseBase64}`);
+  ctx.globalAlpha = 0.5;
   ctx.drawImage(poseImg, 0, 0, w, h);
+  ctx.globalAlpha = 1.0;
 
-  return canvas.toDataURL("image/png").split(",")[1];
-}
-
-// For pose-only (no layers), flatten RGBA pose to white background
-async function _flattenPoseToWhiteBg(poseBase64, w, h) {
-  const canvas = document.createElement("canvas");
-  canvas.width = w; canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, w, h);
-  const poseImg = await _loadImg(`data:image/png;base64,${poseBase64}`);
-  ctx.drawImage(poseImg, 0, 0, w, h);
   return canvas.toDataURL("image/png").split(",")[1];
 }
 
@@ -176,8 +163,8 @@ async function generate() {
           state.img2img = await _compositePoseOverLayers(state.img2img, poseImage, width || 832, height || 1216);
           // Keep user's strength setting
         } else {
-          // Pose-only: flatten to white background for img2img
-          state.img2img = await _flattenPoseToWhiteBg(poseImage, width || 832, height || 1216);
+          // Pose-only: backend already returns RGB with white bg
+          state.img2img = poseImage;
           // Use pose-specific strength only when pose is the sole source
           const poseLayer = layers.find(l => l.poseData && l.poseData.enabled);
           if (poseLayer && poseLayer.poseData.poseStrength !== undefined) {
