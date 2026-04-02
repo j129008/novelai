@@ -19,6 +19,7 @@ backend/
 │   ├── routes.py        # API endpoints (/api/*)
 │   ├── novelai.py       # NovelAI API client & image processing
 │   ├── grok.py          # xAI Grok API client (image, video, vision, chat)
+│   ├── pose.py          # Pose silhouette rendering (Pillow, for img2img)
 │   ├── tagger.py        # WD Tagger model for image analysis
 │   └── florence.py      # Florence model integration
 ├── models/schemas.py    # Pydantic request/response models
@@ -38,6 +39,7 @@ frontend/
     ├── gallery.js       # History gallery, lightbox, load settings
     ├── tags.js          # Tag Intelligence panel + autocomplete
     ├── tag-intelligence.js  # Optimize/refine history, discoveries, saved tags
+    ├── pose.js          # Pose skeleton system (mannequin overlay, drag, scale, pan)
     ├── crop.js          # Image crop/pan for img2img
     ├── explore.js       # Image exploration tools
     ├── provider.js      # Provider switching (NovelAI/Grok)
@@ -91,6 +93,7 @@ Key patterns:
 | `POST /api/analyze-image` | WD Tagger image analysis |
 | `GET /api/tags` | Tag search (140K database) |
 | `GET /api/gallery` | Gallery file listing |
+| `POST /api/render-pose` | Pose silhouette rendering (Pillow mannequin for img2img) |
 | `GET/POST /api/settings` | App settings (output directory) |
 
 ## Optimize Prompt System
@@ -115,6 +118,10 @@ The optimize feature uses Grok (`grok-3-mini`) with `_NOVELAI_GUIDE` (based on o
 - **Flex containers** holding images need `height: 0` to prevent image stretching beyond bounds
 - **`preventDefault` on `mousedown`** blocks native `<select>` dropdowns — never apply to select elements
 - **Reparent popovers** to `document.body` when their parent container has `display:none`
+- **Pose SVG overlay** must use generation resolution aspect ratio for viewBox (not canvas aspect ratio) — otherwise input/output positions won't align
+- **SVG `pointer-events: none`** on the overlay root, `pointer-events: all` only on `<circle>` joint handles — prevents blocking scroll/canvas interactions
+- **NovelAI img2img is NOT ControlNet** — mannequin silhouettes provide rough position/shape guidance only, not precise pose control
+- **Compare mode** (Split/Blend/Flash) stores `state.lastImg2imgInput` at generation time for exact input vs output comparison
 
 ## Team (Sub-Agents)
 
