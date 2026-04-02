@@ -108,11 +108,48 @@ function _mid(a, b) { return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; }
 // ── Module-level state ───────────────────────────────────
 let _dragState = null;
 
-// SVG overlay always fills canvas-drop-target via CSS inset:0
-// Clear any stale inline styles from previous versions
-function _alignOverlayToOutput() {
+// Position SVG overlay to match the generation resolution aspect ratio
+// (like object-fit: contain) so the mannequin maps exactly to the output
+function _alignOverlayToGenRes() {
   const svg = document.getElementById("pose-skeleton-overlay");
-  if (svg) { svg.style.left = ""; svg.style.top = ""; svg.style.width = ""; svg.style.height = ""; }
+  if (!svg) return;
+  const cdt = document.getElementById("canvas-drop-target");
+  if (!cdt) return;
+
+  const cdtRect = cdt.getBoundingClientRect();
+  const cdtW = cdtRect.width, cdtH = cdtRect.height;
+  if (!cdtW || !cdtH) return;
+
+  // Get generation resolution
+  const resEl = document.getElementById("resolution");
+  let genW = 832, genH = 1216;
+  if (resEl && resEl.value) {
+    const parts = resEl.value.split("x");
+    if (parts.length === 2) { genW = parseInt(parts[0]) || 832; genH = parseInt(parts[1]) || 1216; }
+  }
+
+  const genAR = genW / genH;
+  const cdtAR = cdtW / cdtH;
+
+  let svgW, svgH, svgLeft, svgTop;
+  if (genAR > cdtAR) {
+    // Generation is wider than canvas — fit to width
+    svgW = cdtW;
+    svgH = cdtW / genAR;
+    svgLeft = 0;
+    svgTop = (cdtH - svgH) / 2;
+  } else {
+    // Generation is taller than canvas — fit to height
+    svgH = cdtH;
+    svgW = cdtH * genAR;
+    svgLeft = (cdtW - svgW) / 2;
+    svgTop = 0;
+  }
+
+  svg.style.left = svgLeft + "px";
+  svg.style.top = svgTop + "px";
+  svg.style.width = svgW + "px";
+  svg.style.height = svgH + "px";
 }
 
 // ── Render ────────────────────────────────────────────────
@@ -126,12 +163,21 @@ function renderPoseSkeleton(layerIdx) {
   const anyPose = layers.some(l => l.poseData && l.poseData.enabled);
   if (!anyPose) { svg.classList.remove("pose-active"); hideSilhouettePreview(); return; }
 
-  const svgRect = svg.getBoundingClientRect();
-  const ar = svgRect.width && svgRect.height ? svgRect.width / svgRect.height : 1;
+  // Use generation resolution aspect ratio for viewBox
+  const resEl = document.getElementById("resolution");
+  let genW = 832, genH = 1216;
+  if (resEl && resEl.value) {
+    const parts = resEl.value.split("x");
+    if (parts.length === 2) { genW = parseInt(parts[0]) || 832; genH = parseInt(parts[1]) || 1216; }
+  }
+  const ar = genW / genH;
   svg.setAttribute("viewBox", `0 0 ${ar} 1`);
   svg.setAttribute("preserveAspectRatio", "none");
   svg.classList.add("pose-active");
   svg._poseAspect = ar;
+
+  // Position SVG to match generation aspect ratio (like object-fit: contain)
+  _alignOverlayToGenRes();
 
   const activeIdx = layerIdx;
   const poseLayers = [];
@@ -140,7 +186,6 @@ function renderPoseSkeleton(layerIdx) {
   }
   poseLayers.sort((a, b) => (a === activeIdx ? 1 : 0) - (b === activeIdx ? 1 : 0));
   for (const idx of poseLayers) _renderSinglePose(svg, idx, idx === activeIdx, ar);
-  _alignOverlayToOutput();
 }
 
 function _renderSinglePose(svg, layerIdx, isActive, ar) {
@@ -216,6 +261,8 @@ function setupPoseDrag() {
   const svg = document.getElementById("pose-skeleton-overlay");
   if (!svg || svg._poseDragAttached) return;
   svg._poseDragAttached = true;
+
+  window.addEventListener("resize", _alignOverlayToGenRes);
 
   svg.addEventListener("mousedown", (e) => {
     const circle = e.target.closest("circle[data-joint]");

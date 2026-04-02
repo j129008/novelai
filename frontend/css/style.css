@@ -4484,7 +4484,6 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
 }
 #pose-skeleton-overlay {
   position: absolute;
-  inset: 0;
   pointer-events: none;
   z-index: 11;
 }
