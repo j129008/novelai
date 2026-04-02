@@ -1967,6 +1967,9 @@ function setupCanvasViewToggle() {
 
     if (view === "input") {
       inputBtn.classList.remove("cvt-btn--changed");
+      // Clear any generated image from output before showing input
+      const output = document.getElementById("output");
+      if (output) clearOutput(output);
       // Show source: composite preview (NovelAI) or source image (Grok)
       const provider = document.getElementById("provider")?.value || "novelai";
       if (provider === "grok" && state.img2img) {
