@@ -1878,6 +1878,7 @@ async function init() {
   setupPromptAssist();
   setupPromptOptimize();
   setupLayers();
+  setupPoseDrag();
   setupCanvasLayerPanel();
   setupCanvasViewToggle();
   setupCanvasPromptBar();

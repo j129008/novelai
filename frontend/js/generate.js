@@ -15,6 +15,33 @@ function clearOutput(outputEl) {
   if (ph) ph.remove();
 }
 
+// Composite pose silhouette (RGB white bg) over layer composite.
+async function _compositePoseOverLayers(layerBase64, poseBase64, w, h) {
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+
+  const layerImg = await _loadImg(`data:image/png;base64,${layerBase64}`);
+  ctx.drawImage(layerImg, 0, 0, w, h);
+
+  // Blend pose reference on top at 50% — enough for model to see body shape
+  const poseImg = await _loadImg(`data:image/png;base64,${poseBase64}`);
+  ctx.globalAlpha = 0.5;
+  ctx.drawImage(poseImg, 0, 0, w, h);
+  ctx.globalAlpha = 1.0;
+
+  return canvas.toDataURL("image/png").split(",")[1];
+}
+
+function _loadImg(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
 function setGenerateButtonStop() {
   const btn = $("#generate-btn");
   btn.classList.remove("loading");
@@ -118,6 +145,42 @@ async function generate() {
     state.img2img = null; // No layers active → pure text-to-image
   }
 
+  // Pose skeleton → img2img overlay / source
+  const poseFigures = collectPosePayload();
+  if (poseFigures.length > 0) {
+    try {
+      const poseResp = await fetch("/api/render-pose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ figures: poseFigures, width: width || 832, height: height || 1216 }),
+      });
+      if (poseResp.ok) {
+        const poseData = await poseResp.json();
+        const poseImage = poseData.image; // base64 PNG
+
+        if (state.img2img) {
+          // Composite pose body shapes over layer images (transparent bg = clean overlay)
+          state.img2img = await _compositePoseOverLayers(state.img2img, poseImage, width || 832, height || 1216);
+          // Keep user's strength setting
+        } else {
+          // Pose-only: backend already returns RGB with white bg
+          state.img2img = poseImage;
+          // Use pose-specific strength only when pose is the sole source
+          const poseLayer = layers.find(l => l.poseData && l.poseData.enabled);
+          if (poseLayer && poseLayer.poseData.poseStrength !== undefined) {
+            body.strength = poseLayer.poseData.poseStrength;
+          } else {
+            body.strength = 0.6;
+          }
+        }
+
+        console.log("[generate] pose guide active, figures:", poseFigures.length, "strength:", body.strength);
+      }
+    } catch (err) {
+      console.warn("[generate] pose render failed:", err);
+    }
+  }
+
   const inpaintLayer = layers.find(l => l.inpaintMaskBase64);
   console.log("[generate] inpaintLayer:", inpaintLayer ? inpaintLayer.name : "none", "layers with inpaint mask:", layers.filter(l => l.inpaintMaskBase64).length);
   if (inpaintLayer && (state.img2img || state.canvasImageBase64)) {
@@ -162,23 +225,30 @@ async function generate() {
     state.lastSeed = data.seed;
     state.lastImageBase64 = data.image;
     state.lastGeneratedImageBase64 = data.image;
+    state.lastImg2imgInput = state.img2img || null;
     state.canvasImageBase64 = data.image;
     state.canvasImageWidth = width;
     state.canvasImageHeight = height;
 
-    const output = $("#output");
-    const img = document.createElement("img");
-    img.src = `data:image/png;base64,${data.image}`;
-    img.alt = "Generated image";
-    clearOutput(output);
-    output.appendChild(img);
-    // Re-render character markers (cleared by innerHTML reset above)
-    renderCharacterMarkers();
+    // Only show generated image in #output when viewing Output mode
+    // (Input mode shows the layer composite — don't overwrite it)
+    if (_canvasView !== "input") {
+      const output = $("#output");
+      const img = document.createElement("img");
+      img.src = `data:image/png;base64,${data.image}`;
+      img.alt = "Generated image";
+      clearOutput(output);
+      output.appendChild(img);
+      renderCharacterMarkers();
+    }
 
     const actions = $("#image-actions");
     actions.style.display = "flex";
     syncInpaintButtonVisibility();
     $("#info-seed").textContent = `Seed: ${data.seed}`;
+    if (poseFigures.length > 0) {
+      $("#info-seed").textContent += "  |  Pose guide active";
+    }
 
     // Output target layer: write result back into the designated layer
     const outputLayer = layers.find(l => l.isOutputTarget);
@@ -317,6 +387,7 @@ async function generateGrokImage() {
     state.lastSeed = null;
     state.lastImageBase64 = data.image;
     state.lastGeneratedImageBase64 = data.image;
+    state.lastImg2imgInput = state.img2img || null;
     state.canvasImageBase64 = data.image;
     state.canvasImageWidth = null;
     state.canvasImageHeight = null;

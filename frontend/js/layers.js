@@ -16,6 +16,7 @@ function saveLayersToStorage() {
       offsetX: l.offsetX || 0,
       offsetY: l.offsetY || 0,
       scale: l.scale !== undefined ? l.scale : 1.0,
+      poseData: l.poseData || null,
     }));
     localStorage.setItem("nai-layers", JSON.stringify(data));
   } catch (e) {
@@ -43,7 +44,14 @@ function loadLayersFromStorage() {
         offsetX: l.offsetX || 0,
         offsetY: l.offsetY || 0,
         scale: typeof l.scale === "number" ? l.scale : 1.0,
+        poseData: l.poseData || null,
       });
+    });
+    // Migrate legacy "adult" body type → "male"
+    layers.forEach((l) => {
+      if (l.poseData && l.poseData.bodyType === "adult") {
+        l.poseData.bodyType = "male";
+      }
     });
   } catch (_) { /* corrupt storage — ignore */ }
 }
@@ -772,6 +780,8 @@ function renderLayerStrip() {
         tabsList.querySelectorAll(".layer-tab").forEach((t, i) => {
           t.classList.toggle("layer-tab--active", i === _activeLayerIdx);
         });
+        // Update pose skeleton to reflect new active layer
+        if (typeof renderPoseSkeleton === "function") renderPoseSkeleton(idx);
         const panel = document.getElementById("layer-tab-panel");
         if (wasActive && panel && panel.style.display !== "none") {
           panel.style.display = "none";
@@ -908,6 +918,120 @@ function _populateLayerPanel(container, idx) {
   });
   scRow.appendChild(scLabel); scRow.appendChild(scSlider); scRow.appendChild(scVal);
   container.appendChild(scRow);
+
+  // ── Pose Skeleton ──────────────────────────────────────
+  const poseSep = document.createElement("div");
+  poseSep.className = "ltp-sep";
+  container.appendChild(poseSep);
+
+  const poseRow = document.createElement("div");
+  poseRow.className = "ltp-row";
+  const poseLabel = document.createElement("span");
+  poseLabel.className = "ltp-label";
+  poseLabel.textContent = "Pose";
+  const poseToggle = document.createElement("input");
+  poseToggle.type = "checkbox";
+  poseToggle.checked = !!(layer.poseData && layer.poseData.enabled);
+  poseToggle.addEventListener("change", () => {
+    if (!layer.poseData) {
+      layer.poseData = { enabled: true, bodyType: "male", skinColor: "#ffdbac", joints: getDefaultJoints("male"), poseStrength: 0.6 };
+    } else {
+      layer.poseData.enabled = poseToggle.checked;
+    }
+    saveLayersToStorage();
+    renderPoseSkeleton(idx);
+    _populateLayerPanel(container, idx);
+  });
+  poseRow.appendChild(poseLabel);
+  poseRow.appendChild(poseToggle);
+  container.appendChild(poseRow);
+
+  if (layer.poseData && layer.poseData.enabled) {
+    // Body type dropdown
+    const btRow = document.createElement("div");
+    btRow.className = "ltp-row";
+    const btLabel = document.createElement("span");
+    btLabel.className = "ltp-label";
+    btLabel.textContent = "Body";
+    const btSelect = document.createElement("select");
+    btSelect.className = "ltp-select";
+    ["male", "female", "child"].forEach((t) => {
+      const opt = document.createElement("option");
+      opt.value = t;
+      opt.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+      if (layer.poseData.bodyType === t) opt.selected = true;
+      btSelect.appendChild(opt);
+    });
+    btSelect.addEventListener("change", () => {
+      layer.poseData.bodyType = btSelect.value;
+      layer.poseData.joints = getDefaultJoints(btSelect.value);
+      saveLayersToStorage();
+      renderPoseSkeleton(idx);
+    });
+    btRow.appendChild(btLabel);
+    btRow.appendChild(btSelect);
+    container.appendChild(btRow);
+
+    // Skin color picker
+    const stRow = document.createElement("div");
+    stRow.className = "ltp-row";
+    const stLabel = document.createElement("span");
+    stLabel.className = "ltp-label";
+    stLabel.textContent = "Skin";
+    const stColor = document.createElement("input");
+    stColor.type = "color";
+    stColor.value = layer.poseData.skinColor || "#ffdbac";
+    stColor.style.cssText = "width:32px;height:24px;border:none;padding:0;cursor:pointer;background:none;";
+    stColor.addEventListener("input", () => {
+      layer.poseData.skinColor = stColor.value;
+      saveLayersToStorage();
+      renderPoseSkeleton(idx);
+    });
+    stRow.appendChild(stLabel);
+    stRow.appendChild(stColor);
+    container.appendChild(stRow);
+
+    // Strength slider
+    const strRow = document.createElement("div");
+    strRow.className = "ltp-row";
+    const strLabel = document.createElement("span");
+    strLabel.className = "ltp-label";
+    strLabel.textContent = "Strength";
+    const strSlider = document.createElement("input");
+    strSlider.type = "range";
+    strSlider.className = "ltp-slider";
+    strSlider.min = "0";
+    strSlider.max = "1";
+    strSlider.step = "0.05";
+    strSlider.value = String(layer.poseData.poseStrength !== undefined ? layer.poseData.poseStrength : 0.6);
+    const strVal = document.createElement("span");
+    strVal.className = "ltp-val";
+    strVal.textContent = Math.round((layer.poseData.poseStrength !== undefined ? layer.poseData.poseStrength : 0.6) * 100) + "%";
+    strSlider.addEventListener("input", () => {
+      layer.poseData.poseStrength = parseFloat(strSlider.value);
+      strVal.textContent = Math.round(layer.poseData.poseStrength * 100) + "%";
+      saveLayersToStorage();
+    });
+    strRow.appendChild(strLabel);
+    strRow.appendChild(strSlider);
+    strRow.appendChild(strVal);
+    container.appendChild(strRow);
+
+    // Reset button
+    const poseResetRow = document.createElement("div");
+    poseResetRow.className = "ltp-actions";
+    const poseResetBtn = document.createElement("button");
+    poseResetBtn.className = "ltp-btn";
+    poseResetBtn.type = "button";
+    poseResetBtn.textContent = "Reset Pose";
+    poseResetBtn.title = "Reset joints to default position for this body type";
+    poseResetBtn.addEventListener("click", () => {
+      resetLayerPose(idx);
+      _populateLayerPanel(container, idx);
+    });
+    poseResetRow.appendChild(poseResetBtn);
+    container.appendChild(poseResetRow);
+  }
 
   // Tool actions
   const tools = document.createElement("div");
@@ -1837,8 +1961,15 @@ function setupCanvasViewToggle() {
     localStorage.setItem("nai-canvas-view", view);
     inputBtn.classList.toggle("cvt-btn--active", view === "input");
     outputBtn.classList.toggle("cvt-btn--active", view === "output");
+    // Show/hide pose skeleton overlay based on view
+    const poseSvg = document.getElementById("pose-skeleton-overlay");
+    if (poseSvg) poseSvg.style.display = view === "input" ? "" : "none";
+
     if (view === "input") {
       inputBtn.classList.remove("cvt-btn--changed");
+      // Clear any generated image from output before showing input
+      const output = document.getElementById("output");
+      if (output) clearOutput(output);
       // Show source: composite preview (NovelAI) or source image (Grok)
       const provider = document.getElementById("provider")?.value || "novelai";
       if (provider === "grok" && state.img2img) {
@@ -1869,13 +2000,222 @@ function setupCanvasViewToggle() {
     }
   }
 
-  inputBtn.addEventListener("click",  () => applyView("input"));
-  outputBtn.addEventListener("click", () => applyView("output"));
+  inputBtn.addEventListener("click",  () => { exitCompare(); applyView("input"); });
+  outputBtn.addEventListener("click", () => { exitCompare(); applyView("output"); });
 
   // Restore saved view (default to output)
   const saved = localStorage.getItem("nai-canvas-view") || "output";
   inputBtn.classList.toggle("cvt-btn--active", saved === "input");
   outputBtn.classList.toggle("cvt-btn--active", saved === "output");
+
+  // ── Compare Mode ──────────────────────────────────────────
+  let _compareMode = null; // null | "split" | "blend" | "flash"
+  let _splitPos    = 0.5;
+  let _flashInterval = null;
+
+  const splitBtn    = document.getElementById("cvt-split");
+  const blendBtn    = document.getElementById("cvt-blend");
+  const flashBtn    = document.getElementById("cvt-flash");
+  const compareBtns = [splitBtn, blendBtn, flashBtn].filter(Boolean);
+
+  function enableCompareButtons() {
+    const has = !!state.lastGeneratedImageBase64;
+    compareBtns.forEach(b => { b.disabled = !has; });
+  }
+
+  function exitCompare() {
+    if (!_compareMode) return;
+    _compareMode = null;
+    compareBtns.forEach(b => b.classList.remove("cvt-compare-btn--active"));
+
+    // Clean up flash listeners stored on container
+    const container = document.getElementById("compare-container");
+    if (container) {
+      if (typeof container._flashCleanup === "function") container._flashCleanup();
+      container.remove();
+    }
+
+    // Clean up flash interval
+    if (_flashInterval) { clearInterval(_flashInterval); _flashInterval = null; }
+
+    // Restore pose overlay
+    const poseSvg = document.getElementById("pose-skeleton-overlay");
+    if (poseSvg) poseSvg.style.display = "";
+  }
+
+  function enterCompare(mode) {
+    exitCompare();
+    if (!state.lastGeneratedImageBase64) return;
+    _compareMode = mode;
+
+    // Mark active button
+    const btnMap = { split: splitBtn, blend: blendBtn, flash: flashBtn };
+    if (btnMap[mode]) btnMap[mode].classList.add("cvt-compare-btn--active");
+
+    // Hide pose overlay during compare
+    const poseSvg = document.getElementById("pose-skeleton-overlay");
+    if (poseSvg) poseSvg.style.display = "none";
+
+    // Image sources
+    const inputSrc = state.lastImg2imgInput
+      ? "data:image/png;base64," + state.lastImg2imgInput
+      : (state.canvasImageBase64
+          ? "data:image/png;base64," + state.canvasImageBase64
+          : null);
+    const outputSrc = "data:image/png;base64," + state.lastGeneratedImageBase64;
+
+    const cdt = document.getElementById("canvas-drop-target");
+    if (!cdt) return;
+
+    // Build compare container
+    const container = document.createElement("div");
+    container.id = "compare-container";
+    container.className = "compare-container";
+
+    const imgInput = document.createElement("img");
+    imgInput.className = "compare-img-input";
+    imgInput.alt = "Input";
+    imgInput.src = inputSrc || outputSrc; // fallback to output if no input
+
+    const imgOutput = document.createElement("img");
+    imgOutput.className = "compare-img-output";
+    imgOutput.alt = "Output";
+    imgOutput.src = outputSrc;
+
+    if (mode === "split") {
+      _splitPos = 0.5;
+      container.appendChild(imgInput);
+      container.appendChild(imgOutput);
+
+      function updateSplit() {
+        const pct = (_splitPos * 100).toFixed(2);
+        imgInput.style.clipPath  = `inset(0 ${(100 - _splitPos * 100).toFixed(2)}% 0 0)`;
+        imgOutput.style.clipPath = `inset(0 0 0 ${pct}%)`;
+        divider.style.left = pct + "%";
+      }
+
+      const divider = document.createElement("div");
+      divider.className = "compare-divider";
+      container.appendChild(divider);
+      updateSplit();
+
+      let dragging = false;
+      divider.addEventListener("mousedown", (e) => {
+        dragging = true;
+        e.preventDefault();
+      });
+      function onMouseMove(e) {
+        if (!dragging) return;
+        const rect = container.getBoundingClientRect();
+        _splitPos = Math.max(0.02, Math.min(0.98, (e.clientX - rect.left) / rect.width));
+        updateSplit();
+      }
+      function onMouseUp() { dragging = false; }
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup",   onMouseUp);
+
+      container._flashCleanup = () => {
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup",   onMouseUp);
+      };
+
+    } else if (mode === "blend") {
+      container.appendChild(imgInput);
+      imgOutput.style.opacity = "0.5";
+      container.appendChild(imgOutput);
+
+      const wrap = document.createElement("div");
+      wrap.className = "compare-slider-wrap";
+
+      const labelIn = document.createElement("span");
+      labelIn.textContent = "Input";
+
+      const slider = document.createElement("input");
+      slider.type  = "range";
+      slider.min   = "0";
+      slider.max   = "100";
+      slider.value = "50";
+      slider.addEventListener("input", () => {
+        imgOutput.style.opacity = String(parseInt(slider.value, 10) / 100);
+      });
+
+      const labelOut = document.createElement("span");
+      labelOut.textContent = "Output";
+
+      wrap.appendChild(labelIn);
+      wrap.appendChild(slider);
+      wrap.appendChild(labelOut);
+      container.appendChild(wrap);
+
+      container._flashCleanup = null;
+
+    } else if (mode === "flash") {
+      // Default state: show output, spacebar reveals input
+      container.appendChild(imgInput);
+      container.appendChild(imgOutput);
+      imgInput.style.display = "none";
+      let showing = "output";
+
+      function onKeyDown(e) {
+        if (e.code === "Space" && _compareMode === "flash") {
+          e.preventDefault();
+          imgInput.style.display  = "";
+          imgOutput.style.display = "none";
+          showing = "input";
+        }
+      }
+      function onKeyUp(e) {
+        if (e.code === "Space" && _compareMode === "flash") {
+          e.preventDefault();
+          imgInput.style.display  = "none";
+          imgOutput.style.display = "";
+          showing = "output";
+        }
+      }
+      document.addEventListener("keydown", onKeyDown);
+      document.addEventListener("keyup",   onKeyUp);
+
+      // Auto-flash interval (toggles every 500ms)
+      _flashInterval = setInterval(() => {
+        if (_compareMode !== "flash") return;
+        if (showing === "output") {
+          imgInput.style.display  = "";
+          imgOutput.style.display = "none";
+          showing = "input";
+        } else {
+          imgInput.style.display  = "none";
+          imgOutput.style.display = "";
+          showing = "output";
+        }
+      }, 500);
+
+      container._flashCleanup = () => {
+        document.removeEventListener("keydown", onKeyDown);
+        document.removeEventListener("keyup",   onKeyUp);
+        if (_flashInterval) { clearInterval(_flashInterval); _flashInterval = null; }
+      };
+    }
+
+    cdt.appendChild(container);
+  }
+
+  // Wire compare buttons
+  compareBtns.forEach(btn => {
+    const modes = { "cvt-split": "split", "cvt-blend": "blend", "cvt-flash": "flash" };
+    const mode  = modes[btn.id];
+    if (!mode) return;
+    btn.addEventListener("click", () => {
+      if (_compareMode === mode) {
+        exitCompare();
+      } else {
+        enterCompare(mode);
+      }
+    });
+  });
+
+  // Periodically sync enable state after generation completes
+  enableCompareButtons();
+  setInterval(enableCompareButtons, 800);
 }
 
 /* ═══════════════════════════════════════════════════════════

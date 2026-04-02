@@ -25,6 +25,7 @@ const state = {
   lastImageBase64: null,
   lastVideoBase64: null,  // base64 MP4 from Grok video generation
   lastGeneratedImageBase64: null, // the most recent AI-generated image (never overwritten by composite preview)
+  lastImg2imgInput: null,         // the img2img composite sent to the API (captured at generation time for compare mode)
   // canvas-displayed image (may be a gallery preview, not necessarily last generated)
   canvasImageBase64: null,
   canvasImageWidth: null,
