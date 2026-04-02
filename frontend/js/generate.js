@@ -242,14 +242,17 @@ async function generate() {
     state.canvasImageWidth = width;
     state.canvasImageHeight = height;
 
-    const output = $("#output");
-    const img = document.createElement("img");
-    img.src = `data:image/png;base64,${data.image}`;
-    img.alt = "Generated image";
-    clearOutput(output);
-    output.appendChild(img);
-    // Re-render character markers (cleared by innerHTML reset above)
-    renderCharacterMarkers();
+    // Only show generated image in #output when viewing Output mode
+    // (Input mode shows the layer composite — don't overwrite it)
+    if (_canvasView !== "input") {
+      const output = $("#output");
+      const img = document.createElement("img");
+      img.src = `data:image/png;base64,${data.image}`;
+      img.alt = "Generated image";
+      clearOutput(output);
+      output.appendChild(img);
+      renderCharacterMarkers();
+    }
 
     const actions = $("#image-actions");
     actions.style.display = "flex";

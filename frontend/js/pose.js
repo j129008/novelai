@@ -108,26 +108,11 @@ function _mid(a, b) { return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; }
 // ── Module-level state ───────────────────────────────────
 let _dragState = null;
 
-// ── Overlay alignment ────────────────────────────────────
-
+// SVG overlay always fills canvas-drop-target via CSS inset:0
+// Clear any stale inline styles from previous versions
 function _alignOverlayToOutput() {
   const svg = document.getElementById("pose-skeleton-overlay");
-  if (!svg) return;
-  const output = document.getElementById("output");
-  const img = output ? output.querySelector("img") : null;
-  const cdt = document.getElementById("canvas-drop-target");
-  if (!cdt) return;
-  const cdtRect = cdt.getBoundingClientRect();
-  if (img && img.naturalWidth && img.naturalHeight) {
-    const imgRect = img.getBoundingClientRect();
-    svg.style.left   = (imgRect.left - cdtRect.left) + "px";
-    svg.style.top    = (imgRect.top - cdtRect.top) + "px";
-    svg.style.width  = imgRect.width + "px";
-    svg.style.height = imgRect.height + "px";
-  } else {
-    svg.style.left = "0"; svg.style.top = "0";
-    svg.style.width = "100%"; svg.style.height = "100%";
-  }
+  if (svg) { svg.style.left = ""; svg.style.top = ""; svg.style.width = ""; svg.style.height = ""; }
 }
 
 // ── Render ────────────────────────────────────────────────
@@ -231,11 +216,6 @@ function setupPoseDrag() {
   const svg = document.getElementById("pose-skeleton-overlay");
   if (!svg || svg._poseDragAttached) return;
   svg._poseDragAttached = true;
-
-  window.addEventListener("resize", _alignOverlayToOutput);
-  const observer = new MutationObserver(_alignOverlayToOutput);
-  const output = document.getElementById("output");
-  if (output) observer.observe(output, { childList: true, subtree: true });
 
   svg.addEventListener("mousedown", (e) => {
     const circle = e.target.closest("circle[data-joint]");

@@ -328,6 +328,23 @@ The silhouette preview image MUST align precisely with the SVG skeleton overlay.
 - **THEN** the silhouette body parts (head, torso, limbs) are centered on the corresponding skeleton joints
 - **AND** the render-pose API is called with width/height matching the canvas aspect ratio
 
+### Requirement: Canvas View Isolation
+When the user is viewing Input mode, generated images MUST NOT be inserted into the output area. The generated image SHALL only appear when switching to Output mode. The pose overlay size MUST remain consistent — it SHALL always fill the canvas-drop-target area regardless of whether a generated image exists.
+
+#### Scenario: Generate in Input view does not overwrite
+- **WHEN** user is in Input view with pose overlay visible
+- **AND** a generation completes
+- **THEN** the generated image is NOT placed in #output
+- **AND** the pose overlay remains visible at the same size
+- **AND** the Output button shows a change indicator dot
+
+#### Scenario: Pose overlay size stays consistent
+- **WHEN** user sets up a pose figure in Input view
+- **AND** then generates an image
+- **AND** switches between Input and Output
+- **THEN** the pose overlay always fills the entire canvas-drop-target
+- **AND** the mannequin does NOT shrink or reposition
+
 ### Requirement: Prevent Browser Zoom
 When pose mode is active, the system SHALL prevent browser zoom (Ctrl+scroll / trackpad pinch) on the canvas area. All wheel events on the canvas area while pose is active SHALL be consumed by the skeleton scale handler, preventing the browser from interpreting them as page zoom.
 
