@@ -225,6 +225,7 @@ async function generate() {
     state.lastSeed = data.seed;
     state.lastImageBase64 = data.image;
     state.lastGeneratedImageBase64 = data.image;
+    state.lastImg2imgInput = state.img2img || null;
     state.canvasImageBase64 = data.image;
     state.canvasImageWidth = width;
     state.canvasImageHeight = height;
@@ -386,6 +387,7 @@ async function generateGrokImage() {
     state.lastSeed = null;
     state.lastImageBase64 = data.image;
     state.lastGeneratedImageBase64 = data.image;
+    state.lastImg2imgInput = state.img2img || null;
     state.canvasImageBase64 = data.image;
     state.canvasImageWidth = null;
     state.canvasImageHeight = null;

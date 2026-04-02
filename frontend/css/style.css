@@ -5087,6 +5087,85 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   background: var(--accent);
 }
 
+/* ── Compare mode buttons ──────────────────────────────────── */
+.cvt-compare-btn {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  opacity: 0.6;
+}
+
+.cvt-compare-btn:not(:disabled):hover {
+  opacity: 1;
+}
+
+.cvt-compare-btn--active {
+  opacity: 1;
+  background: var(--accent-dim);
+  color: var(--accent-bright);
+}
+
+.cvt-compare-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* ── Compare overlay ───────────────────────────────────────── */
+.compare-container {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.compare-container img {
+  position: absolute;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.compare-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--text-primary);
+  cursor: ew-resize;
+  z-index: 2;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+  transition: background 0.15s;
+}
+
+.compare-divider:hover {
+  background: var(--accent-bright);
+}
+
+.compare-slider-wrap {
+  position: absolute;
+  bottom: 16px;
+  left: 20%;
+  right: 20%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.compare-slider-wrap input[type="range"] {
+  flex: 1;
+}
+
+.compare-slider-wrap span {
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .cvt-clear {
   position: absolute;
   z-index: 20;

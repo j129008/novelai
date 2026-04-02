@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=187">
+  <link rel="stylesheet" href="css/style.css?v=188">
 </head>
 <body>
   <div class="app">
@@ -706,6 +706,9 @@
           <div id="canvas-view-toggle" class="canvas-view-toggle" style="display:none">
             <button id="cvt-input" class="cvt-btn" type="button">Input</button>
             <button id="cvt-output" class="cvt-btn cvt-btn--active" type="button">Output</button>
+            <button id="cvt-split" class="cvt-btn cvt-compare-btn" type="button" disabled title="Split compare — drag divider to reveal">Split</button>
+            <button id="cvt-blend" class="cvt-btn cvt-compare-btn" type="button" disabled title="Blend compare — use slider to mix">Blend</button>
+            <button id="cvt-flash" class="cvt-btn cvt-compare-btn" type="button" disabled title="Flash compare — spacebar to switch, auto-flashes at 500ms">Flash</button>
           </div>
           <div id="history-search-wrap" class="history-search-wrap" style="display:none">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -1128,8 +1131,8 @@
   <script src="js/tag-intelligence.js?v=127"></script>
   <script src="js/tags.js?v=161"></script>
   <script src="js/pose.js?v=187"></script>
-  <script src="js/layers.js?v=185"></script>
-  <script src="js/generate.js?v=186"></script>
+  <script src="js/layers.js?v=188"></script>
+  <script src="js/generate.js?v=188"></script>
 
   <script src="js/gallery.js?v=143"></script>
   <script src="js/explore.js?v=124"></script>

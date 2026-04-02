@@ -2000,13 +2000,222 @@ function setupCanvasViewToggle() {
     }
   }
 
-  inputBtn.addEventListener("click",  () => applyView("input"));
-  outputBtn.addEventListener("click", () => applyView("output"));
+  inputBtn.addEventListener("click",  () => { exitCompare(); applyView("input"); });
+  outputBtn.addEventListener("click", () => { exitCompare(); applyView("output"); });
 
   // Restore saved view (default to output)
   const saved = localStorage.getItem("nai-canvas-view") || "output";
   inputBtn.classList.toggle("cvt-btn--active", saved === "input");
   outputBtn.classList.toggle("cvt-btn--active", saved === "output");
+
+  // ── Compare Mode ──────────────────────────────────────────
+  let _compareMode = null; // null | "split" | "blend" | "flash"
+  let _splitPos    = 0.5;
+  let _flashInterval = null;
+
+  const splitBtn    = document.getElementById("cvt-split");
+  const blendBtn    = document.getElementById("cvt-blend");
+  const flashBtn    = document.getElementById("cvt-flash");
+  const compareBtns = [splitBtn, blendBtn, flashBtn].filter(Boolean);
+
+  function enableCompareButtons() {
+    const has = !!state.lastGeneratedImageBase64;
+    compareBtns.forEach(b => { b.disabled = !has; });
+  }
+
+  function exitCompare() {
+    if (!_compareMode) return;
+    _compareMode = null;
+    compareBtns.forEach(b => b.classList.remove("cvt-compare-btn--active"));
+
+    // Clean up flash listeners stored on container
+    const container = document.getElementById("compare-container");
+    if (container) {
+      if (typeof container._flashCleanup === "function") container._flashCleanup();
+      container.remove();
+    }
+
+    // Clean up flash interval
+    if (_flashInterval) { clearInterval(_flashInterval); _flashInterval = null; }
+
+    // Restore pose overlay
+    const poseSvg = document.getElementById("pose-skeleton-overlay");
+    if (poseSvg) poseSvg.style.display = "";
+  }
+
+  function enterCompare(mode) {
+    exitCompare();
+    if (!state.lastGeneratedImageBase64) return;
+    _compareMode = mode;
+
+    // Mark active button
+    const btnMap = { split: splitBtn, blend: blendBtn, flash: flashBtn };
+    if (btnMap[mode]) btnMap[mode].classList.add("cvt-compare-btn--active");
+
+    // Hide pose overlay during compare
+    const poseSvg = document.getElementById("pose-skeleton-overlay");
+    if (poseSvg) poseSvg.style.display = "none";
+
+    // Image sources
+    const inputSrc = state.lastImg2imgInput
+      ? "data:image/png;base64," + state.lastImg2imgInput
+      : (state.canvasImageBase64
+          ? "data:image/png;base64," + state.canvasImageBase64
+          : null);
+    const outputSrc = "data:image/png;base64," + state.lastGeneratedImageBase64;
+
+    const cdt = document.getElementById("canvas-drop-target");
+    if (!cdt) return;
+
+    // Build compare container
+    const container = document.createElement("div");
+    container.id = "compare-container";
+    container.className = "compare-container";
+
+    const imgInput = document.createElement("img");
+    imgInput.className = "compare-img-input";
+    imgInput.alt = "Input";
+    imgInput.src = inputSrc || outputSrc; // fallback to output if no input
+
+    const imgOutput = document.createElement("img");
+    imgOutput.className = "compare-img-output";
+    imgOutput.alt = "Output";
+    imgOutput.src = outputSrc;
+
+    if (mode === "split") {
+      _splitPos = 0.5;
+      container.appendChild(imgInput);
+      container.appendChild(imgOutput);
+
+      function updateSplit() {
+        const pct = (_splitPos * 100).toFixed(2);
+        imgInput.style.clipPath  = `inset(0 ${(100 - _splitPos * 100).toFixed(2)}% 0 0)`;
+        imgOutput.style.clipPath = `inset(0 0 0 ${pct}%)`;
+        divider.style.left = pct + "%";
+      }
+
+      const divider = document.createElement("div");
+      divider.className = "compare-divider";
+      container.appendChild(divider);
+      updateSplit();
+
+      let dragging = false;
+      divider.addEventListener("mousedown", (e) => {
+        dragging = true;
+        e.preventDefault();
+      });
+      function onMouseMove(e) {
+        if (!dragging) return;
+        const rect = container.getBoundingClientRect();
+        _splitPos = Math.max(0.02, Math.min(0.98, (e.clientX - rect.left) / rect.width));
+        updateSplit();
+      }
+      function onMouseUp() { dragging = false; }
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup",   onMouseUp);
+
+      container._flashCleanup = () => {
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup",   onMouseUp);
+      };
+
+    } else if (mode === "blend") {
+      container.appendChild(imgInput);
+      imgOutput.style.opacity = "0.5";
+      container.appendChild(imgOutput);
+
+      const wrap = document.createElement("div");
+      wrap.className = "compare-slider-wrap";
+
+      const labelIn = document.createElement("span");
+      labelIn.textContent = "Input";
+
+      const slider = document.createElement("input");
+      slider.type  = "range";
+      slider.min   = "0";
+      slider.max   = "100";
+      slider.value = "50";
+      slider.addEventListener("input", () => {
+        imgOutput.style.opacity = String(parseInt(slider.value, 10) / 100);
+      });
+
+      const labelOut = document.createElement("span");
+      labelOut.textContent = "Output";
+
+      wrap.appendChild(labelIn);
+      wrap.appendChild(slider);
+      wrap.appendChild(labelOut);
+      container.appendChild(wrap);
+
+      container._flashCleanup = null;
+
+    } else if (mode === "flash") {
+      // Default state: show output, spacebar reveals input
+      container.appendChild(imgInput);
+      container.appendChild(imgOutput);
+      imgInput.style.display = "none";
+      let showing = "output";
+
+      function onKeyDown(e) {
+        if (e.code === "Space" && _compareMode === "flash") {
+          e.preventDefault();
+          imgInput.style.display  = "";
+          imgOutput.style.display = "none";
+          showing = "input";
+        }
+      }
+      function onKeyUp(e) {
+        if (e.code === "Space" && _compareMode === "flash") {
+          e.preventDefault();
+          imgInput.style.display  = "none";
+          imgOutput.style.display = "";
+          showing = "output";
+        }
+      }
+      document.addEventListener("keydown", onKeyDown);
+      document.addEventListener("keyup",   onKeyUp);
+
+      // Auto-flash interval (toggles every 500ms)
+      _flashInterval = setInterval(() => {
+        if (_compareMode !== "flash") return;
+        if (showing === "output") {
+          imgInput.style.display  = "";
+          imgOutput.style.display = "none";
+          showing = "input";
+        } else {
+          imgInput.style.display  = "none";
+          imgOutput.style.display = "";
+          showing = "output";
+        }
+      }, 500);
+
+      container._flashCleanup = () => {
+        document.removeEventListener("keydown", onKeyDown);
+        document.removeEventListener("keyup",   onKeyUp);
+        if (_flashInterval) { clearInterval(_flashInterval); _flashInterval = null; }
+      };
+    }
+
+    cdt.appendChild(container);
+  }
+
+  // Wire compare buttons
+  compareBtns.forEach(btn => {
+    const modes = { "cvt-split": "split", "cvt-blend": "blend", "cvt-flash": "flash" };
+    const mode  = modes[btn.id];
+    if (!mode) return;
+    btn.addEventListener("click", () => {
+      if (_compareMode === mode) {
+        exitCompare();
+      } else {
+        enterCompare(mode);
+      }
+    });
+  });
+
+  // Periodically sync enable state after generation completes
+  enableCompareButtons();
+  setInterval(enableCompareButtons, 800);
 }
 
 /* ═══════════════════════════════════════════════════════════
