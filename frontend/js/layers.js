@@ -934,7 +934,7 @@ function _populateLayerPanel(container, idx) {
   poseToggle.checked = !!(layer.poseData && layer.poseData.enabled);
   poseToggle.addEventListener("change", () => {
     if (!layer.poseData) {
-      layer.poseData = { enabled: true, bodyType: "male", skinTone: "light", joints: getDefaultJoints("male"), poseStrength: 0.6 };
+      layer.poseData = { enabled: true, bodyType: "male", skinColor: "#ffdbac", joints: getDefaultJoints("male"), poseStrength: 0.6 };
     } else {
       layer.poseData.enabled = poseToggle.checked;
     }
@@ -972,27 +972,23 @@ function _populateLayerPanel(container, idx) {
     btRow.appendChild(btSelect);
     container.appendChild(btRow);
 
-    // Skin tone dropdown
+    // Skin color picker
     const stRow = document.createElement("div");
     stRow.className = "ltp-row";
     const stLabel = document.createElement("span");
     stLabel.className = "ltp-label";
     stLabel.textContent = "Skin";
-    const stSelect = document.createElement("select");
-    stSelect.className = "ltp-select";
-    ["light", "dark"].forEach((t) => {
-      const opt = document.createElement("option");
-      opt.value = t;
-      opt.textContent = t.charAt(0).toUpperCase() + t.slice(1);
-      if ((layer.poseData.skinTone || "light") === t) opt.selected = true;
-      stSelect.appendChild(opt);
-    });
-    stSelect.addEventListener("change", () => {
-      layer.poseData.skinTone = stSelect.value;
+    const stColor = document.createElement("input");
+    stColor.type = "color";
+    stColor.value = layer.poseData.skinColor || "#ffdbac";
+    stColor.style.cssText = "width:32px;height:24px;border:none;padding:0;cursor:pointer;background:none;";
+    stColor.addEventListener("input", () => {
+      layer.poseData.skinColor = stColor.value;
       saveLayersToStorage();
+      renderPoseSkeleton(idx);
     });
     stRow.appendChild(stLabel);
-    stRow.appendChild(stSelect);
+    stRow.appendChild(stColor);
     container.appendChild(stRow);
 
     // Strength slider

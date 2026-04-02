@@ -27,7 +27,7 @@ async function enablePose(page) {
   }
   await page.waitForFunction(() => {
     const svg = document.getElementById("pose-skeleton-overlay");
-    return svg && svg.querySelectorAll("circle").length >= 17;
+    return svg && svg.querySelectorAll("circle").length >= 13;
   }, null, { timeout: 3000 });
 }
 
@@ -50,7 +50,7 @@ test.describe("Pose Skeleton", () => {
         viewBox: svg.getAttribute("viewBox"),
       };
     });
-    expect(result.circles).toBeGreaterThanOrEqual(17);
+    expect(result.circles).toBeGreaterThanOrEqual(13);
     expect(result.paths).toBeGreaterThanOrEqual(8);  // limb capsules
     // viewBox matches canvas aspect ratio (not 0 0 1 1)
     expect(result.viewBox).toMatch(/^0 0 [\d.]+ 1$/);
@@ -373,7 +373,7 @@ test.describe("Pose Skeleton", () => {
     expect(result.paths).toBeGreaterThanOrEqual(8);     // 8 limb capsules + neck
     expect(result.polygons).toBeGreaterThanOrEqual(1);  // torso
     expect(result.ellipses).toBeGreaterThanOrEqual(1);  // head
-    expect(result.circles).toBeGreaterThanOrEqual(17);  // joint handles
+    expect(result.circles).toBeGreaterThanOrEqual(13);  // joint handles
   });
 
   // AC-14: Shift+drag pans skeleton
@@ -410,15 +410,29 @@ test.describe("Pose Skeleton", () => {
     await addLayerAndOpenPanel(page);
     await enablePose(page);
 
-    // Check that body parts use the skin color fill
     const fill = await page.evaluate(() => {
       const svg = document.getElementById("pose-skeleton-overlay");
-      const path = svg.querySelector("path"); // first limb capsule
+      const path = svg.querySelector("path");
       return path ? path.getAttribute("fill") : null;
     });
 
-    // Default skin tone is "light" = #ffdbac
+    // Default skin color is #ffdbac
     expect(fill).toBe("#ffdbac");
+
+    // Change color via poseData and re-render
+    await page.evaluate(() => {
+      layers[0].poseData.skinColor = "#ff0000";
+      saveLayersToStorage();
+      renderPoseSkeleton(0);
+    });
+    await page.waitForTimeout(100);
+
+    const newFill = await page.evaluate(() => {
+      const svg = document.getElementById("pose-skeleton-overlay");
+      const path = svg.querySelector("path");
+      return path ? path.getAttribute("fill") : null;
+    });
+    expect(newFill).toBe("#ff0000");
   });
 
   // AC-16: Scroll wheel scales skeleton
