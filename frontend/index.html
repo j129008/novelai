@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NovelAI — Image Generator</title>
-  <link rel="stylesheet" href="css/style.css?v=162">
+  <link rel="stylesheet" href="css/style.css?v=181">
 </head>
 <body>
   <div class="app">
@@ -763,6 +763,8 @@
           <div id="canvas-drop-target" class="canvas-drop-target">
             <div id="inpaint-active-badge" class="inpaint-active-badge" aria-hidden="true" style="display:none">Inpaint Mask</div>
             <canvas id="inpaint-mask-overlay" aria-hidden="true"></canvas>
+            <img id="pose-silhouette-preview" aria-hidden="true" style="display:none">
+            <svg id="pose-skeleton-overlay" aria-hidden="true"></svg>
             <button id="cvt-clear" class="cvt-clear" type="button" title="Clear canvas" style="display:none">&times;</button>
 
             <!-- Inline layer editor — overlays the displayed image in-place -->
@@ -1125,8 +1127,9 @@
   <script src="js/crop.js?v=134"></script>
   <script src="js/tag-intelligence.js?v=127"></script>
   <script src="js/tags.js?v=161"></script>
-  <script src="js/layers.js?v=163"></script>
-  <script src="js/generate.js?v=163"></script>
+  <script src="js/pose.js?v=182"></script>
+  <script src="js/layers.js?v=179"></script>
+  <script src="js/generate.js?v=178"></script>
 
   <script src="js/gallery.js?v=143"></script>
   <script src="js/explore.js?v=124"></script>

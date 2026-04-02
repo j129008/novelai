@@ -264,6 +264,47 @@ class LocalTagsBatchResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Pose Skeleton Rendering
+# ---------------------------------------------------------------------------
+
+class PoseJoints(BaseModel):
+    nose: list[float]           # [x, y], normalised 0.0–1.0
+    neck: list[float]
+    right_shoulder: list[float]
+    right_elbow: list[float]
+    right_wrist: list[float]
+    left_shoulder: list[float]
+    left_elbow: list[float]
+    left_wrist: list[float]
+    right_hip: list[float]
+    right_knee: list[float]
+    right_ankle: list[float]
+    left_hip: list[float]
+    left_knee: list[float]
+    left_ankle: list[float]
+    right_eye: list[float]
+    left_eye: list[float]
+    right_ear: list[float]
+    left_ear: list[float]
+
+
+class PoseFigure(BaseModel):
+    joints: PoseJoints
+    body_type: str = "male"   # "male" | "female" | "child"
+    skin_tone: str = "light"  # "light" | "dark"
+
+
+class RenderPoseRequest(BaseModel):
+    figures: list[PoseFigure]
+    width: int = Field(default=832, ge=64, le=4096)
+    height: int = Field(default=1216, ge=64, le=4096)
+
+
+class RenderPoseResponse(BaseModel):
+    image: str  # base64 PNG
+
+
+# ---------------------------------------------------------------------------
 # Gallery Organize — batch sort files by type into numbered subfolders
 # ---------------------------------------------------------------------------
 

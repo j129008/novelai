@@ -15,6 +15,46 @@ function clearOutput(outputEl) {
   if (ph) ph.remove();
 }
 
+// Composite a pose silhouette (RGBA, transparent bg) over the layer composite.
+// The pose image has transparent background — only the body shapes have pixels.
+// This means layer content (purple bg, etc.) shows through everywhere except the body.
+async function _compositePoseOverLayers(layerBase64, poseBase64, w, h) {
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+
+  // Draw layer composite (background — fully visible)
+  const layerImg = await _loadImg(`data:image/png;base64,${layerBase64}`);
+  ctx.drawImage(layerImg, 0, 0, w, h);
+
+  // Draw pose silhouette on top — transparent bg means only body shapes appear
+  const poseImg = await _loadImg(`data:image/png;base64,${poseBase64}`);
+  ctx.drawImage(poseImg, 0, 0, w, h);
+
+  return canvas.toDataURL("image/png").split(",")[1];
+}
+
+// For pose-only (no layers), flatten RGBA pose to white background
+async function _flattenPoseToWhiteBg(poseBase64, w, h) {
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, w, h);
+  const poseImg = await _loadImg(`data:image/png;base64,${poseBase64}`);
+  ctx.drawImage(poseImg, 0, 0, w, h);
+  return canvas.toDataURL("image/png").split(",")[1];
+}
+
+function _loadImg(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
 function setGenerateButtonStop() {
   const btn = $("#generate-btn");
   btn.classList.remove("loading");
@@ -118,6 +158,42 @@ async function generate() {
     state.img2img = null; // No layers active → pure text-to-image
   }
 
+  // Pose skeleton → img2img overlay / source
+  const poseFigures = collectPosePayload();
+  if (poseFigures.length > 0) {
+    try {
+      const poseResp = await fetch("/api/render-pose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ figures: poseFigures, width: width || 832, height: height || 1216 }),
+      });
+      if (poseResp.ok) {
+        const poseData = await poseResp.json();
+        const poseImage = poseData.image; // base64 PNG
+
+        if (state.img2img) {
+          // Composite pose body shapes over layer images (transparent bg = clean overlay)
+          state.img2img = await _compositePoseOverLayers(state.img2img, poseImage, width || 832, height || 1216);
+          // Keep user's strength setting
+        } else {
+          // Pose-only: flatten to white background for img2img
+          state.img2img = await _flattenPoseToWhiteBg(poseImage, width || 832, height || 1216);
+          // Use pose-specific strength only when pose is the sole source
+          const poseLayer = layers.find(l => l.poseData && l.poseData.enabled);
+          if (poseLayer && poseLayer.poseData.poseStrength !== undefined) {
+            body.strength = poseLayer.poseData.poseStrength;
+          } else {
+            body.strength = 0.6;
+          }
+        }
+
+        console.log("[generate] pose guide active, figures:", poseFigures.length, "strength:", body.strength);
+      }
+    } catch (err) {
+      console.warn("[generate] pose render failed:", err);
+    }
+  }
+
   const inpaintLayer = layers.find(l => l.inpaintMaskBase64);
   console.log("[generate] inpaintLayer:", inpaintLayer ? inpaintLayer.name : "none", "layers with inpaint mask:", layers.filter(l => l.inpaintMaskBase64).length);
   if (inpaintLayer && (state.img2img || state.canvasImageBase64)) {
@@ -179,6 +255,9 @@ async function generate() {
     actions.style.display = "flex";
     syncInpaintButtonVisibility();
     $("#info-seed").textContent = `Seed: ${data.seed}`;
+    if (poseFigures.length > 0) {
+      $("#info-seed").textContent += "  |  Pose guide active";
+    }
 
     // Output target layer: write result back into the designated layer
     const outputLayer = layers.find(l => l.isOutputTarget);

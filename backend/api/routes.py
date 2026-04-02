@@ -30,6 +30,7 @@ from models.schemas import (
     ExploreLink,
     ExplorePageRequest,
     ExplorePageResponse,
+    FlorenceAnalysis,
     GalleryFileItem,
     GalleryListResponse,
     GenerateRequest,
@@ -51,13 +52,15 @@ from models.schemas import (
     OrganizeRequest,
     OrganizeResponse,
     RecordCharactersRequest,
+    RenderPoseRequest,
+    RenderPoseResponse,
     SuggestTagsRequest,
     SuggestTagsResponse,
     TagSuggestion,
-    FlorenceAnalysis,
     WdTag,
 )
 from api.novelai import generate_image
+from api.pose import render_pose_image
 
 router = APIRouter(prefix="/api")
 
@@ -1733,5 +1736,20 @@ async def analyze_local_image(req: LocalAnalyzeRequest):
         grok_data = {"tags": result["tags"], "description": result["description"]}
         _write_tags_cache(cache_path, "grok", grok_data)
         return LocalAnalyzeResponse(grok=GrokAnalysis(**grok_data))
+
+
+# ---------------------------------------------------------------------------
+# Pose skeleton rendering
+# ---------------------------------------------------------------------------
+
+@router.post("/render-pose", response_model=RenderPoseResponse)
+async def render_pose(req: RenderPoseRequest):
+    """Render an OpenPose-format skeleton image from normalised joint coordinates."""
+    try:
+        img_bytes = render_pose_image(req.figures, req.width, req.height)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Pose rendering failed: {exc}")
+    img_b64 = base64.b64encode(img_bytes).decode()
+    return RenderPoseResponse(image=img_b64)
 
     raise HTTPException(status_code=400, detail="Invalid method")

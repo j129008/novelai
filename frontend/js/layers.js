@@ -16,6 +16,7 @@ function saveLayersToStorage() {
       offsetX: l.offsetX || 0,
       offsetY: l.offsetY || 0,
       scale: l.scale !== undefined ? l.scale : 1.0,
+      poseData: l.poseData || null,
     }));
     localStorage.setItem("nai-layers", JSON.stringify(data));
   } catch (e) {
@@ -43,7 +44,14 @@ function loadLayersFromStorage() {
         offsetX: l.offsetX || 0,
         offsetY: l.offsetY || 0,
         scale: typeof l.scale === "number" ? l.scale : 1.0,
+        poseData: l.poseData || null,
       });
+    });
+    // Migrate legacy "adult" body type → "male"
+    layers.forEach((l) => {
+      if (l.poseData && l.poseData.bodyType === "adult") {
+        l.poseData.bodyType = "male";
+      }
     });
   } catch (_) { /* corrupt storage — ignore */ }
 }
@@ -772,6 +780,8 @@ function renderLayerStrip() {
         tabsList.querySelectorAll(".layer-tab").forEach((t, i) => {
           t.classList.toggle("layer-tab--active", i === _activeLayerIdx);
         });
+        // Update pose skeleton to reflect new active layer
+        if (typeof renderPoseSkeleton === "function") renderPoseSkeleton(idx);
         const panel = document.getElementById("layer-tab-panel");
         if (wasActive && panel && panel.style.display !== "none") {
           panel.style.display = "none";
@@ -908,6 +918,124 @@ function _populateLayerPanel(container, idx) {
   });
   scRow.appendChild(scLabel); scRow.appendChild(scSlider); scRow.appendChild(scVal);
   container.appendChild(scRow);
+
+  // ── Pose Skeleton ──────────────────────────────────────
+  const poseSep = document.createElement("div");
+  poseSep.className = "ltp-sep";
+  container.appendChild(poseSep);
+
+  const poseRow = document.createElement("div");
+  poseRow.className = "ltp-row";
+  const poseLabel = document.createElement("span");
+  poseLabel.className = "ltp-label";
+  poseLabel.textContent = "Pose";
+  const poseToggle = document.createElement("input");
+  poseToggle.type = "checkbox";
+  poseToggle.checked = !!(layer.poseData && layer.poseData.enabled);
+  poseToggle.addEventListener("change", () => {
+    if (!layer.poseData) {
+      layer.poseData = { enabled: true, bodyType: "male", skinTone: "light", joints: getDefaultJoints("male"), poseStrength: 0.6 };
+    } else {
+      layer.poseData.enabled = poseToggle.checked;
+    }
+    saveLayersToStorage();
+    renderPoseSkeleton(idx);
+    _populateLayerPanel(container, idx);
+  });
+  poseRow.appendChild(poseLabel);
+  poseRow.appendChild(poseToggle);
+  container.appendChild(poseRow);
+
+  if (layer.poseData && layer.poseData.enabled) {
+    // Body type dropdown
+    const btRow = document.createElement("div");
+    btRow.className = "ltp-row";
+    const btLabel = document.createElement("span");
+    btLabel.className = "ltp-label";
+    btLabel.textContent = "Body";
+    const btSelect = document.createElement("select");
+    btSelect.className = "ltp-select";
+    ["male", "female", "child"].forEach((t) => {
+      const opt = document.createElement("option");
+      opt.value = t;
+      opt.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+      if (layer.poseData.bodyType === t) opt.selected = true;
+      btSelect.appendChild(opt);
+    });
+    btSelect.addEventListener("change", () => {
+      layer.poseData.bodyType = btSelect.value;
+      layer.poseData.joints = getDefaultJoints(btSelect.value);
+      saveLayersToStorage();
+      renderPoseSkeleton(idx);
+    });
+    btRow.appendChild(btLabel);
+    btRow.appendChild(btSelect);
+    container.appendChild(btRow);
+
+    // Skin tone dropdown
+    const stRow = document.createElement("div");
+    stRow.className = "ltp-row";
+    const stLabel = document.createElement("span");
+    stLabel.className = "ltp-label";
+    stLabel.textContent = "Skin";
+    const stSelect = document.createElement("select");
+    stSelect.className = "ltp-select";
+    ["light", "dark"].forEach((t) => {
+      const opt = document.createElement("option");
+      opt.value = t;
+      opt.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+      if ((layer.poseData.skinTone || "light") === t) opt.selected = true;
+      stSelect.appendChild(opt);
+    });
+    stSelect.addEventListener("change", () => {
+      layer.poseData.skinTone = stSelect.value;
+      saveLayersToStorage();
+    });
+    stRow.appendChild(stLabel);
+    stRow.appendChild(stSelect);
+    container.appendChild(stRow);
+
+    // Strength slider
+    const strRow = document.createElement("div");
+    strRow.className = "ltp-row";
+    const strLabel = document.createElement("span");
+    strLabel.className = "ltp-label";
+    strLabel.textContent = "Strength";
+    const strSlider = document.createElement("input");
+    strSlider.type = "range";
+    strSlider.className = "ltp-slider";
+    strSlider.min = "0";
+    strSlider.max = "1";
+    strSlider.step = "0.05";
+    strSlider.value = String(layer.poseData.poseStrength !== undefined ? layer.poseData.poseStrength : 0.6);
+    const strVal = document.createElement("span");
+    strVal.className = "ltp-val";
+    strVal.textContent = Math.round((layer.poseData.poseStrength !== undefined ? layer.poseData.poseStrength : 0.6) * 100) + "%";
+    strSlider.addEventListener("input", () => {
+      layer.poseData.poseStrength = parseFloat(strSlider.value);
+      strVal.textContent = Math.round(layer.poseData.poseStrength * 100) + "%";
+      saveLayersToStorage();
+    });
+    strRow.appendChild(strLabel);
+    strRow.appendChild(strSlider);
+    strRow.appendChild(strVal);
+    container.appendChild(strRow);
+
+    // Reset button
+    const poseResetRow = document.createElement("div");
+    poseResetRow.className = "ltp-actions";
+    const poseResetBtn = document.createElement("button");
+    poseResetBtn.className = "ltp-btn";
+    poseResetBtn.type = "button";
+    poseResetBtn.textContent = "Reset Pose";
+    poseResetBtn.title = "Reset joints to default position for this body type";
+    poseResetBtn.addEventListener("click", () => {
+      resetLayerPose(idx);
+      _populateLayerPanel(container, idx);
+    });
+    poseResetRow.appendChild(poseResetBtn);
+    container.appendChild(poseResetRow);
+  }
 
   // Tool actions
   const tools = document.createElement("div");
@@ -1837,6 +1965,10 @@ function setupCanvasViewToggle() {
     localStorage.setItem("nai-canvas-view", view);
     inputBtn.classList.toggle("cvt-btn--active", view === "input");
     outputBtn.classList.toggle("cvt-btn--active", view === "output");
+    // Show/hide pose skeleton overlay based on view
+    const poseSvg = document.getElementById("pose-skeleton-overlay");
+    if (poseSvg) poseSvg.style.display = view === "input" ? "" : "none";
+
     if (view === "input") {
       inputBtn.classList.remove("cvt-btn--changed");
       // Show source: composite preview (NovelAI) or source image (Grok)

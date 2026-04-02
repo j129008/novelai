@@ -4471,6 +4471,56 @@ details.accordion[open] .accordion-header { color: var(--text-primary); border-b
   border-radius: var(--radius-xl);
 }
 
+/* ─── Pose skeleton SVG overlay ─── */
+#pose-silhouette-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+  z-index: 10; /* below skeleton overlay (11), above inpaint mask */
+  opacity: 0.85;
+}
+#pose-skeleton-overlay {
+  position: absolute;
+  left: 0; top: 0; width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 11; /* above inpaint-mask-overlay (z:2/10), below char-markers (z:30) */
+}
+#pose-skeleton-overlay circle {
+  pointer-events: all;
+  cursor: grab;
+  transition: r 0.1s, fill 0.1s;
+}
+#pose-skeleton-overlay circle:hover {
+  r: 0.009;
+  fill: var(--accent-bright);
+}
+#pose-skeleton-overlay circle.dragging {
+  cursor: grabbing;
+  fill: var(--accent-bright);
+}
+
+/* ─── Layer tab panel — pose controls ─── */
+.ltp-sep {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 2px 0;
+}
+.ltp-select {
+  flex: 1;
+  font-size: 0.68rem;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-deep);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+  cursor: pointer;
+}
+.ltp-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+
 /* ─── Inpaint active badge ─── */
 .inpaint-active-badge {
   position: absolute;
