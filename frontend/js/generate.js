@@ -230,9 +230,10 @@ async function generate() {
     state.canvasImageWidth = width;
     state.canvasImageHeight = height;
 
-    // Only show generated image in #output when viewing Output mode
-    // (Input mode shows the layer composite — don't overwrite it)
-    if (_canvasView !== "input") {
+    // Show generated image — auto-switch to output view if on input
+    {
+      const cvtOutput = document.getElementById("cvt-output");
+      if (_canvasView === "input" && cvtOutput) cvtOutput.click();
       const output = $("#output");
       const img = document.createElement("img");
       img.src = `data:image/png;base64,${data.image}`;
@@ -270,12 +271,6 @@ async function generate() {
       refreshCompositePreview();
     }
 
-    // Don't force-switch view — respect user's choice.
-    // If on Input view, mark Output as changed so they know a new image arrived.
-    if (_canvasView === "input") {
-      const cvtOutput = document.getElementById("cvt-output");
-      if (cvtOutput) cvtOutput.classList.add("cvt-btn--changed");
-    }
     updateCanvasPanel();
 
     loadGallery();
@@ -392,6 +387,11 @@ async function generateGrokImage() {
     state.canvasImageWidth = null;
     state.canvasImageHeight = null;
 
+    // Auto-switch to output view if on input
+    {
+      const cvtOutput = document.getElementById("cvt-output");
+      if (_canvasView === "input" && cvtOutput) cvtOutput.click();
+    }
     const output = $("#output");
     const img = document.createElement("img");
     img.src = `data:image/png;base64,${data.image}`;
@@ -405,12 +405,6 @@ async function generateGrokImage() {
     updateCanvasPanel(); // Show Input/Output toggle for Grok
     const infoSeed = $("#info-seed");
     if (infoSeed) infoSeed.textContent = state.img2img ? "Grok (edit)" : "Grok";
-
-    // Don't force-switch view — respect user's choice
-    if (_canvasView === "input") {
-      const cvtOutput = document.getElementById("cvt-output");
-      if (cvtOutput) cvtOutput.classList.add("cvt-btn--changed");
-    }
 
     loadGallery();
     if (window._savePromptToHistory) window._savePromptToHistory();
